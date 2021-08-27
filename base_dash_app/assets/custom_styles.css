@@ -1,0 +1,26 @@
+.DateInput {
+    height: 26px !important;
+    vertical-align: top;
+}
+
+.SingleDatePicker, .SingleDatePickerInput {
+    height: 38px !important;
+}
+
+.DateInput_input, .DateInput_input_1 {
+    color: inherit !important;
+    text-align: center;
+    font-size: 16px ! important;
+    height: 26px !important;
+    line-height: 16px !important;
+    width: inherit !important;
+    padding: 5px !important;
+}
+
+.display_on_parent_hover_only {
+    visibility: hidden;
+}
+
+.display_child_on_hover_only:hover .display_on_parent_hover_only {
+    visibility: visible;
+}
