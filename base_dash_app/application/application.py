@@ -13,6 +13,7 @@ from base_dash_app.components.navbar import NavBar
 from base_dash_app.services.base_service import BaseService
 from base_dash_app.utils.db_utils import DbManager
 from base_dash_app.views.base_view import BaseView
+from base_dash_app.virtual_objects.interfaces.Startable import Startable, ExternalTriggerEvent
 
 
 class AppDescriptor:
@@ -20,11 +21,15 @@ class AppDescriptor:
     Used to define the service with as much granular control as needed.
     """
     def __init__(
-        self, *, db_file: str, title: str = None, service_classes: List[Type[BaseService]] = None,
-        external_stylesheets: List[str] = None, views: List[Type[BaseView]] = None,
+        self, *,
+            title: str = None,
+            service_classes: List[Type[BaseService]] = None,
+            external_stylesheets: List[str] = None,
+            views: List[Type[BaseView]] = None,
+            db_file: str = None,
     ):
         """
-        :param db_file: Required - location of sqlite db file
+        :param db_file: Optional - location of an sqlite db file
         :param title: Optional - Title of app
         :param service_classes: Optional - list of all uninitialized service classes that extend BaseService
         :param external_stylesheets:
@@ -32,8 +37,6 @@ class AppDescriptor:
             the app
         """
 
-        if db_file is None:
-            raise Exception("Can't start application without db_file")
         self.db_file: str = db_file
         self.title: str = title if title is not None else ""
         self.service_classes: List[Type[BaseService]] = service_classes if service_classes is not None else []
@@ -52,8 +55,10 @@ class RuntimeApplication:
         )
 
         self.server = self.app.server
+        self.dbm = None
 
-        self.dbm = DbManager(app_descriptor.db_file)
+        if app_descriptor.db_file is not None:
+            self.dbm = DbManager(app_descriptor.db_file)
 
         # define services #
         self.services: Dict[Type, BaseService] = {}
@@ -99,8 +104,13 @@ class RuntimeApplication:
 
         self.app.layout = self.get_layout
 
-    def run_server(self, debug=False, host="0.0.0.0"):
-        # self.dbm.upgrade_db()
+    def run_server(self, debug=False, host="0.0.0.0", upgrade_db=False):
+        if self.dbm is not None and upgrade_db:
+            self.dbm.upgrade_db()
+
+        for startable in Startable.STARTABLE_DICT[ExternalTriggerEvent.SERVER_START]:
+            startable.start()
+
         self.app.run_server(debug=debug, host=host)
 
     def initialize_navbar(self) -> NavBar:

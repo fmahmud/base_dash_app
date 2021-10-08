@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Pattern, Callable
+from typing import Pattern, Callable, Optional
 
 from base_dash_app.components.base_component import BaseComponent
 from base_dash_app.utils.db_utils import DbManager
@@ -9,7 +9,8 @@ class BaseView(BaseComponent, ABC):
     VIEWS = []
 
     def __init__(self, title: str, url_regex: Pattern[str],
-                 register_callback_func: Callable, dbm: DbManager,
+                 register_callback_func: Callable,
+                 dbm: Optional[DbManager] = None,
                  nav_url: str = "", show_in_navbar: bool = True,
                  service_provider: Callable = None):
         self.title = title,
@@ -19,7 +20,7 @@ class BaseView(BaseComponent, ABC):
         self.show_in_navbar = show_in_navbar
         self.register_callback_func = register_callback_func
         self.get_service = service_provider
-        self.dbm = dbm
+        self.dbm: Optional[DbManager] = dbm
 
         if self not in BaseView.VIEWS:
             BaseView.VIEWS.append(self)

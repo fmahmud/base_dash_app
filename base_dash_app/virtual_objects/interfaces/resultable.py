@@ -2,11 +2,12 @@ from abc import ABC, abstractmethod
 from typing import Callable, Optional
 
 from base_dash_app.enums.status_colors import StatusColors
+from base_dash_app.virtual_objects.result import Result
 
 
 class Resultable(ABC):
     @abstractmethod
-    def get_result(self, *, perspective: Callable[['Resultable'], Optional[int]] = None):
+    def get_result(self, *, perspective: Callable[['Resultable'], Optional[int]] = None) -> Result:
         """
         A resultable object contains a prior result, computed in the past. This function
         returns that value. Optionally, this result can have perspectives, in the case
@@ -19,19 +20,6 @@ class Resultable(ABC):
         """
         pass
 
-    @staticmethod
-    def get_status_color_from_result(result):
-        # todo: potentially bad as None means in progress and not included... fix
-        if result is None:
-            return StatusColors.IN_PROGRESS
-
-        if result < 0:
-            return StatusColors.FAILURE
-        elif result == 0:
-            return StatusColors.WARNING
-        else:
-            return StatusColors.SUCCESS
-
     @abstractmethod
-    def get_status_color(self, *, perspective=None):
-        return Resultable.get_status_color_from_result(self.get_result(perspective=perspective))
+    def get_status_color(self, *, perspective=None) -> StatusColors:
+        return self.get_result(perspective=perspective).status_color

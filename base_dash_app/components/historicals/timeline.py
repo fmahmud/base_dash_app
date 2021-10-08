@@ -7,6 +7,9 @@ from base_dash_app.virtual_objects.interfaces.resultable_event import Resultable
 
 
 class Timeline(BaseComponent):
+    """
+        Experimental: under construction!
+    """
     def render(self, *, events: List[ResultableEvent]):
         if len(events) == 0:
             return None
