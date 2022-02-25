@@ -5,10 +5,10 @@ from base_dash_app.utils.utils import apply
 
 
 class Request:
-    def __init__(self, method: HttpMethod, url, url_params=None, body=None, headers=None, auth=()):
+    def __init__(self, method: HttpMethod, url, query_params=None, body=None, headers=None, auth=()):
         self.method: HttpMethod = method
         self.url: str = url
-        self.url_params: Dict[str, str] = url_params
+        self.query_params: Dict[str, str] = query_params
         self.body = body
         self.headers: Dict[str, str] = headers
         self.auth: Tuple[str, str] = auth
@@ -23,7 +23,7 @@ class Request:
         return {
             "method": self.method.to_dict(),
             "url": self.url,
-            "url_params": self.url_params,
+            "query_params": self.query_params,
             "body": self.body,
             "headers": self.headers,
             "auth": self.auth,
@@ -36,10 +36,10 @@ class Request:
         self.headers = apply(self.headers, headers)
 
     def add_url_params(self, params: Dict[str, str]):
-        if self.url_params is None:
-            self.url_params = {}
+        if self.query_params is None:
+            self.query_params = {}
 
-        self.url_params = apply(self.url_params, params)
+        self.query_params = apply(self.query_params, params)
 
     def set_auth(self, username, password):
         if self.auth is None:

@@ -5,6 +5,13 @@ from collections import Counter
 ELO_K = 80
 SIMPLE_DATE_FORMAT = "%d %b %Y"
 
+
+def apply_all_to_dict(a: dict, **kwargs):
+    for k, v in kwargs.items():
+        a[k] = v
+    return a
+
+
 def apply(a: dict, b: dict):
     to_return = dict(a)
     for k, v in b.items():

@@ -13,5 +13,7 @@ class NavBar(BaseComponent):
             brand=self.title,
             color="primary",
             sticky="top",
-            dark=True
+            dark=True,
+            style={"boxShadow": "0 2px 2px -2px rgba(0,0,0,.2)"}
+
         )

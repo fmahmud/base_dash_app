@@ -24,7 +24,6 @@ def render_from_stc_list(status_to_count_list: List['StatusToCount']):
                 dbc.Progress(value=100 * stc.count / total, color=stc.color, bar=True)
                 for stc in status_to_count_list
             ],
-            multi=True,
             style={"marginTop": "20px", "marginRight": "20px"},
             id="ratio_bar_id_" + str(ratio_bar_id)
         ),
@@ -72,7 +71,6 @@ def render(successes, failures, warns=0, in_progress=0):
                 dbc.Progress(value=100 * failures / total, color="danger", bar=True),
                 dbc.Progress(value=100 * in_progress / total, color="info", bar=True),
             ],
-            multi=True,
             style={"marginTop": "20px", "marginRight": "20px"},
             id="ratio_bar_id_" + str(ratio_bar_id)
         ),

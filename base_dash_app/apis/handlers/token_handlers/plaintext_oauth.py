@@ -44,7 +44,7 @@ class PlaintextOAuthHandler(TokenHandler):
         request = Request(
             method=HttpMethods.POST.value,
             url=self.oauth_provider.token_endpoint,
-            url_params={},
+            query_params={},
             body={
                 "email": client_id,
                 "password": {
