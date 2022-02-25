@@ -1,6 +1,7 @@
 import dash_bootstrap_components as dbc
 
-from base_dash_app.application.application import AppDescriptor, RuntimeApplication
+from base_dash_app.application.runtime_application import RuntimeApplication
+from base_dash_app.application.app_descriptor import AppDescriptor
 from demo_app.demo_view import DemoView
 
 external_stylesheets = [
@@ -15,4 +16,4 @@ my_app_descriptor = AppDescriptor(
 )
 
 app = RuntimeApplication(my_app_descriptor)
-app.run_server(debug=True)
+app.run_server(debug=False)

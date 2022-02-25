@@ -28,7 +28,7 @@ class OAuthTokenHandler(TokenHandler):
         request = Request(
             method=HttpMethods.POST.value,
             url=self.oauth_provider.token_endpoint,
-            url_params={},
+            query_params={},
             body={
                 "client_id": client_id,
                 "client_secret": client_secret,

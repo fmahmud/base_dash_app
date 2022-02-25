@@ -24,8 +24,10 @@ def __make_call(url, func, headers=get_base_header(), body={}, url_params={}, au
         if i > 0:
             logger.info("...retrying")
         try:
-            response = func(url=url, headers=headers,
-                            data=json.dumps(body), params=url_params, auth=auth, timeout=200)
+            response = func(
+                url=url, headers=headers,
+                data=json.dumps(body), params=url_params, auth=auth, timeout=200
+            )
             if hasattr(response, 'status_code'):
                 status_code = response.status_code
             response.raise_for_status()
@@ -53,4 +55,4 @@ def __make_call(url, func, headers=get_base_header(), body={}, url_params={}, au
 def make_request(call: Request):
     logger.debug("Making request: %s", str(call))
     return __make_call(url=call.url, func=call.method.function,
-                headers=call.headers, body=call.body, url_params=call.url_params, auth=call.auth)
+                       headers=call.headers, body=call.body, url_params=call.query_params, auth=call.auth)

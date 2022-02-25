@@ -11,6 +11,9 @@ class Detailable(ABC):
     def get_detail_component(self):
         pass
 
+    def has_details(self):
+        return True
+
     # @abstractmethod
     # def get_text1(self):
     #     pass
