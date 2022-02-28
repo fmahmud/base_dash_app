@@ -21,7 +21,6 @@ nonce = 0
 
 class TodoList(BaseComponent):
     def __init__(self, register_callback_func: Callable, items: List[Task]):
-        super().__init__(register_callback_func)
         global nonce
         self.nonce = nonce
         nonce += 1
