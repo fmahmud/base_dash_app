@@ -81,5 +81,5 @@ def render(successes, failures, warns=0, in_progress=0):
 class StatusToCount:
     def __init__(self, state_name: str, color: StatusColors, count: int):
         self.name: str = state_name
-        self.color: str = str(color)
+        self.color: str = color.value.bootstrap_alt
         self.count: int = count
