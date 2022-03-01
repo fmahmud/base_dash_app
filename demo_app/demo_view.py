@@ -5,9 +5,12 @@ from typing import Callable
 from dash.dependencies import Output, Input, State
 from dash.exceptions import PreventUpdate
 
+from base_dash_app.components.data_visualization import ratio_bar
+from base_dash_app.components.data_visualization.ratio_bar import StatusToCount
 from base_dash_app.components.details import details
 from base_dash_app.components.details.details import DetailTextItem
 from base_dash_app.components.lists.todo_list.todo_list import TodoList
+from base_dash_app.enums.status_colors import StatusColors
 from base_dash_app.models.task import Task
 from base_dash_app.utils.db_utils import DbManager
 from base_dash_app.views.base_view import BaseView
@@ -103,7 +106,11 @@ class DemoView(BaseView):
         return html.Div(
             children=[
                 search_bar,
-                html.Div(children=[], id=SEARCH_RESULT_DIV_ID, style={"marginTop": "40px"})
+                html.Div(children=[], id=SEARCH_RESULT_DIV_ID, style={"marginTop": "40px"}),
+                ratio_bar.render_from_stc_list([
+                    StatusToCount(state_name="A", count=5, color=StatusColors.PENDING),
+                    StatusToCount(state_name="A", count=5, color=StatusColors.IN_PROGRESS)
+                ])
             ],
             style={"maxWidth": "1280px", "margin": "0 auto", "padding": "20px"}
         )
