@@ -14,6 +14,6 @@ class NavBar(BaseComponent):
             color="primary",
             sticky="top",
             dark=True,
-            style={"boxShadow": "0 2px 2px -2px rgba(0,0,0,.2)"}
-
+            style={"boxShadow": "0 2px 2px -2px rgba(0,0,0,.2)"},
+            fluid=True
         )

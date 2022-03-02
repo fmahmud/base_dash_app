@@ -12,15 +12,19 @@ T = TypeVar("T", bound=BaseModel)  # Declare type variable
 
 
 class BaseService(ABC, Generic[T]):
-    def __init__(self, dbm: Optional[DbManager], service_name: str, object_type: Type[T], service_provider: Callable = None):
+    def __init__(self, dbm: Optional[DbManager], service_name: str, object_type: Type[T] = None, service_provider: Callable = None):
         self.dbm: Optional[DbManager] = dbm
         self.logger = logging.getLogger(service_name)
         self.object_type = object_type
         self.get_service = service_provider
+        self.__service_name = service_name
 
     def get_by_id(self, id: int) -> T:
         if self.dbm is None:
             raise Exception("No DB configured.")
+
+        if self.object_type is None:
+            raise Exception(f"Service {self.__service_name} is not a model providing service.")
 
         session: Session = self.dbm.get_session()
         return session.query(self.object_type).filter_by(id=id).first()
@@ -29,12 +33,18 @@ class BaseService(ABC, Generic[T]):
         if self.dbm is None:
             raise Exception("No DB configured.")
 
+        if self.object_type is None:
+            raise Exception(f"Service {self.__service_name} is not a model providing service.")
+
         session: Session = self.dbm.get_session()
         return session.query(self.object_type).all()
 
     def save(self, target: T) -> T:
         if self.dbm is None:
             raise Exception("No DB configured.")
+
+        if self.object_type is None:
+            raise Exception(f"Service {self.__service_name} is not a model providing service.")
 
         session: Session = self.dbm.get_session()
         session.add(target)
@@ -45,6 +55,9 @@ class BaseService(ABC, Generic[T]):
     def save_all(self, targets: List[T]) -> List[T]:
         if self.dbm is None:
             raise Exception("No DB configured.")
+
+        if self.object_type is None:
+            raise Exception(f"Service {self.__service_name} is not a model providing service.")
 
         session: Session = self.dbm.get_session()
         session.add_all(targets)
