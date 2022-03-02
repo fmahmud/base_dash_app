@@ -16,8 +16,8 @@ class BaseView(BaseComponent, ABC):
 
     def __init__(
             self, title: str, url_regex: Pattern[str], register_callback_func: Callable,
-             dbm: Optional[DbManager] = None, nav_url: str = "", show_in_navbar: bool = True,
-             service_provider: Callable = None, input_to_states_map: List[InputToState] = None
+            dbm: Optional[DbManager] = None, nav_url: str = "", show_in_navbar: bool = True,
+            service_provider: Callable = None, input_to_states_map: List[InputToState] = None
     ):
         self.title: str = title
         self.url_regex = url_regex
@@ -80,7 +80,9 @@ class BaseView(BaseComponent, ABC):
     def raw_render(*args, **kwargs):
         pass
 
+    def handle_global_state_change(self, new_state):
+        pass
+
     # @staticmethod
     # def get_full_page_inputs():
     #     return []
-

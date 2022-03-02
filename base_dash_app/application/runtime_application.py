@@ -9,14 +9,15 @@ import dash_html_components as html
 from dash.dependencies import Output, Input, State
 
 from base_dash_app.application.app_descriptor import AppDescriptor
+from base_dash_app.components.callback_utils.mappers import InputToState
+from base_dash_app.components.callback_utils.utils import get_triggering_id_from_callback_context, \
+    get_state_values_for_input_from_args_list
 from base_dash_app.components.lists.todo_list.todo_list_item import TaskGroup
 from base_dash_app.components.navbar import NavBar
 from base_dash_app.services.base_service import BaseService
+from base_dash_app.services.global_state_service import GlobalStateService
 from base_dash_app.utils.db_utils import DbManager
 from base_dash_app.virtual_objects.interfaces.Startable import Startable, ExternalTriggerEvent
-
-
-# todo: split these two classes and name the files app_descriptor and runtime_application
 
 
 class RuntimeApplication:
@@ -35,51 +36,60 @@ class RuntimeApplication:
         if app_descriptor.db_file is not None:
             self.dbm = DbManager(app_descriptor.db_file)
 
-        # define services #
+        # define services
         self.services: Dict[Type, BaseService] = {}
 
-        # define APIs
-        # self.apis: Dict[Type, ]
+        # todo: define APIs
 
         def get_service_by_name(service_class: Type) -> BaseService:
             return self.services.get(service_class)
 
         base_service_args = {
             "dbm": self.dbm,
-            "service_provider": get_service_by_name
+            "service_provider": get_service_by_name,
         }
 
         self.services = {s: s(**base_service_args) for s in app_descriptor.service_classes}
+        self.services[GlobalStateService] = GlobalStateService(initial_state=app_descriptor.initial_global_state)
 
         base_view_args = {
             "register_callback_func": self.register_callback,
             "dbm": self.dbm,
-            "service_provider": get_service_by_name,
+            "service_provider": get_service_by_name
         }
 
-        components_with_internal_callbacks = [
-            # todo: support custom components through app descriptor
-            TaskGroup
-        ]
+        # components_with_internal_callbacks = [
+        #     # todo: support custom components through app descriptor
+        #     TaskGroup
+        # ]
 
         # define pages
         self.pages = [p(**base_view_args) for p in app_descriptor.views]
 
         wrapped_get_handler = self.bind_to_self(self.handle_get_call)
 
+        self.__global_inputs = app_descriptor.global_inputs
+        self.__global_input_string_ids_map = {its.get_input_string_id(): its for its in self.__global_inputs}
+        resulting_inputs = [Input('url', 'pathname'), Input('url', 'search')]
+        resulting_states = []
+        for g_input in app_descriptor.global_inputs:
+            g_input: InputToState
+            resulting_inputs.append(g_input.input.get_as_input())
+            resulting_states += [s.get_as_state() for s in g_input.states]
+
         self.register_callback(
             output=Output('page-content', 'children'),
-            inputs=[Input('url', 'pathname'), Input('url', 'search')],
+            inputs=resulting_inputs,
             function=wrapped_get_handler,
-            state=[]
+            state=resulting_states
         )
 
-        for comp in components_with_internal_callbacks:
-            callbacks = comp.get_callback_definitions()
-            for cb in callbacks:
-                self.register_callback(**cb)
+        # for comp in components_with_internal_callbacks:
+        #     callbacks = comp.get_callback_definitions()
+        #     for cb in callbacks:
+        #         self.register_callback(**cb)
 
-        self.navbar = self.initialize_navbar()
+        self.navbar = self.initialize_navbar(app_descriptor.extra_nav_bar_components)
 
         self.app.layout = self.get_layout
 
@@ -92,19 +102,24 @@ class RuntimeApplication:
 
         self.app.run_server(debug=debug, host=host)
 
-    def initialize_navbar(self) -> NavBar:
+    def initialize_navbar(self, extra_components: List) -> NavBar:
         nav_items = []
 
         for page in self.pages:
             if page.show_in_navbar:
-                nav_items.append(dbc.NavItem(
-                    dbc.NavLink(
-                        page.title,
-                        href=page.nav_url,
-                        external_link=False
-                    ),
-                    style={"fontSize": "16px"}
-                ))
+                nav_items.append(
+                    dbc.NavItem(
+                        dbc.NavLink(
+                            page.title,
+                            href=page.nav_url,
+                            external_link=False
+                        ),
+                        style={"fontSize": "16px"}
+                    )
+                )
+
+        for comp in extra_components:
+            nav_items.append(comp)
 
         return NavBar(title=self.app_descriptor.title, nav_items=nav_items)
 
@@ -120,6 +135,7 @@ class RuntimeApplication:
                         "margin": "0 auto"
                     }
                 ),
+                # todo - global alerts div
                 # html.Div(
                 #     id="alerts-div",
                 #     style={
@@ -139,13 +155,28 @@ class RuntimeApplication:
         setattr(self, func.__name__, bound_method)
         return bound_method
 
-    def handle_get_call(self, url: str, query_params: str):
+    def handle_get_call(self, url: str, query_params: str, *args):
+        triggering_id, index = get_triggering_id_from_callback_context(dash.callback_context)
+
+        actual_id = None
+        for k in self.__global_input_string_ids_map.keys():
+            if triggering_id.startswith(k):
+                actual_id = k
+                break
+
+        if actual_id is not None:
+            states_for_input = get_state_values_for_input_from_args_list(
+                input_id=actual_id, input_string_ids_map=self.__global_input_string_ids_map, args_list=args
+            )
+        else:
+            states_for_input = {}
+
         decoded_url = unquote(url)
         decoded_params = unquote(query_params)
         for page in self.pages:
             if page.matches(decoded_url):
                 try:
-                    return page.render(decoded_params)
+                    return page.render(decoded_params, states_for_input)
                 except Exception as e:
                     traceback.print_exc()
                     return html.Div("Page under construction")
