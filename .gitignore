@@ -130,3 +130,5 @@ dmypy.json
 
 .idea/
 /demo_app/temp.db
+
+.DS_Store
