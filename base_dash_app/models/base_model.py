@@ -33,6 +33,5 @@ class BaseModel(get_base_class(), ABC, metaclass=DeclarativeABCMeta):
     def __str__(self):
         pass
 
-    @abstractmethod
     def to_dict(self):
-        pass
+        return vars(self)
