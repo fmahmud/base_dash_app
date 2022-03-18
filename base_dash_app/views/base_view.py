@@ -6,7 +6,8 @@ from dash.dependencies import Output
 from dash.exceptions import PreventUpdate
 
 from base_dash_app.components.base_component import BaseComponent
-from base_dash_app.components.callback_utils.utils import invalid_n_clicks, get_triggering_id_from_callback_context
+from base_dash_app.components.callback_utils.utils import invalid_n_clicks, get_triggering_id_from_callback_context, \
+    get_state_values_for_input_from_args_list
 from base_dash_app.components.callback_utils.mappers import InputToState
 from base_dash_app.utils.db_utils import DbManager
 
@@ -17,7 +18,8 @@ class BaseView(BaseComponent, ABC):
     def __init__(
             self, title: str, url_regex: Pattern[str], register_callback_func: Callable,
             dbm: Optional[DbManager] = None, nav_url: str = "", show_in_navbar: bool = True,
-            service_provider: Callable = None, input_to_states_map: List[InputToState] = None
+            service_provider: Callable = None, input_to_states_map: List[InputToState] = None,
+            api_provider: Callable = None
     ):
         self.title: str = title
         self.url_regex = url_regex
@@ -26,6 +28,7 @@ class BaseView(BaseComponent, ABC):
         self.show_in_navbar = show_in_navbar
         self.register_callback_func = register_callback_func
         self.get_service = service_provider
+        self.get_api = api_provider
         self.dbm: Optional[DbManager] = dbm
         self.input_to_states_map: List[InputToState] = input_to_states_map if input_to_states_map else []
         self.input_string_ids_map = {its.get_input_string_id(): its for its in self.input_to_states_map}
@@ -42,6 +45,13 @@ class BaseView(BaseComponent, ABC):
 
         if self not in BaseView.VIEWS:
             BaseView.VIEWS.append(self)
+
+    def get_callback_state(self, input_id, args):
+        return get_state_values_for_input_from_args_list(
+            input_id=input_id,
+            input_string_ids_map=self.input_string_ids_map,
+            args_list=list(args[len(self.input_to_states_map):])
+        )
 
     def _pre_handle_any_input(self, *args):
         if all(invalid_n_clicks(i) for i in args[0:len(self.input_to_states_map)]):
