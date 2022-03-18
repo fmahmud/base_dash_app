@@ -12,12 +12,19 @@ T = TypeVar("T", bound=BaseModel)  # Declare type variable
 
 
 class BaseService(ABC, Generic[T]):
-    def __init__(self, dbm: Optional[DbManager], service_name: str, object_type: Type[T] = None, service_provider: Callable = None):
+    def __init__(
+            self, dbm: Optional[DbManager],
+            service_name: str = None,
+            object_type: Type[T] = None,
+            service_provider: Callable = None,
+            api_provider: Callable = None
+    ):
         self.dbm: Optional[DbManager] = dbm
-        self.logger = logging.getLogger(service_name)
+        self.__service_name = service_name if service_name is not None else self.__class__.__name__
+        self.logger = logging.getLogger(self.__service_name)
         self.object_type = object_type
         self.get_service = service_provider
-        self.__service_name = service_name
+        self.get_api = api_provider
 
     def get_by_id(self, id: int) -> T:
         if self.dbm is None:
@@ -48,7 +55,11 @@ class BaseService(ABC, Generic[T]):
 
         session: Session = self.dbm.get_session()
         session.add(target)
-        session.commit()
+        try:
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            raise e
 
         return target
 
@@ -61,6 +72,10 @@ class BaseService(ABC, Generic[T]):
 
         session: Session = self.dbm.get_session()
         session.add_all(targets)
-        session.commit()
+        try:
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            raise e
 
         return targets

@@ -12,7 +12,7 @@ external_stylesheets = [
 
 my_app_descriptor = AppDescriptor(
     db_file="./temp.db", title="Test App", external_stylesheets=external_stylesheets,
-    views=[DemoView]
+    views=[DemoView], view_groups={"Test": [DemoView]}
 )
 
 app = RuntimeApplication(my_app_descriptor)

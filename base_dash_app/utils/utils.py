@@ -13,6 +13,15 @@ def apply_all_to_dict(a: dict, **kwargs):
 
 
 def apply(a: dict, b: dict):
+    if a is None and b is not None:
+        return b
+
+    if b is None and a is not None:
+        return a
+
+    if a is None and b is None:
+        return None
+
     to_return = dict(a)
     for k, v in b.items():
         to_return[k] = v

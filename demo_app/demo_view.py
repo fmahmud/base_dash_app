@@ -27,13 +27,12 @@ SEARCH_RESULT_DIV_ID = "search-result-div-id"
 
 
 class DemoView(BaseView):
-    def __init__(self, register_callback_func: Callable, dbm: DbManager, service_provider: Callable):
+    def __init__(self, **kwargs):
         super().__init__(
-            "Demo View", re.compile("^/demo$"), register_callback_func,
-            show_in_navbar=True, nav_url="/demo", service_provider=service_provider, dbm=dbm
+            "Demo View", re.compile("^/demo$"), show_in_navbar=True, nav_url="/demo", **kwargs
         )
         self.todo_list_component = TodoList(
-            register_callback_func,
+            self.register_callback_func,
             [
                 Task("Item 1", "Do item 1 really well."),
                 Task("Item 2", "Do item 2 really well."),
@@ -44,7 +43,7 @@ class DemoView(BaseView):
         self.watchlist = []
         self.finnhub_client = finnhub.Client(api_key="c7o457qad3idf06mmdc0")
 
-        register_callback_func(
+        self.register_callback_func(
             output=Output(SEARCH_RESULT_DIV_ID, "children"),
             inputs=[Input(SEARCH_BUTTON_ID, "n_clicks")],
             state=[State(SEARCH_BAR_ID, "value")],
@@ -109,11 +108,11 @@ class DemoView(BaseView):
                 html.Div(children=[], id=SEARCH_RESULT_DIV_ID, style={"marginTop": "40px"}),
                 ratio_bar.render_from_stc_list([
                     StatusToCount(state_name="A", count=5, color=StatusColors.PENDING),
-                    StatusToCount(state_name="A", count=5, color=StatusColors.IN_PROGRESS)
+                    StatusToCount(state_name="B", count=5, color=StatusColors.IN_PROGRESS)
                 ])
             ],
             style={"maxWidth": "1280px", "margin": "0 auto", "padding": "20px"}
         )
 
-    def render(self, query_params):
+    def render(self, query_params, *args):
         return DemoView.raw_render(self.watchlist)

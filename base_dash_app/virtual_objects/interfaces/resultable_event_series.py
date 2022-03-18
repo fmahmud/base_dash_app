@@ -60,14 +60,14 @@ class ResultableEventSeries(ABC):
 
         if cached_result.result is None:
             self.uncategorized_events.append(cached_result)
-        elif cached_result.result < 0:
+        elif cached_result.result.result < 0:
             self.failed_events.append(cached_result)
-        elif cached_result.result == 0:
+        elif cached_result.result.result == 0:
             self.warning_events.append(cached_result)
         else:
             self.success_events.append(cached_result)
 
-        self.compute_stats_for_result(cached_result.result, cached_result.get_date())
+        self.compute_stats_for_result(cached_result.result.result, cached_result.get_date())
 
     def process_result(self, result: float, resultable_event: ResultableEvent):
         cached_result = CachedResultableEvent(result, resultable_event.get_date(), original_re=resultable_event)

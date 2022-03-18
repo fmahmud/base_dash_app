@@ -8,20 +8,28 @@ import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Output, Input, State
 
+from base_dash_app.apis.api import API
 from base_dash_app.application.app_descriptor import AppDescriptor
 from base_dash_app.components.callback_utils.mappers import InputToState
 from base_dash_app.components.callback_utils.utils import get_triggering_id_from_callback_context, \
     get_state_values_for_input_from_args_list
 from base_dash_app.components.lists.todo_list.todo_list_item import TaskGroup
-from base_dash_app.components.navbar import NavBar
+from base_dash_app.components.navbar import NavBar, NavDefinition, NavGroup
 from base_dash_app.services.base_service import BaseService
 from base_dash_app.services.global_state_service import GlobalStateService
 from base_dash_app.utils.db_utils import DbManager
+from base_dash_app.views.base_view import BaseView
 from base_dash_app.virtual_objects.interfaces.Startable import Startable, ExternalTriggerEvent
 
 
 class RuntimeApplication:
     def __init__(self, app_descriptor: AppDescriptor):
+        from base_dash_app.utils.logger_utils import configure_logging
+        configure_logging(
+            logging_format=app_descriptor.logging_format,
+            log_level=app_descriptor.log_level
+        )
+
         self.app_descriptor = app_descriptor
 
         self.app = dash.Dash(
@@ -39,14 +47,20 @@ class RuntimeApplication:
         # define services
         self.services: Dict[Type, BaseService] = {}
 
-        # todo: define APIs
-
         def get_service_by_name(service_class: Type) -> BaseService:
             return self.services.get(service_class)
+
+        self.apis: Dict[Type, API] = {}
+        for api_type in app_descriptor.apis:
+            self.apis[api_type] = api_type()
+
+        def get_api_by_name(api_class: Type) -> API:
+            return self.apis.get(api_class)
 
         base_service_args = {
             "dbm": self.dbm,
             "service_provider": get_service_by_name,
+            "api_provider": get_api_by_name
         }
 
         self.services = {s: s(**base_service_args) for s in app_descriptor.service_classes}
@@ -54,8 +68,7 @@ class RuntimeApplication:
 
         base_view_args = {
             "register_callback_func": self.register_callback,
-            "dbm": self.dbm,
-            "service_provider": get_service_by_name
+            **base_service_args
         }
 
         # components_with_internal_callbacks = [
@@ -89,7 +102,7 @@ class RuntimeApplication:
         #     for cb in callbacks:
         #         self.register_callback(**cb)
 
-        self.navbar = self.initialize_navbar(app_descriptor.extra_nav_bar_components)
+        self.navbar = self.initialize_navbar(app_descriptor.extra_nav_bar_components, app_descriptor.view_groups)
 
         self.app.layout = self.get_layout
 
@@ -102,26 +115,35 @@ class RuntimeApplication:
 
         self.app.run_server(debug=debug, host=host)
 
-    def initialize_navbar(self, extra_components: List) -> NavBar:
+    def initialize_navbar(self, extra_components: List, view_groups: Dict[str, List[Type[BaseView]]]) -> NavBar:
         nav_items = []
+
+        pages_to_ignore = set()
+        nav_groups: List[NavGroup] = []
+        page_to_nav_group: Dict[Type[BaseView], NavGroup] = {}
+        for k, v in view_groups.items():
+            pages_to_ignore.update(set(v))  # add new page types
+            nav_group: NavGroup = NavGroup(k)  # create new nav group
+            nav_groups.append(nav_group)  # add to list
+            for page in v:
+                page_to_nav_group[page] = nav_group  # add to mapping to go the other way
 
         for page in self.pages:
             if page.show_in_navbar:
-                nav_items.append(
-                    dbc.NavItem(
-                        dbc.NavLink(
-                            page.title,
-                            href=page.nav_url,
-                            external_link=False
-                        ),
-                        style={"fontSize": "16px"}
+                if type(page) in page_to_nav_group:
+                    nav_group: NavGroup = page_to_nav_group[type(page)]
+                    nav_group.add_nav(NavDefinition(label=page.title, url=page.nav_url))
+                else:
+                    nav_items.append(
+                        NavDefinition(label=page.title, url=page.nav_url).render()
                     )
-                )
 
-        for comp in extra_components:
-            nav_items.append(comp)
-
-        return NavBar(title=self.app_descriptor.title, nav_items=nav_items)
+        return NavBar(
+            title=self.app_descriptor.title,
+            nav_items=nav_items,
+            nav_groups=nav_groups,
+            extra_components=extra_components
+        )
 
     def get_layout(self):
         return html.Div(
@@ -135,7 +157,7 @@ class RuntimeApplication:
                         "margin": "0 auto"
                     }
                 ),
-                # todo - global alerts div
+                # todo - global alerts div (issue #16)
                 # html.Div(
                 #     id="alerts-div",
                 #     style={

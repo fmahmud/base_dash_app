@@ -1,5 +1,6 @@
 from typing import List, Type, Hashable, Any, Dict
 
+from base_dash_app.apis.api import API
 from base_dash_app.components.callback_utils.mappers import InputToState
 from base_dash_app.services.base_service import BaseService
 from base_dash_app.views.base_view import BaseView
@@ -18,7 +19,11 @@ class AppDescriptor:
             db_file: str = None,
             initial_global_state: Dict[Hashable, Any] = None,
             extra_nav_bar_components: List = None,
-            global_inputs: List[InputToState] = None
+            global_inputs: List[InputToState] = None,
+            view_groups: Dict[str, List[Type[BaseView]]] = None,
+            apis: List[Type[API]] = None,
+            logging_format=None,
+            log_level=None
     ):
         """
         :param db_file: Optional - location of an sqlite db file
@@ -38,4 +43,8 @@ class AppDescriptor:
         self.views: List[Type[BaseView]] = views if views is not None else []
         self.initial_global_state = {} if initial_global_state is None else initial_global_state
         self.extra_nav_bar_components = extra_nav_bar_components if extra_nav_bar_components is not None else []
-        self.global_inputs = global_inputs if global_inputs is not None else []
+        self.global_inputs: List[InputToState] = global_inputs if global_inputs is not None else []
+        self.view_groups: Dict[str, List[Type[BaseView]]] = view_groups if view_groups is not None else {}
+        self.apis: List[Type[API]] = apis if apis is not None else []
+        self.logging_format = logging_format
+        self.log_level = log_level
