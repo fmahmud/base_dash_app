@@ -4,7 +4,11 @@ from base_dash_app.components.base_component import BaseComponent
 
 
 class SmallCard(BaseComponent):
-    def __init__(self, title, body, left_complication=None, right_complication=None, style=None, actions=None):
+    def __init__(
+            self, title, body,
+            left_complication=None, right_complication=None,
+            style=None, actions=None
+    ):
         self.title = title
         self.body = body
         self.style = style if style is not None else {}
@@ -50,7 +54,10 @@ class SmallCard(BaseComponent):
             )
 
         return dbc.Card(
-            dbc.Row(card_children),
-            dbc.Row(self.actions, style={"padding": "10px"}) if self.actions is not None else "",
+            children=[
+                dbc.Row(card_children),
+                dbc.Row(self.actions, style={"margin": "0 -5px"})
+                if len(self.actions) > 0 else "",
+            ],
             style=self.style
         )

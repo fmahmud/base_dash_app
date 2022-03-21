@@ -31,7 +31,10 @@ def render_from_stc_list(status_to_count_list: List['StatusToCount']):
     ], id="ratio_div_" + str(ratio_bar_id))
 
 
-def render(successes, failures, warns=0, in_progress=0):
+def render(successes, failures, warns=0, in_progress=0, style_override=None):
+    if style_override is None:
+        style_override = {}
+
     global ratio_bar_id
     ratio_bar_id += 1
     total = successes + failures + warns + in_progress
@@ -71,7 +74,7 @@ def render(successes, failures, warns=0, in_progress=0):
                 dbc.Progress(value=100 * failures / total, color="danger", bar=True),
                 dbc.Progress(value=100 * in_progress / total, color="info", bar=True),
             ],
-            style={"marginTop": "20px", "marginRight": "20px"},
+            style={**{"marginTop": "20px", "marginRight": "20px"}, **style_override},
             id="ratio_bar_id_" + str(ratio_bar_id)
         ),
         dbc.Tooltip(tooltip_value, target="ratio_bar_id_" + str(ratio_bar_id))
