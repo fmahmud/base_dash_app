@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Callable, Optional
 
-from base_dash_app.enums.status_colors import StatusColors
+from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.virtual_objects.result import Result
 
 
@@ -21,5 +21,5 @@ class Resultable(ABC):
         pass
 
     @abstractmethod
-    def get_status_color(self, *, perspective=None) -> StatusColors:
-        return self.get_result(perspective=perspective).status_color
+    def get_status_color(self, *, perspective=None) -> StatusesEnum:
+        return self.get_result(perspective=perspective).status

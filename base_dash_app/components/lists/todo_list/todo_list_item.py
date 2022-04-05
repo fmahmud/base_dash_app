@@ -7,7 +7,7 @@ from dash.exceptions import PreventUpdate
 from base_dash_app.components.base_component import BaseComponent
 from base_dash_app.components.details import details
 from base_dash_app.components.details.details import DetailTextItem
-from base_dash_app.enums.status_colors import StatusColors
+from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.enums.task_repeat_period_enum import TaskRepeatPeriodEnum
 from base_dash_app.enums.todo_status_enum import TodoStatusEnum
 from base_dash_app.models.task import Task
@@ -56,9 +56,9 @@ class TaskGroup(Detailable, Nameable, BaseComponent):
         days_left = (self.due_date - now).days
         style = {}
         if days_left <= 2:
-            style["color"] = StatusColors.WARNING.value
+            style["color"] = StatusesEnum.WARNING.value
         if days_left < 1:
-            style["color"] = StatusColors.FAILURE.value
+            style["color"] = StatusesEnum.FAILURE.value
         text_items.append(DetailTextItem("%i days left" % days_left, style))
 
         text_items.append(DetailTextItem("Num Tasks: %i" % len(self.tasks), {}))

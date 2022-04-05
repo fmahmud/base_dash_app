@@ -13,7 +13,7 @@ import dash_html_components as html
 from base_dash_app.components.lists.todo_list.todo_list_item import TaskGroup
 from base_dash_app.models.task import Task
 from base_dash_app.enums.todo_status_enum import TodoStatusEnum
-from base_dash_app.enums.status_colors import StatusColors
+from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.virtual_objects.interfaces.nameable import Nameable
 
 nonce = 0

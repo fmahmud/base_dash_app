@@ -1,7 +1,7 @@
 import abc
 from typing import Dict
 
-from utils.Startable import ExternalTriggerEvent
+from base_dash_app.virtual_objects.interfaces.startable import ExternalTriggerEvent
 
 
 class Stoppable:
@@ -13,5 +13,5 @@ class Stoppable:
         self.stop_trigger = trigger
 
     @abc.abstractmethod
-    def stop(self):
+    def stop(self, *args, **kwargs):
         pass

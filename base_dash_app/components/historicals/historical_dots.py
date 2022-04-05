@@ -3,11 +3,11 @@ from typing import List
 import dash_html_components as html
 from dash.development.base_component import Component
 
-from base_dash_app.enums.status_colors import StatusColors
+from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.virtual_objects.interfaces.resultable_event import ResultableEvent, CachedResultableEvent
 
 
-def __render_event_rectangle(color: StatusColors):
+def __render_event_rectangle(color: StatusesEnum):
     return html.Span(
         style={
             "height": "20px", "width": "20px", "backgroundColor": color.value,
@@ -17,7 +17,7 @@ def __render_event_rectangle(color: StatusColors):
     )
 
 
-def render(data: List[StatusColors] = []) -> Component:
+def render(data: List[StatusesEnum] = []) -> Component:
     if len(data) == 0:
         return html.Div()
 

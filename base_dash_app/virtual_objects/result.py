@@ -1,7 +1,7 @@
-from base_dash_app.enums.status_colors import StatusColors
+from base_dash_app.enums.status_colors import StatusesEnum
 
 
 class Result:
-    def __init__(self, result, status_color: StatusColors):
+    def __init__(self, result, status: StatusesEnum):
         self.result = result
-        self.status_color: StatusColors = status_color
+        self.status: StatusesEnum = status

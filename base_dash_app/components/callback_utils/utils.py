@@ -20,7 +20,7 @@ def get_triggering_id_from_callback_context(callback_context):
         triggering_id = callback_context.triggered[0]["prop_id"]
 
     if triggering_id.startswith("{"):
-        triggering_id = triggering_id.replace(".n_clicks", "")
+        triggering_id = triggering_id.split("}.")[0] + "}"
         id_as_json = json.loads(triggering_id)
         if "type" in id_as_json and "index" in id_as_json:
             return id_as_json["type"], id_as_json["index"]

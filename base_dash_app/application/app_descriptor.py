@@ -4,6 +4,7 @@ from base_dash_app.apis.api import API
 from base_dash_app.components.callback_utils.mappers import InputToState
 from base_dash_app.services.base_service import BaseService
 from base_dash_app.views.base_view import BaseView
+from base_dash_app.virtual_objects.job import JobDefinition
 
 
 class AppDescriptor:
@@ -23,7 +24,8 @@ class AppDescriptor:
             view_groups: Dict[str, List[Type[BaseView]]] = None,
             apis: List[Type[API]] = None,
             logging_format=None,
-            log_level=None
+            log_level=None,
+            jobs: List[Type[JobDefinition]] = None
     ):
         """
         :param db_file: Optional - location of an sqlite db file
@@ -48,3 +50,4 @@ class AppDescriptor:
         self.apis: List[Type[API]] = apis if apis is not None else []
         self.logging_format = logging_format
         self.log_level = log_level
+        self.jobs: List[Type[JobDefinition]] = jobs if jobs is not None else []

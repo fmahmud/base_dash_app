@@ -3,9 +3,7 @@ from typing import List, Callable, Dict, Type, Union
 from urllib.parse import unquote
 
 import dash
-import dash_bootstrap_components as dbc
-import dash_core_components as dcc
-import dash_html_components as html
+from dash import dcc, html
 from dash.dependencies import Output, Input, State
 
 from base_dash_app.apis.api import API
@@ -19,7 +17,8 @@ from base_dash_app.services.base_service import BaseService
 from base_dash_app.services.global_state_service import GlobalStateService
 from base_dash_app.utils.db_utils import DbManager
 from base_dash_app.views.base_view import BaseView
-from base_dash_app.virtual_objects.interfaces.Startable import Startable, ExternalTriggerEvent
+from base_dash_app.virtual_objects.interfaces.startable import Startable, ExternalTriggerEvent
+from base_dash_app.virtual_objects.job import JobDefinition
 
 
 class RuntimeApplication:
@@ -47,20 +46,28 @@ class RuntimeApplication:
         # define services
         self.services: Dict[Type, BaseService] = {}
 
-        def get_service_by_name(service_class: Type) -> BaseService:
+        def get_service_by_type(service_class: Type) -> BaseService:
             return self.services.get(service_class)
 
         self.apis: Dict[Type, API] = {}
         for api_type in app_descriptor.apis:
-            self.apis[api_type] = api_type()
+            self.apis[api_type] = api_type() # parent constructor vars will come from child
 
-        def get_api_by_name(api_class: Type) -> API:
+        def get_api_by_type(api_class: Type) -> API:
             return self.apis.get(api_class)
+
+        self.job_definitions: Dict[Type, JobDefinition] = {
+            job_type: job_type() for job_type in app_descriptor.jobs  # parent constructor vars will come from child
+        }
+
+        def get_job_by_type(jd_class: Type) -> JobDefinition:
+            return self.job_definitions.get(jd_class)
 
         base_service_args = {
             "dbm": self.dbm,
-            "service_provider": get_service_by_name,
-            "api_provider": get_api_by_name
+            "service_provider": get_service_by_type,
+            "api_provider": get_api_by_type,
+            "job_provider": get_job_by_type,
         }
 
         self.services = {s: s(**base_service_args) for s in app_descriptor.service_classes}

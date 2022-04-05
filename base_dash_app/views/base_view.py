@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from typing import Pattern, Callable, Optional, List
 
@@ -19,7 +20,7 @@ class BaseView(BaseComponent, ABC):
             self, title: str, url_regex: Pattern[str], register_callback_func: Callable,
             dbm: Optional[DbManager] = None, nav_url: str = "", show_in_navbar: bool = True,
             service_provider: Callable = None, input_to_states_map: List[InputToState] = None,
-            api_provider: Callable = None
+            api_provider: Callable = None, job_provider: Callable = None
     ):
         self.title: str = title
         self.url_regex = url_regex
@@ -29,11 +30,14 @@ class BaseView(BaseComponent, ABC):
         self.register_callback_func = register_callback_func
         self.get_service = service_provider
         self.get_api = api_provider
+        self.get_job = job_provider
         self.dbm: Optional[DbManager] = dbm
         self.input_to_states_map: List[InputToState] = input_to_states_map if input_to_states_map else []
         self.input_string_ids_map = {its.get_input_string_id(): its for its in self.input_to_states_map}
 
-        self.wrapper_div_id: str = f"{self.title.lower().replace(' ', '-')}-wrapper-div-id"
+        self.__name = self.title.lower().replace(' ', '-')
+        self.wrapper_div_id: str = f"{self.__name}-wrapper-div-id"
+        self.logger = logging.getLogger(self.__name)
 
         if len(self.input_to_states_map) > 0:
             register_callback_func(

@@ -21,7 +21,7 @@ class Startable:
         Startable.STARTABLE_DICT[trigger].append(self)
 
     @abc.abstractmethod
-    def start(self):
+    def start(self, *args, **kwargs):
         pass
 
 

@@ -2,7 +2,7 @@ import datetime
 from abc import ABC, abstractmethod
 from typing import Callable, Optional
 
-from base_dash_app.enums.status_colors import StatusColors
+from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.virtual_objects.interfaces.event import Event
 from base_dash_app.virtual_objects.interfaces.linkable import Linkable
 from base_dash_app.virtual_objects.interfaces.listable import Listable
@@ -26,8 +26,8 @@ class ResultableEvent(Resultable, Nameable, Listable, Linkable, Event, ABC):
 
 
 class CachedResultableEvent(ResultableEvent):
-    def get_status_color(self, *, perspective=None) -> StatusColors:
-        return self.result.status_color
+    def get_status_color(self, *, perspective=None) -> StatusesEnum:
+        return self.result.status
 
     def __eq__(self, other):
         return self.original_re.__eq__(other)
@@ -40,7 +40,7 @@ class CachedResultableEvent(ResultableEvent):
 
     def get_header(self) -> (str, dict):
         text, style = self.original_re.get_header()
-        style["color"] = self.result.status_color.value
+        style["color"] = self.result.status.value
         return text, style
 
     def get_text(self) -> (str, dict):

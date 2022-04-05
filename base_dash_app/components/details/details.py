@@ -5,7 +5,7 @@ import dash_html_components as html
 from base_dash_app.components.data_visualization import ratio_bar
 from base_dash_app.components.base_component import BaseComponent
 from base_dash_app.components.data_visualization.ratio_bar import StatusToCount
-from base_dash_app.enums.status_colors import StatusColors
+from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.utils import utils
 from base_dash_app.virtual_objects.interfaces.detailable import Detailable
 import dash_bootstrap_components as dbc
@@ -32,11 +32,11 @@ class DetailTextItem(BaseComponent):
 
 def render_summary_inner_div_from_detailable(detailable: Detailable):
     status_to_counts: List[StatusToCount] = [
-        StatusToCount("Success", StatusColors.SUCCESS, detailable.get_successes()),
-        StatusToCount("Warning", StatusColors.WARNING, detailable.get_warnings()),
-        StatusToCount("In Progress", StatusColors.IN_PROGRESS, detailable.get_in_progress()),
-        StatusToCount("Failed", StatusColors.FAILURE, detailable.get_failures()),
-        StatusToCount("Pending", StatusColors.PENDING, detailable.get_num_pending()),
+        StatusToCount("Success", StatusesEnum.SUCCESS, detailable.get_successes()),
+        StatusToCount("Warning", StatusesEnum.WARNING, detailable.get_warnings()),
+        StatusToCount("In Progress", StatusesEnum.IN_PROGRESS, detailable.get_in_progress()),
+        StatusToCount("Failed", StatusesEnum.FAILURE, detailable.get_failures()),
+        StatusToCount("Pending", StatusesEnum.PENDING, detailable.get_num_pending()),
     ]
 
     return render_summary_inner_div(

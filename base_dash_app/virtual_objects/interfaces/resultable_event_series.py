@@ -3,6 +3,7 @@ from abc import ABC
 from typing import List
 
 from base_dash_app.virtual_objects.interfaces.resultable_event import ResultableEvent, CachedResultableEvent
+from base_dash_app.virtual_objects.result import Result
 from base_dash_app.virtual_objects.statistics.statistic import Statistic
 from base_dash_app.virtual_objects.statistics.statistic_over_time import StatisticOverTime
 from base_dash_app.virtual_objects.statistics.streaks import BestStreak, WorstStreak
@@ -69,7 +70,7 @@ class ResultableEventSeries(ABC):
 
         self.compute_stats_for_result(cached_result.result.result, cached_result.get_date())
 
-    def process_result(self, result: float, resultable_event: ResultableEvent):
+    def process_result(self, result: Result, resultable_event: ResultableEvent):
         cached_result = CachedResultableEvent(result, resultable_event.get_date(), original_re=resultable_event)
         self.process_cached_result(cached_result)
         return cached_result

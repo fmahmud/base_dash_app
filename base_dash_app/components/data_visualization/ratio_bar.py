@@ -3,7 +3,7 @@ from typing import List
 import dash_bootstrap_components as dbc
 import dash_html_components as html
 
-from base_dash_app.enums.status_colors import StatusColors
+from base_dash_app.enums.status_colors import StatusesEnum
 
 ratio_bar_id = 0
 
@@ -82,7 +82,7 @@ def render(successes, failures, warns=0, in_progress=0, style_override=None):
 
 
 class StatusToCount:
-    def __init__(self, state_name: str, color: StatusColors, count: int):
+    def __init__(self, state_name: str, color: StatusesEnum, count: int):
         self.name: str = state_name
         self.color: str = color.value.bootstrap_alt
         self.count: int = count
