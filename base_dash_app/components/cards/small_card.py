@@ -12,23 +12,20 @@ class SmallCard(BaseComponent):
         self.title = title
         self.body = body
         self.style = style if style is not None else {}
-        self.style = self.style
         self.left_complication = left_complication
         self.right_complication = right_complication
         self.actions = actions if actions is not None else []
 
-    def render(self, *args, **kwargs):
+    def render(self, *args, complication_width_percent=25, **kwargs):
         card_children = []
-        complication_width = 25
         max_body_width = \
-            100 - (complication_width if self.left_complication is not None else 0) \
-            - (complication_width if self.right_complication is not None else 0)
+            100 - (complication_width_percent if self.left_complication is not None else 0) \
+            - (complication_width_percent if self.right_complication is not None else 0)
 
         complication_style = {
-            "maxWidth": f"calc({complication_width}% - .5rem)",
-            "width": f"calc({complication_width}% - .5rem)",
+            "maxWidth": f"calc({complication_width_percent}% - .5rem)",
+            "width": f"calc({complication_width_percent}% - .5rem)",
             "lineHeight": "6rem",
-            "marginLeft": ".5rem"
         }
 
         if self.left_complication is not None:
