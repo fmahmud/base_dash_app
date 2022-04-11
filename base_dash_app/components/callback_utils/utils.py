@@ -10,7 +10,11 @@ def is_empty_or_none(s):
 
 
 def invalid_n_clicks(n_clicks):
-    return n_clicks in [[None], [], None, 0]
+    if n_clicks in [[None], [], None, 0]:
+        return True
+
+    if type(n_clicks) == list:
+        return all(n in [[None], [], None, 0] for n in n_clicks)
 
 
 def get_triggering_id_from_callback_context(callback_context):

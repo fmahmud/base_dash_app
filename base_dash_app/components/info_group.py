@@ -6,7 +6,7 @@ from base_dash_app.components.base_component import BaseComponent
 import dash_bootstrap_components as dbc
 
 card_style = {"marginBottom": "10px", "width": "49%", "float": "left", "position": "relative",
-              "marginRight": "10px"}
+              "marginRight": "10px", "border": "1px solid grey", "borderRadius": "5px", "padding": "5px"}
 
 
 class InfoItemsGroup(BaseComponent):
@@ -38,7 +38,7 @@ class InfoItemsGroup(BaseComponent):
             components.append(html.H2(self.title, style={"marginBottom": "10px"}))
 
         for item in self.items:
-            components.append(dbc.Card(item, body=True, style={**card_style, **card_style_override}))
+            components.append(html.Div(children=[item], style={**card_style, **card_style_override}))
 
         return html.Div(
             children=components, style=wrapper_style_override
