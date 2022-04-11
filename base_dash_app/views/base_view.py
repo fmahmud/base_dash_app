@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Pattern, Callable, Optional, List
 
 import dash
+from dash import html
 from dash.dependencies import Output
 from dash.exceptions import PreventUpdate
 
@@ -11,6 +12,8 @@ from base_dash_app.components.callback_utils.utils import invalid_n_clicks, get_
     get_state_values_for_input_from_args_list
 from base_dash_app.components.callback_utils.mappers import InputToState
 from base_dash_app.utils.db_utils import DbManager
+
+
 
 
 class BaseView(BaseComponent, ABC):
@@ -96,6 +99,7 @@ class BaseView(BaseComponent, ABC):
 
     def handle_global_state_change(self, new_state):
         pass
+
 
     # @staticmethod
     # def get_full_page_inputs():

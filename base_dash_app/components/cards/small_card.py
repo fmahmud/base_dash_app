@@ -2,19 +2,24 @@
 import dash_bootstrap_components as dbc
 from base_dash_app.components.base_component import BaseComponent
 
+num_instances = 0
+
 
 class SmallCard(BaseComponent):
     def __init__(
             self, title, body,
             left_complication=None, right_complication=None,
-            style=None, actions=None
+            style=None, actions=None, component_id=None
     ):
+        global num_instances
+        num_instances += 1
         self.title = title
         self.body = body
         self.style = style if style is not None else {}
         self.left_complication = left_complication
         self.right_complication = right_complication
         self.actions = actions if actions is not None else []
+        self.component_id = component_id if component_id is not None else f"small-card-{num_instances}"
 
     def render(self, *args, complication_width_percent=25, **kwargs):
         card_children = []
@@ -56,5 +61,6 @@ class SmallCard(BaseComponent):
                 dbc.Row(self.actions, style={"margin": "0 -5px"})
                 if len(self.actions) > 0 else "",
             ],
-            style=self.style
+            style=self.style,
+            id=self.component_id ,
         )

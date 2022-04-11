@@ -7,10 +7,10 @@ from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.virtual_objects.interfaces.resultable_event import ResultableEvent, CachedResultableEvent
 
 
-def __render_event_rectangle(color: StatusesEnum):
+def render_event_rectangle(color: StatusesEnum):
     return html.Span(
         style={
-            "height": "20px", "width": "20px", "backgroundColor": color.value,
+            "height": "20px", "width": "20px", "backgroundColor": color.value.hex_color,
             "display": "inline-block", "marginRight": "2px", "borderRadius": "30px",
             "verticalAlign": "middle"
         }
@@ -21,7 +21,7 @@ def render(data: List[StatusesEnum] = []) -> Component:
     if len(data) == 0:
         return html.Div()
 
-    dots = [__render_event_rectangle(datum) for datum in data]
+    dots = [render_event_rectangle(datum) for datum in data]
 
     the_div = html.Div(
         children=dots,
@@ -35,7 +35,7 @@ def render_from_resultable_events(data: List[CachedResultableEvent]) -> Componen
     if len(data) == 0:
         return html.Div()
 
-    dots = [__render_event_rectangle(datum.get_status_color()) for datum in data]
+    dots = [render_event_rectangle(datum.get_status_color()) for datum in data]
 
     the_div = html.Div(
         children=dots,
