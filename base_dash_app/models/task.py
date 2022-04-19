@@ -2,7 +2,7 @@ import datetime
 from typing import List, Callable, Optional
 
 import dash_bootstrap_components as dbc
-import dash_html_components as html
+from dash import html
 
 from base_dash_app.components.details.details import DetailTextItem
 from base_dash_app.components.historicals import historical_dots

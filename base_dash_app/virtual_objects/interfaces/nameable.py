@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-import dash_html_components as html
+
+from dash import html
 
 
 class Nameable(ABC):

@@ -8,7 +8,7 @@ from dash.exceptions import PreventUpdate
 from base_dash_app.components.base_component import BaseComponent
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
-import dash_html_components as html
+from dash import html
 
 from base_dash_app.components.lists.todo_list.todo_list_item import TaskGroup
 from base_dash_app.models.task import Task

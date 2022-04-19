@@ -1,6 +1,6 @@
 from typing import List
 
-import dash_html_components as html
+from dash import html
 from dash.development.base_component import Component
 
 from base_dash_app.enums.status_colors import StatusesEnum

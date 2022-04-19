@@ -42,13 +42,15 @@ class NoAuthHandler(AuthHandler):
 class API(ABC):
     def __init__(
             self, url: str, auth_handler: AuthHandler = None, *,
-            common_headers: Dict[str, str] = None
+            common_headers: Dict[str, str] = None,
+            push_alert: Callable = None, **kwargs
     ):
         self.url: str = url
         self.auth_handler: AuthHandler = auth_handler if auth_handler is not None else NoAuthHandler()
         self.__endpoints: Dict[Tuple[str, HttpMethod], Endpoint] = {}
         self.common_headers: Dict[str, str] = common_headers if common_headers is not None else {}
         self.functions: Dict[str, Callable] = {}
+        self.push_alert = push_alert
 
     def add_endpoint(self, path: str, http_method: HttpMethod, name: str):
         if (path, http_method) in self.__endpoints:

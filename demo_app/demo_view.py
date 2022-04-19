@@ -5,6 +5,7 @@ from typing import Callable
 from dash.dependencies import Output, Input, State
 from dash.exceptions import PreventUpdate
 
+from base_dash_app.components.alerts import Alert
 from base_dash_app.components.data_visualization import ratio_bar
 from base_dash_app.components.data_visualization.ratio_bar import StatusToCount
 from base_dash_app.components.details import details
@@ -14,7 +15,7 @@ from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.models.task import Task
 from base_dash_app.utils.db_utils import DbManager
 from base_dash_app.views.base_view import BaseView
-import dash_html_components as html
+from dash import html
 import dash_bootstrap_components as dbc
 import finnhub
 
@@ -53,7 +54,7 @@ class DemoView(BaseView):
     def handle_search(self, n_clicks, search_value):
         if n_clicks == 0 or n_clicks is None:
             raise PreventUpdate()
-
+        self.push_alert(Alert("TEST ALERT!"))
         if search_value is None or search_value == '':
             raise PreventUpdate()
 
