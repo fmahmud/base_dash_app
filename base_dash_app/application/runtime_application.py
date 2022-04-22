@@ -56,6 +56,10 @@ class RuntimeApplication:
         def push_new_alert(alert: Alert):
             self.active_alerts.append(alert)
 
+        def remove_alert(alert: Alert):
+            if alert is not None and alert in self.active_alerts:
+                self.active_alerts.remove(alert)
+
         def get_service_by_type(service_class: Type) -> BaseService:
             return self.services.get(service_class)
 
@@ -65,15 +69,15 @@ class RuntimeApplication:
         def get_job_by_type(jd_class: Type) -> JobDefinition:
             return self.job_definitions.get(jd_class)
 
+        if app_descriptor.db_file is not None:
+            self.dbm = DbManager(app_descriptor.db_file)
+
         base_service_args = {
             "dbm": self.dbm,
             "service_provider": get_service_by_type,
             "api_provider": get_api_by_type,
             "job_provider": get_job_by_type,
         }
-
-        if app_descriptor.db_file is not None:
-            self.dbm = DbManager(app_descriptor.db_file)
 
         for api_type in app_descriptor.apis:
             self.apis[api_type] = api_type(**base_service_args)  # parent constructor vars will come from child
@@ -89,6 +93,7 @@ class RuntimeApplication:
         base_view_args = {
             "register_callback_func": self.register_callback,
             "push_alert": push_new_alert,
+            "remove_alert": remove_alert,
             **base_service_args
         }
 

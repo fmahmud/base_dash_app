@@ -33,6 +33,15 @@ class Alert:
     def to_json_string(self):
         return json.dumps(vars(self))
 
+    def __eq__(self, other):
+        if type(other) == type(self):
+            return other.id == self.id
+
+        return False
+
+    def __hash__(self):
+        return hash(self.id)
+
 
 def render_alerts_div(alerts: List[Alert], wrapper_style=None):
     if wrapper_style is None:
@@ -45,20 +54,25 @@ def render_alerts_div(alerts: List[Alert], wrapper_style=None):
         children=[
             dbc.Alert(
                 children=[
-                    alert.body,
+                    html.Div(
+                        alert.body,
+                        style={
+                            "position": "relative", "float": "left", "maxWidth": "calc(100% - 40px)",
+                            "overflow": "hidden", "whiteSpace": "nowrap", "textOverflow": "ellipsis"
+                        }
+                    ),
                     html.Button(
                         className="btn-close", type="button", id={"type": DISMISS_ALERT_BTN_ID, "index": alert.id},
-                        style={"position": "relative", "float": "right"}
+                        style={"position": "absolute", "right": "14px", "top": "14px"}
                     ),
                 ],
                 is_open=True,
-                style={**{"width": "550px"}, **alert.style},
+                style={**{"width": "550px", "position": "relative", "float": "right"}, **alert.style},
                 color=alert.color
             )
             for alert in alerts
         ],
         style={
-            "position": "absolute", "top": "0px", "right": "0px", "bottom": 0, "left": 0, "padding": "15px",
-            "pointerEvents": "auto", **wrapper_style
+            "position": "relative", "padding": "15px", "pointerEvents": "auto", **wrapper_style
         }
     )

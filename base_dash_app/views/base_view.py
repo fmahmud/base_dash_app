@@ -22,7 +22,7 @@ class BaseView(BaseComponent, ABC):
             dbm: Optional[DbManager] = None, nav_url: str = "", show_in_navbar: bool = True,
             service_provider: Callable = None, input_to_states_map: List[InputToState] = None,
             api_provider: Callable = None, job_provider: Callable = None,
-            push_alert: Callable = None,
+            push_alert: Callable = None, remove_alert: Callable = None,
             **kwargs
     ):
         self.title: str = title
@@ -36,6 +36,7 @@ class BaseView(BaseComponent, ABC):
         self.get_job = job_provider
         self.dbm: Optional[DbManager] = dbm
         self.push_alert = push_alert
+        self.remove_alert = remove_alert
         self.input_to_states_map: List[InputToState] = input_to_states_map if input_to_states_map else []
         self.input_string_ids_map = {its.get_input_string_id(): its for its in self.input_to_states_map}
 
