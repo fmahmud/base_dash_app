@@ -1,17 +1,46 @@
+import json
 from typing import List
 
 from dash import html
 import dash_bootstrap_components as dbc
 
+DISMISS_ALERT_BTN_ID = "close-alert-btn-id"
+
+num_alerts = 0
+
 
 class Alert:
-    def __init__(self, body, icon=None, header=None, dismissable=True, duration=None, style=None):
+    def __init__(self, body, icon=None, header=None, dismissable=True, duration=None, style=None, color="secondary"):
         self.body = body
         self.icon = icon
         self.header = header
         self.dismissable = dismissable
         self.style = style if style is not None else {}
         self.duration = duration
+        global num_alerts
+        num_alerts += 1
+        self.id = num_alerts
+        self.color = color
+
+    @staticmethod
+    def from_dict(dictionary):
+        return Alert(**dictionary)
+
+    @staticmethod
+    def from_json_string(string_repr):
+        return Alert.from_dict(json.loads(string_repr))
+
+    def to_json_string(self):
+        return json.dumps(vars(self))
+
+    def __eq__(self, other):
+        if type(other) == type(self):
+            return other.id == self.id
+
+        return False
+
+    def __hash__(self):
+        return hash(self.id)
 
 
 def render_alerts_div(alerts: List[Alert], wrapper_style=None):
@@ -23,19 +52,27 @@ def render_alerts_div(alerts: List[Alert], wrapper_style=None):
 
     return html.Div(
         children=[
-            dbc.Toast(
-                children=alert.body,
-                id=f"alert-divs-id-{i}",
-                header=alert.header,
-                dismissable=alert.dismissable,
-                icon=alert.icon,
-                style={**{"width": "350px"}, **alert.style},
-                duration=alert.duration
+            dbc.Alert(
+                children=[
+                    html.Div(
+                        alert.body,
+                        style={
+                            "position": "relative", "float": "left", "maxWidth": "calc(100% - 40px)",
+                            "overflow": "hidden", "whiteSpace": "nowrap", "textOverflow": "ellipsis"
+                        }
+                    ),
+                    html.Button(
+                        className="btn-close", type="button", id={"type": DISMISS_ALERT_BTN_ID, "index": alert.id},
+                        style={"position": "absolute", "right": "14px", "top": "14px"}
+                    ),
+                ],
+                is_open=True,
+                style={**{"width": "550px", "position": "relative", "float": "right"}, **alert.style},
+                color=alert.color
             )
-            for i, alert in enumerate(alerts)
+            for alert in alerts
         ],
         style={
-            "position": "absolute", "top": "15px", "right": "15px", "width": "380px", "padding": "15px",
-            **wrapper_style
+            "position": "relative", "padding": "15px", "pointerEvents": "auto", **wrapper_style
         }
     )

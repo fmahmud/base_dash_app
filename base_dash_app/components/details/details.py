@@ -1,6 +1,6 @@
 from typing import Dict, List
 
-import dash_html_components as html
+from dash import html
 
 from base_dash_app.components.data_visualization import ratio_bar
 from base_dash_app.components.base_component import BaseComponent

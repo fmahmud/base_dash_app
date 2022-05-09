@@ -4,13 +4,16 @@ from urllib.parse import unquote
 
 import dash
 from dash import dcc, html
-from dash.dependencies import Output, Input, State
+from dash.dependencies import Output, Input, State, ALL
+from dash.exceptions import PreventUpdate
 
 from base_dash_app.apis.api import API
 from base_dash_app.application.app_descriptor import AppDescriptor
+from base_dash_app.components import alerts
+from base_dash_app.components.alerts import Alert
 from base_dash_app.components.callback_utils.mappers import InputToState
 from base_dash_app.components.callback_utils.utils import get_triggering_id_from_callback_context, \
-    get_state_values_for_input_from_args_list
+    get_state_values_for_input_from_args_list, invalid_n_clicks
 from base_dash_app.components.lists.todo_list.todo_list_item import TaskGroup
 from base_dash_app.components.navbar import NavBar, NavDefinition, NavGroup
 from base_dash_app.services.base_service import BaseService
@@ -19,6 +22,10 @@ from base_dash_app.utils.db_utils import DbManager
 from base_dash_app.views.base_view import BaseView
 from base_dash_app.virtual_objects.interfaces.startable import Startable, ExternalTriggerEvent
 from base_dash_app.virtual_objects.job import JobDefinition
+
+ALERTS_WRAPPER_INTERVAL_ID = "alerts-wrapper-interval-id"
+
+ALERTS_WRAPPER_DIV_ID = "alerts-wrapper-div-id"
 
 
 class RuntimeApplication:
@@ -32,7 +39,7 @@ class RuntimeApplication:
         self.app_descriptor = app_descriptor
 
         self.app = dash.Dash(
-            app_descriptor.title, external_stylesheets=app_descriptor.external_stylesheets,
+            title=app_descriptor.title, external_stylesheets=app_descriptor.external_stylesheets,
             suppress_callback_exceptions=True,
             assets_folder='./base_dash_app/assets'
         )
@@ -40,28 +47,30 @@ class RuntimeApplication:
         self.server = self.app.server
         self.dbm = None
 
-        if app_descriptor.db_file is not None:
-            self.dbm = DbManager(app_descriptor.db_file)
-
-        # define services
+        self.active_alerts: List[Alert] = []
         self.services: Dict[Type, BaseService] = {}
+        self.apis: Dict[Type, API] = {}
+        self.job_definitions: Dict[Type, JobDefinition] = {}
+        self.views: List[BaseView] = []
+
+        def push_new_alert(alert: Alert):
+            self.active_alerts.append(alert)
+
+        def remove_alert(alert: Alert):
+            if alert is not None and alert in self.active_alerts:
+                self.active_alerts.remove(alert)
 
         def get_service_by_type(service_class: Type) -> BaseService:
             return self.services.get(service_class)
 
-        self.apis: Dict[Type, API] = {}
-        for api_type in app_descriptor.apis:
-            self.apis[api_type] = api_type() # parent constructor vars will come from child
-
         def get_api_by_type(api_class: Type) -> API:
             return self.apis.get(api_class)
 
-        self.job_definitions: Dict[Type, JobDefinition] = {
-            job_type: job_type() for job_type in app_descriptor.jobs  # parent constructor vars will come from child
-        }
-
         def get_job_by_type(jd_class: Type) -> JobDefinition:
             return self.job_definitions.get(jd_class)
+
+        if app_descriptor.db_file is not None:
+            self.dbm = DbManager(app_descriptor.db_file)
 
         base_service_args = {
             "dbm": self.dbm,
@@ -70,21 +79,31 @@ class RuntimeApplication:
             "job_provider": get_job_by_type,
         }
 
-        self.services = {s: s(**base_service_args) for s in app_descriptor.service_classes}
+        for api_type in app_descriptor.apis:
+            self.apis[api_type] = api_type(**base_service_args)  # parent constructor vars will come from child
+
+        for job_type in app_descriptor.jobs:  # parent constructor vars will come from child
+            self.job_definitions[job_type] = job_type(**base_service_args)
+
+        for s in app_descriptor.service_classes:
+            self.services[s] = s(**base_service_args)
+
         self.services[GlobalStateService] = GlobalStateService(initial_state=app_descriptor.initial_global_state)
 
         base_view_args = {
             "register_callback_func": self.register_callback,
+            "push_alert": push_new_alert,
+            "remove_alert": remove_alert,
             **base_service_args
         }
+
+        for view in app_descriptor.views:
+            self.views.append(view(**base_view_args))
 
         # components_with_internal_callbacks = [
         #     # todo: support custom components through app descriptor
         #     TaskGroup
         # ]
-
-        # define pages
-        self.pages = [p(**base_view_args) for p in app_descriptor.views]
 
         wrapped_get_handler = self.bind_to_self(self.handle_get_call)
 
@@ -104,6 +123,16 @@ class RuntimeApplication:
             state=resulting_states
         )
 
+        self.register_callback(
+            output=Output(ALERTS_WRAPPER_DIV_ID, "children"),
+            inputs=[
+                Input({"type": alerts.DISMISS_ALERT_BTN_ID, "index": ALL}, "n_clicks"),
+                Input(ALERTS_WRAPPER_INTERVAL_ID, "n_intervals")
+            ],
+            state=[],
+            function=self.bind_to_self(self.handle_alerts)
+        )
+
         # for comp in components_with_internal_callbacks:
         #     callbacks = comp.get_callback_definitions()
         #     for cb in callbacks:
@@ -112,6 +141,27 @@ class RuntimeApplication:
         self.navbar = self.initialize_navbar(app_descriptor.extra_nav_bar_components, app_descriptor.view_groups)
 
         self.app.layout = self.get_layout
+
+    def handle_alerts(self, n_clicks, n_interval):
+        if invalid_n_clicks(n_clicks) and invalid_n_clicks(n_interval):
+            raise PreventUpdate()
+
+        trigerring_id, index = get_triggering_id_from_callback_context(dash.callback_context)
+        if trigerring_id.startswith(alerts.DISMISS_ALERT_BTN_ID):
+            alert_to_dismiss = None
+            for alert in self.active_alerts:
+                if alert.id == index:
+                    alert_to_dismiss = alert
+                    break
+
+            if alert_to_dismiss is None:
+                raise PreventUpdate("Couldn't find alert with id %i" % index)
+
+            self.active_alerts.remove(alert_to_dismiss)
+
+        return [
+            alerts.render_alerts_div(self.active_alerts)
+        ]
 
     def run_server(self, debug=False, host="0.0.0.0", upgrade_db=False):
         if self.dbm is not None and upgrade_db:
@@ -135,7 +185,7 @@ class RuntimeApplication:
             for page in v:
                 page_to_nav_group[page] = nav_group  # add to mapping to go the other way
 
-        for page in self.pages:
+        for page in self.views:
             if page.show_in_navbar:
                 if type(page) in page_to_nav_group:
                     nav_group: NavGroup = page_to_nav_group[type(page)]
@@ -158,10 +208,23 @@ class RuntimeApplication:
                 dcc.Location(id="url", refresh=False),
                 self.navbar.render(),
                 html.Div(
+                    children=alerts.render_alerts_div(
+                        self.active_alerts,
+                        wrapper_style={} if len(self.active_alerts) > 0 else {"display": "none"}
+                    ),
+                    id=ALERTS_WRAPPER_DIV_ID,
+                    style={
+                        "zIndex": "10000", "position": "absolute", "right": "0", "top": "60px",
+                        "width": "580px", "bottom": "0px", "pointerEvents": "none"
+                    }
+                ),
+                dcc.Interval(
+                    id=ALERTS_WRAPPER_INTERVAL_ID, interval=1000, disabled=False
+                ),
+                html.Div(
                     id="page-content",
                     style={
-                        "width": "90wh", "height": "100%", "padding": "20px",
-                        "margin": "0 auto"
+                        "height": "100%", "padding": "20px", "margin": "0 auto",
                     }
                 ),
                 # todo - global alerts div (issue #16)
@@ -202,7 +265,7 @@ class RuntimeApplication:
 
         decoded_url = unquote(url)
         decoded_params = unquote(query_params)
-        for page in self.pages:
+        for page in self.views:
             if page.matches(decoded_url):
                 try:
                     return page.render(decoded_params, states_for_input)

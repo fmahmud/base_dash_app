@@ -1,6 +1,6 @@
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
-import dash_html_components as html
+from dash import html
 from base_dash_app.components.base_component import BaseComponent
 from base_dash_app.virtual_objects.interfaces.linkable import Linkable
 from base_dash_app.virtual_objects.interfaces.listable import Listable

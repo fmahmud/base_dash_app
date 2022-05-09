@@ -39,7 +39,7 @@ class JobProgressContainer:
 
 
 class JobDefinition(ResultableEventSeries, Startable, Stoppable, ABC):
-    def __init__(self, job_name: str):
+    def __init__(self, job_name: str, **kwargs):
         ResultableEventSeries.__init__(self)
         Startable.__init__(self)
         Stoppable.__init__(self)

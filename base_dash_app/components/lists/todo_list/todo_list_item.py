@@ -1,6 +1,7 @@
 import datetime
 from typing import List, Dict
 
+from dash import html
 from dash.dependencies import Output, MATCH, Input, State
 from dash.exceptions import PreventUpdate
 
@@ -16,7 +17,6 @@ from base_dash_app.virtual_objects.interfaces.nameable import Nameable
 
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
-import dash_html_components as html
 
 task_id = 0
 
