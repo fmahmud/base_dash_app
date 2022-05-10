@@ -1,6 +1,6 @@
 ﻿# base_dash_app
 
-Current version: 0.3.8
+Current version: 0.3.29
 
 ## Package Usage
 
