@@ -16,4 +16,4 @@ my_app_descriptor = AppDescriptor(
 )
 
 app = RuntimeApplication(my_app_descriptor)
-app.run_server(debug=False)
+app.run_server(debug=False, port=60000)
