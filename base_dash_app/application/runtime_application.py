@@ -127,7 +127,8 @@ class RuntimeApplication:
             output=Output(ALERTS_WRAPPER_DIV_ID, "children"),
             inputs=[
                 Input({"type": alerts.DISMISS_ALERT_BTN_ID, "index": ALL}, "n_clicks"),
-                Input(ALERTS_WRAPPER_INTERVAL_ID, "n_intervals")
+                Input(ALERTS_WRAPPER_INTERVAL_ID, "n_intervals"),
+                Input(alerts.CLEAR_ALL_ALERTS_BTN_ID, "n_clicks"),
             ],
             state=[],
             function=self.bind_to_self(self.handle_alerts)
@@ -142,8 +143,9 @@ class RuntimeApplication:
 
         self.app.layout = self.get_layout
 
-    def handle_alerts(self, n_clicks, n_interval):
-        if invalid_n_clicks(n_clicks) and invalid_n_clicks(n_interval):
+    def handle_alerts(self, n_clicks, n_interval, clear_all_nclicks, *args, **kwargs):
+        if invalid_n_clicks(n_clicks) and invalid_n_clicks(n_interval)\
+                and invalid_n_clicks(clear_all_nclicks):
             raise PreventUpdate()
 
         trigerring_id, index = get_triggering_id_from_callback_context(dash.callback_context)
@@ -158,19 +160,21 @@ class RuntimeApplication:
                 raise PreventUpdate("Couldn't find alert with id %i" % index)
 
             self.active_alerts.remove(alert_to_dismiss)
+        elif trigerring_id.startswith(alerts.CLEAR_ALL_ALERTS_BTN_ID):
+            self.active_alerts.clear()
 
         return [
             alerts.render_alerts_div(self.active_alerts)
         ]
 
-    def run_server(self, debug=False, host="0.0.0.0", upgrade_db=False):
+    def run_server(self, debug=False, host="0.0.0.0", upgrade_db=False, port=8050):
         if self.dbm is not None and upgrade_db:
             self.dbm.upgrade_db()
 
         for startable in Startable.STARTABLE_DICT[ExternalTriggerEvent.SERVER_START]:
             startable.start()
 
-        self.app.run_server(debug=debug, host=host)
+        self.app.run_server(debug=debug, host=host, port=port)
 
     def initialize_navbar(self, extra_components: List, view_groups: Dict[str, List[Type[BaseView]]]) -> NavBar:
         nav_items = []
