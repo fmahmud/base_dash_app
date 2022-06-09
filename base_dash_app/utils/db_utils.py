@@ -17,3 +17,6 @@ class DbManager:
 
     def get_session(self) -> Session:
         return self.session
+
+    def new_session(self):
+        return self.__Session()

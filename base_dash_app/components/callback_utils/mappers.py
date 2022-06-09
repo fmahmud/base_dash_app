@@ -4,7 +4,7 @@ from dash.dependencies import ALL, _Wildcard, State, Input
 
 
 class StateMapping:
-    def __init__(self, state_id, state_property, *, is_dynamic=False, index=ALL):
+    def __init__(self, state_id, state_property, *, is_dynamic=False, index=None):
         self._state_id = state_id
         self.state_property = state_property
         self.is_dynamic = is_dynamic
@@ -26,7 +26,7 @@ class StateMapping:
 
 
 class InputMapping:
-    def __init__(self, input_id, input_property, *, is_dynamic=False, index=ALL):
+    def __init__(self, input_id, input_property, *, is_dynamic=False, index=None):
         self._input_id = input_id
         self.input_property = input_property
         self.is_dynamic = is_dynamic

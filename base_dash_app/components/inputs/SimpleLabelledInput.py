@@ -11,7 +11,8 @@ class SimpleLabelledInput(BaseComponent):
             self, input_id, label: str = None, placeholder: str = None,
             form_text: str = None, valid_form_feedback: str = None,
             invalid_form_feedback: str = None, style_override: Dict = None,
-            initial_validity: bool = None, input_type: str = None
+            initial_validity: bool = None, input_type: str = None,
+            required: bool = False
     ):
         self.label = label
         self.input_id = input_id
@@ -19,10 +20,11 @@ class SimpleLabelledInput(BaseComponent):
         self.form_text = form_text
         self.valid_form_feedback = valid_form_feedback
         self.invalid_form_feedback = invalid_form_feedback
-        self.style = {"padding": "10px", "marginBottom": "15px"}
+        self.style = {"padding": "10px", "marginTop": "15px"}
         if style_override is not None:
             self.style = {**self.style, **style_override}
 
+        self.required: bool = required
         self.is_valid = initial_validity
         self.input_type = input_type if input_type is not None else "text"
 
@@ -32,7 +34,8 @@ class SimpleLabelledInput(BaseComponent):
                 dbc.Label(self.label, html_for=self.input_id) if self.label is not None else None,
                 dbc.Input(
                     placeholder=self.placeholder, id=self.input_id,
-                    style=self.style, valid=self.is_valid, type=self.input_type
+                    style=self.style, valid=self.is_valid is True, type=self.input_type,
+                    required=self.required, invalid=self.is_valid is False
                 ),
                 dbc.FormText(self.form_text) if self.form_text is not None else None,
                 dbc.FormFeedback(self.valid_form_feedback, type="valid")

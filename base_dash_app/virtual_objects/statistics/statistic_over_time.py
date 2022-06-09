@@ -25,7 +25,7 @@ class StatisticOverTime:
 
     def process_resultable_event(self, result: "ResultableEvent"):
         """todo: get perspective in here? or delete this?"""
-        self.process_result(result.get_result(), result.get_date())
+        self.process_result(result.get_result().result, result.get_date())
 
     def get_graphables(self, ordered=True):
         to_return = []

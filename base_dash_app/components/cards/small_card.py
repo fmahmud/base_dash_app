@@ -58,9 +58,8 @@ class SmallCard(BaseComponent):
         return dbc.Card(
             children=[
                 dbc.Row(card_children),
-                dbc.Row(self.actions, style={"margin": "0 -5px"})
-                if len(self.actions) > 0 else "",
+                dbc.Row(self.actions, style={"margin": "0 -5px"}) if len(self.actions) > 0 else None,
             ],
             style=self.style,
-            id=self.component_id ,
+            id=self.component_id,
         )
