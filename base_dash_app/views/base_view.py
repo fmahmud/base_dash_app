@@ -23,6 +23,7 @@ class BaseView(BaseComponent, ABC):
             service_provider: Callable = None, input_to_states_map: List[InputToState] = None,
             api_provider: Callable = None, job_provider: Callable = None,
             push_alert: Callable = None, remove_alert: Callable = None,
+            all_jobs=None, all_apis=None,
             **kwargs
     ):
         self.title: str = title
@@ -36,6 +37,8 @@ class BaseView(BaseComponent, ABC):
         self.get_service = service_provider
         self.get_api = api_provider
         self.get_job = job_provider
+        self.all_jobs = all_jobs
+        self.all_apis = all_apis
         self.dbm: Optional[DbManager] = dbm
 
         self.push_alert = push_alert
@@ -105,7 +108,6 @@ class BaseView(BaseComponent, ABC):
 
     def handle_global_state_change(self, new_state):
         pass
-
 
     # @staticmethod
     # def get_full_page_inputs():

@@ -71,8 +71,14 @@ class RuntimeApplication:
         def get_api_by_type(api_class: Type) -> API:
             return self.apis.get(api_class)
 
+        def get_all_apis() -> Dict[Type, API]:
+            return self.apis
+
         def get_job_by_type(jd_class: Type) -> JobDefinition:
             return self.job_definitions.get(jd_class)
+
+        def get_all_jobs() -> Dict[Type, JobDefinition]:
+            return self.job_definitions
 
         if app_descriptor.db_file is not None:
             self.dbm = DbManager(app_descriptor.db_file)
@@ -85,6 +91,8 @@ class RuntimeApplication:
             "service_provider": get_service_by_type,
             "api_provider": get_api_by_type,
             "job_provider": get_job_by_type,
+            "all_jobs": get_all_jobs,
+            "all_apis": get_all_apis,
         }
 
         job_def_service: JobDefinitionService = JobDefinitionService(**base_service_args)
