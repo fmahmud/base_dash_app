@@ -27,7 +27,7 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
     id = Column(Integer, Sequence("job_definitions_id_seq"), primary_key=True)
     name = Column(String)
     job_class = Column(String)
-    job_instances = relationship("JobInstance", )
+    job_instances = relationship("JobInstance", back_populates="job_definition")
 
     def __lt__(self, other):
         pass

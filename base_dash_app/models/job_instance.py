@@ -22,7 +22,7 @@ class JobInstance(CachedResultableEvent, Progressable, BaseModel):
     id = Column(Integer, Sequence("job_instances_id_seq"), primary_key=True)
     job_definition_id = Column(Integer, ForeignKey("job_definitions.id"))
 
-    job_definition = relationship("JobDefinition", lazy="joined")
+    job_definition = relationship("JobDefinition", back_populates="job_instances")
 
     resultable_value = Column(Float)
     start_time = Column(DateTime)
