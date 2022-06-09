@@ -6,6 +6,7 @@ import dash
 from dash import dcc, html
 from dash.dependencies import Output, Input, State, ALL
 from dash.exceptions import PreventUpdate
+from sqlalchemy.orm import Session
 
 from base_dash_app.apis.api import API
 from base_dash_app.application.app_descriptor import AppDescriptor
@@ -14,14 +15,16 @@ from base_dash_app.components.alerts import Alert
 from base_dash_app.components.callback_utils.mappers import InputToState
 from base_dash_app.components.callback_utils.utils import get_triggering_id_from_callback_context, \
     get_state_values_for_input_from_args_list, invalid_n_clicks
+from base_dash_app.components.cards.special_cards.job_card import JobCard
 from base_dash_app.components.lists.todo_list.todo_list_item import TaskGroup
 from base_dash_app.components.navbar import NavBar, NavDefinition, NavGroup
 from base_dash_app.services.base_service import BaseService
 from base_dash_app.services.global_state_service import GlobalStateService
+from base_dash_app.services.job_definition_service import JobDefinitionService
 from base_dash_app.utils.db_utils import DbManager
 from base_dash_app.views.base_view import BaseView
 from base_dash_app.virtual_objects.interfaces.startable import Startable, ExternalTriggerEvent
-from base_dash_app.virtual_objects.job import JobDefinition
+from base_dash_app.models.job_definition import JobDefinition
 
 ALERTS_WRAPPER_INTERVAL_ID = "alerts-wrapper-interval-id"
 
@@ -54,6 +57,8 @@ class RuntimeApplication:
         self.views: List[BaseView] = []
 
         def push_new_alert(alert: Alert):
+            if type(alert) != Alert:
+                raise Exception(f"Trying to push alert of incorrect type: {type(alert)}.")
             self.active_alerts.append(alert)
 
         def remove_alert(alert: Alert):
@@ -72,6 +77,9 @@ class RuntimeApplication:
         if app_descriptor.db_file is not None:
             self.dbm = DbManager(app_descriptor.db_file)
 
+        if self.dbm is not None and app_descriptor.upgrade_db:
+            self.dbm.upgrade_db()
+
         base_service_args = {
             "dbm": self.dbm,
             "service_provider": get_service_by_type,
@@ -79,16 +87,39 @@ class RuntimeApplication:
             "job_provider": get_job_by_type,
         }
 
+        job_def_service: JobDefinitionService = JobDefinitionService(**base_service_args)
+        all_jobs_from_db: List[JobDefinition] = job_def_service.get_all()
+
         for api_type in app_descriptor.apis:
             self.apis[api_type] = api_type(**base_service_args)  # parent constructor vars will come from child
 
-        for job_type in app_descriptor.jobs:  # parent constructor vars will come from child
-            self.job_definitions[job_type] = job_type(**base_service_args)
+        # for job_type in app_descriptor.jobs:  # parent constructor vars will come from child
+        #     self.job_definitions[job_type] = job_type(**base_service_args)
+
+        required_job_to_class_map = {job_type.__name__: job_type for job_type in app_descriptor.jobs}
+
+        for jd in all_jobs_from_db:
+            if jd.job_class in required_job_to_class_map:
+                actual_type = required_job_to_class_map[jd.job_class]
+                jd.__class__ = actual_type
+                self.job_definitions[actual_type] = jd
+
+        for class_name, job_class in required_job_to_class_map.items():
+            if job_class not in self.job_definitions:
+                # job was never saved to DB
+                job = JobDefinition(**base_service_args)
+                job.job_class = job_class.__name__  # todo: what's the point if they're both the same?
+                job.name = job_class.__name__
+                job_def_service.save(job)
+
+                job.__class__ = job_class
+                self.job_definitions[job_class] = job
 
         for s in app_descriptor.service_classes:
             self.services[s] = s(**base_service_args)
 
         self.services[GlobalStateService] = GlobalStateService(initial_state=app_descriptor.initial_global_state)
+        self.services[JobDefinitionService] = job_def_service
 
         base_view_args = {
             "register_callback_func": self.register_callback,
@@ -134,10 +165,10 @@ class RuntimeApplication:
             function=self.bind_to_self(self.handle_alerts)
         )
 
-        # for comp in components_with_internal_callbacks:
-        #     callbacks = comp.get_callback_definitions()
-        #     for cb in callbacks:
-        #         self.register_callback(**cb)
+        # register internal callback components
+        components_with_internal_callbacks = [JobCard]
+        for comp_class in components_with_internal_callbacks:
+            comp_class.do_registrations(self.register_callback)
 
         self.navbar = self.initialize_navbar(app_descriptor.extra_nav_bar_components, app_descriptor.view_groups)
 
@@ -167,14 +198,15 @@ class RuntimeApplication:
             alerts.render_alerts_div(self.active_alerts)
         ]
 
-    def run_server(self, debug=False, host="0.0.0.0", upgrade_db=False, port=8050):
-        if self.dbm is not None and upgrade_db:
-            self.dbm.upgrade_db()
-
+    def run_server(self, debug=False, host="0.0.0.0", port=8050, **kwargs):
         for startable in Startable.STARTABLE_DICT[ExternalTriggerEvent.SERVER_START]:
             startable.start()
-
-        self.app.run_server(debug=debug, host=host, port=port)
+        try:
+            self.app.run_server(debug=debug, host=host, port=port)
+        except:
+            raise
+        finally:
+            self.dbm.session.close_all()
 
     def initialize_navbar(self, extra_components: List, view_groups: Dict[str, List[Type[BaseView]]]) -> NavBar:
         nav_items = []

@@ -5,16 +5,31 @@ from dash.development.base_component import Component
 
 from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.virtual_objects.interfaces.resultable_event import ResultableEvent, CachedResultableEvent
+import dash_bootstrap_components as dbc
 
 
-def render_event_rectangle(color: StatusesEnum):
-    return html.Span(
-        style={
-            "height": "20px", "width": "20px", "backgroundColor": color.value.hex_color,
-            "display": "inline-block", "marginRight": "2px", "borderRadius": "30px",
-            "verticalAlign": "middle"
-        }
-    )
+def render_event_rectangle(color: StatusesEnum, *, dot_style_override=None, tooltip_id=None):
+    if dot_style_override is None:
+        dot_style_override = {}
+
+    if tooltip_id is not None:
+        span = html.Span(
+            style={
+                "height": "20px", "width": "20px", "backgroundColor": color.value.hex_color,
+                "display": "inline-block", "marginRight": "2px", "borderRadius": "30px",
+                "verticalAlign": "middle", **dot_style_override
+            },
+            id=tooltip_id
+        )
+    else:
+        span = html.Span(
+            style={
+                "height": "20px", "width": "20px", "backgroundColor": color.value.hex_color,
+                "display": "inline-block", "marginRight": "2px", "borderRadius": "30px",
+                "verticalAlign": "middle", **dot_style_override
+            },
+        )
+    return span
 
 
 def render(data: List[StatusesEnum] = []) -> Component:
@@ -31,11 +46,30 @@ def render(data: List[StatusesEnum] = []) -> Component:
     return the_div
 
 
-def render_from_resultable_events(data: List[CachedResultableEvent]) -> Component:
+def render_from_resultable_events(data: List[CachedResultableEvent], *, dot_style_override=None, use_tooltips=False) -> Component:
     if len(data) == 0:
         return html.Div()
 
-    dots = [render_event_rectangle(datum.get_status_color()) for datum in data]
+    if use_tooltips:
+        tooltips = []
+        dots = []
+        for datum in data:
+            dots.append(
+                render_event_rectangle(
+                    color=datum.get_status_color(),
+                    dot_style_override=dot_style_override,
+                    tooltip_id=datum.get_tooltip_id()
+                )
+            )
+
+            tooltips.append(dbc.Tooltip(datum.get_name(), target=datum.get_tooltip_id(), placement="bottom"))
+
+        dots = [*dots, *tooltips]
+    else:
+        dots = [
+            render_event_rectangle(datum.get_status_color(), dot_style_override=dot_style_override)
+            for datum in data
+        ]
 
     the_div = html.Div(
         children=dots,

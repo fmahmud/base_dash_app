@@ -23,6 +23,7 @@ def get_triggering_id_from_callback_context(callback_context):
     if len(callback_context.triggered) == 1 and "prop_id" in callback_context.triggered[0]:
         triggering_id = callback_context.triggered[0]["prop_id"]
 
+    # todo: very fragile - based purely on convention
     if triggering_id.startswith("{"):
         triggering_id = triggering_id.split("}.")[0] + "}"
         id_as_json = json.loads(triggering_id)

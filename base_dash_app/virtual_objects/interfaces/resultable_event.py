@@ -26,6 +26,9 @@ class ResultableEvent(Resultable, Nameable, Listable, Linkable, Event, ABC):
 
 
 class CachedResultableEvent(ResultableEvent):
+    def get_tooltip_id(self):
+        return self.tooltip_id
+
     def get_status_color(self, *, perspective=None) -> StatusesEnum:
         return self.result.status
 
@@ -49,10 +52,13 @@ class CachedResultableEvent(ResultableEvent):
     def get_extras(self):
         return self.original_re.get_extras()
 
-    def __init__(self, result: Result, date: datetime.datetime, *, original_re: ResultableEvent = None):
+    def __init__(
+            self, result: Result, date: datetime.datetime,
+            *, original_re: ResultableEvent = None, tooltip_id=None):
         super().__init__(date)
         self.result: Result = result
         self.original_re: ResultableEvent = original_re
+        self.tooltip_id = tooltip_id
 
     def get_result(self, *, perspective: Callable[['Resultable'], Optional[int]] = None) -> Result:
         return self.result

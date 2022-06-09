@@ -10,7 +10,13 @@ class Event(ABC):
         return self.date
 
     def get_string_date(self):
-        return self.date.strftime("%d/%m/%Y")
+        return self.date.strftime("%d/%m/%Y %H:%M")
 
-    def __lt__(self, other: 'Event'):
+    def __lt__(self, other):
+        if type(other) != type(self):
+            return False
+        if other.date is None or self.date is None:
+            #todo: better comparison between None and nonNones
+            return False
+
         return self.date < other.date

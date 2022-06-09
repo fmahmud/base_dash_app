@@ -30,13 +30,17 @@ class BaseView(BaseComponent, ABC):
         self.path_params = {}
         self.nav_url = nav_url
         self.show_in_navbar = show_in_navbar
+
         self.register_callback_func = register_callback_func
+
         self.get_service = service_provider
         self.get_api = api_provider
         self.get_job = job_provider
         self.dbm: Optional[DbManager] = dbm
+
         self.push_alert = push_alert
         self.remove_alert = remove_alert
+
         self.input_to_states_map: List[InputToState] = input_to_states_map if input_to_states_map else []
         self.input_string_ids_map = {its.get_input_string_id(): its for its in self.input_to_states_map}
 
