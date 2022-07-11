@@ -43,13 +43,17 @@ TEST_ALERT_BTN_ID = "test-alert-btn-id"
 
 class TestJobDef(JobDefinition):
     parameters = [
-        JobParameterDefinition(param_name="Param 1", param_type=str, required=True),
-        JobParameterDefinition(param_name="Param 2", param_type=int),
-        JobParameterDefinition(param_name="Param 3", param_type=str),
+        JobParameterDefinition(param_name="Param 1", param_type=str, required=True, variable_name="param_1"),
+        JobParameterDefinition(param_name="Param 2", param_type=int, variable_name="param_2"),
+        JobParameterDefinition(param_name="Param 3", param_type=bool, variable_name="param_3"),
     ]
 
     def __init__(self, *args, **kwargs):
-        super().__init__()
+        super().__init__(
+            *args,
+            description="This is a test job that doesn't do anything. It has a 50% chance of failure.",
+            **kwargs
+        )
 
     def check_completion_criteria(self, *args, prog_container: VirtualJobProgressContainer, **kwargs) -> StatusesEnum:
         return prog_container.execution_status

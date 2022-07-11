@@ -19,6 +19,8 @@ class BaseService(ABC, Generic[T]):
             service_provider: Callable = None,
             api_provider: Callable = None,
             job_provider: Callable = None,
+            all_apis=None,
+            all_jobs=None,
     ):
         self.dbm: Optional[DbManager] = dbm
         self.__service_name = service_name if service_name is not None else self.__class__.__name__
@@ -27,6 +29,8 @@ class BaseService(ABC, Generic[T]):
         self.get_service = service_provider
         self.get_api = api_provider
         self.get_job = job_provider
+        self.all_jobs = all_jobs
+        self.all_apis = all_apis
 
     def get_by_id(self, id: int) -> T:
         if self.dbm is None:

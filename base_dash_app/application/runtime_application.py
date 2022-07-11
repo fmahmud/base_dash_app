@@ -93,6 +93,9 @@ class RuntimeApplication:
             "job_provider": get_job_by_type,
             "all_jobs": get_all_jobs,
             "all_apis": get_all_apis,
+            "register_callback_func": self.register_callback,
+            "push_alert": push_new_alert,
+            "remove_alert": remove_alert,
         }
 
         job_def_service: JobDefinitionService = JobDefinitionService(**base_service_args)
@@ -110,17 +113,18 @@ class RuntimeApplication:
             if jd.job_class in required_job_to_class_map:
                 actual_type = required_job_to_class_map[jd.job_class]
                 jd.__class__ = actual_type
+                jd.set_base_service_args(**base_service_args)
                 self.job_definitions[actual_type] = jd
 
         for class_name, job_class in required_job_to_class_map.items():
             if job_class not in self.job_definitions:
                 # job was never saved to DB
-                job = JobDefinition(**base_service_args)
+                job = job_class(**base_service_args)
                 job.job_class = job_class.__name__  # todo: what's the point if they're both the same?
                 job.name = job_class.__name__
                 job_def_service.save(job)
 
-                job.__class__ = job_class
+                # job.__class__ = job_class
                 self.job_definitions[job_class] = job
 
         for s in app_descriptor.service_classes:
@@ -129,12 +133,7 @@ class RuntimeApplication:
         self.services[GlobalStateService] = GlobalStateService(initial_state=app_descriptor.initial_global_state)
         self.services[JobDefinitionService] = job_def_service
 
-        base_view_args = {
-            "register_callback_func": self.register_callback,
-            "push_alert": push_new_alert,
-            "remove_alert": remove_alert,
-            **base_service_args
-        }
+        base_view_args = base_service_args
 
         for view in app_descriptor.views:
             self.views.append(view(**base_view_args))

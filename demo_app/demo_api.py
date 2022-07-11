@@ -10,7 +10,7 @@ class DemoApi(API):
     def test_func(*args, **kwargs):
         print("args = " + str(args))
         print("kwargs = " + str(kwargs))
-        return args, kwargs
+        return args
 
 
 test_api = DemoApi()

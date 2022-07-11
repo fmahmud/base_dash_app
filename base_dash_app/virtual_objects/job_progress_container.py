@@ -23,6 +23,7 @@ class VirtualJobProgressContainer:
         self.progress: float = 0.0
         self.completed: bool = False
         self.extras = {}
+        self.logs = []
 
     def get_status(self):
         if self.prerequisites_status in passing_statuses:

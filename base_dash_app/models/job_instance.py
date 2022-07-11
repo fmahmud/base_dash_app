@@ -36,6 +36,7 @@ class JobInstance(CachedResultableEvent, Progressable, BaseModel):
     completion_criteria_status_id = Column(Integer, default=5)
     end_reason = Column(String)
     extras = Column(String)
+    logs = Column(String)
 
     def __repr__(self):
         pass

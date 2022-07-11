@@ -1,25 +1,21 @@
 import datetime
-from typing import List, Type, Dict, Tuple, Optional
+from typing import List, Type, Dict, Optional
 
 import dash
+import dash_bootstrap_components as dbc
 from dash import html, dcc, ALL
 from dash.exceptions import PreventUpdate
 from sqlalchemy.orm import Session
 
-from base_dash_app.components.base_component import BaseComponent, ComponentWithInternalCallback
+from base_dash_app.components.base_component import ComponentWithInternalCallback
 from base_dash_app.components.callback_utils.mappers import InputToState, InputMapping, StateMapping
 from base_dash_app.components.cards.small_card import SmallCard
 from base_dash_app.components.historicals import historical_dots
-from base_dash_app.components.inputs.SimpleLabelledInput import SimpleLabelledInput
+from base_dash_app.components.inputs.simple_labelled_input import SimpleLabelledInput
 from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.models.job_definition import JobDefinition
-from base_dash_app.models.job_instance import JobInstance
 from base_dash_app.services.job_definition_service import JobDefinitionService
-from base_dash_app.virtual_objects.interfaces.resultable_event import CachedResultableEvent
-import dash_bootstrap_components as dbc
-
 from base_dash_app.virtual_objects.job_parameter import JobParameterDefinition
-from base_dash_app.virtual_objects.job_progress_container import VirtualJobProgressContainer
 
 INDEX_DELIMITER = "||||"
 
@@ -33,9 +29,9 @@ JOB_RUNNER_BTN_ID = "job-runner-btn-id"
 
 
 class JobCard(ComponentWithInternalCallback):
-    def __init__(self, job_definition: JobDefinition, job_def_service: JobDefinitionService, *args, **kwargs):
+    def __init__(self, job_definition: Type[JobDefinition], job_def_service: JobDefinitionService, *args, **kwargs):
         super().__init__()
-        self.job_definition: JobDefinition = job_definition
+        self.job_definition = job_definition
         self.job_def_service: JobDefinitionService = job_def_service
 
     @classmethod
@@ -50,7 +46,7 @@ class JobCard(ComponentWithInternalCallback):
         # todo: parameters for job execution - look at DeployedContractView in ContractsDashboard
 
         instance: JobCard
-        job_def: JobDefinition = instance.job_definition
+        job_def: Type[JobDefinition] = instance.job_definition
         session: Session = Session.object_session(job_def)
         session.refresh(job_def)
 
@@ -78,8 +74,6 @@ class JobCard(ComponentWithInternalCallback):
                 }
             """
 
-            print("JobCard: running job!")
-
             param_defs_dict: Dict[str, JobParameterDefinition] = instance.job_definition.get_params_dict()
             param_to_value_map = {}
             should_run = True
@@ -91,14 +85,18 @@ class JobCard(ComponentWithInternalCallback):
 
                     param_def: JobParameterDefinition = param_defs_dict[param_name]
                     prop = state["property"]
-                    if prop not in state:
+                    if prop not in state or state[prop] is None:
                         # no value was entered
                         if param_def.required:
                             error_messages[param_def] = "This parameter is required."
                             should_run = False
                         continue
 
-                    param_to_value_map[param_name] = param_def.convert_to_correct_type(state[prop])
+                    try:
+                        param_to_value_map[param_def.variable_name] = param_def.convert_to_correct_type(state[prop])
+                    except Exception as e:
+                        error_messages[param_def] = str(e)
+                        should_run = False
 
             if should_run:
                 instance.progress_container = instance.job_def_service.run_job(
@@ -112,7 +110,7 @@ class JobCard(ComponentWithInternalCallback):
             children=[
                 self.__render_job_card()
             ],
-            style={"maxWidth": "660px", "padding": "12px"},
+            style={"width": "660px", "position": "relative", "float": "left", "marginRight": "20px"},
             id={"type": JobCard.get_wrapper_div_id(), "index": self._instance_id}
         )
 
@@ -145,7 +143,7 @@ class JobCard(ComponentWithInternalCallback):
         if form_messages is None:
             form_messages = {}
 
-        job: JobDefinition = self.job_definition
+        job = self.job_definition
         is_in_progress = job.current_prog_container is not None
 
         job_class: Type[JobDefinition] = type(job)
@@ -178,14 +176,17 @@ class JobCard(ComponentWithInternalCallback):
         for param in parameter_defs:
             rendered_params.append(
                 SimpleLabelledInput(
+                    label=param.param_name,
                     input_id={
                         "type": JOB_CARD_PARAM_INPUT_ID,
                         "index": f"{self._instance_id}{INDEX_DELIMITER}{param.param_name}"
                     },
                     input_type="number" if param.param_type in [int, float] else "text",
-                    placeholder=param.param_name,
+                    placeholder=param.placeholder,
                     initial_validity=None if param not in form_messages else False,
                     invalid_form_feedback=form_messages[param] if param in form_messages else None,
+                    disabled=not param.editable,
+                    starting_value=param.starting_value
                 ).render()
             )
 
@@ -194,6 +195,7 @@ class JobCard(ComponentWithInternalCallback):
             title=html.H3(job.name),
             body=html.Div(
                 children=[
+                    html.Div(job.description) if job.description is not None else None,
                     html.Div(f"Last Run: {difference_in_days}" if not is_in_progress else "In Progress"),
                     html.Div(
                         children=[
@@ -241,8 +243,5 @@ class JobCard(ComponentWithInternalCallback):
                 ],
             ),
         ).render()
-
-        print("Job is in progress: " + str(job.is_in_progress()))
-        print(f"Job Progress = {job.get_progress()}")
 
         return job_card

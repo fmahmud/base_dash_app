@@ -1,5 +1,6 @@
 import datetime
 from concurrent.futures import ThreadPoolExecutor
+from typing import Type
 
 from sqlalchemy.orm import Session
 
@@ -23,17 +24,18 @@ class JobDefinitionService(BaseService):
 
         self.threadpool_executor = ThreadPoolExecutor(max_workers=5)
 
-    def run_job(self, *args, job_def: JobDefinition, **kwargs):
-        self.logger.info("Starting run job")
-        if job_def.is_in_progress():
-            raise Exception("Can't run two instances of the same job at the same time.")
-
+    def run_job(self, *args, job_def, **kwargs):
         job_class = type(job_def)
+
+        if not issubclass(job_class, JobDefinition):
+            raise Exception(f"Provided job definition was not of a valid type. Was of type {job_class}.")
 
         if job_class == JobDefinition:
             raise Exception("Trying to execute a JobDefinition instead of a child class.")
 
-        # todo: pass session in from outside so we maintain it better.
+        self.logger.info("Starting run job")
+        if job_def.is_in_progress():
+            raise Exception("Can't run two instances of the same job at the same time.")
 
         current_instance = JobInstance()
         current_instance.job_definition_id = job_def.id
