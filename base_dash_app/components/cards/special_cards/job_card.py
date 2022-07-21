@@ -14,8 +14,8 @@ from base_dash_app.components.historicals import historical_dots
 from base_dash_app.components.inputs.simple_labelled_input import SimpleLabelledInput
 from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.models.job_definition import JobDefinition
+from base_dash_app.models.job_definition_parameter import JobDefinitionParameter
 from base_dash_app.services.job_definition_service import JobDefinitionService
-from base_dash_app.virtual_objects.job_parameter import JobParameterDefinition
 
 INDEX_DELIMITER = "||||"
 
@@ -29,9 +29,9 @@ JOB_RUNNER_BTN_ID = "job-runner-btn-id"
 
 
 class JobCard(ComponentWithInternalCallback):
-    def __init__(self, job_definition: Type[JobDefinition], job_def_service: JobDefinitionService, *args, **kwargs):
+    def __init__(self, job_definition: JobDefinition, job_def_service: JobDefinitionService, *args, **kwargs):
         super().__init__()
-        self.job_definition = job_definition
+        self.job_definition: JobDefinition = job_definition
         self.job_def_service: JobDefinitionService = job_def_service
 
     @classmethod
@@ -46,7 +46,7 @@ class JobCard(ComponentWithInternalCallback):
         # todo: parameters for job execution - look at DeployedContractView in ContractsDashboard
 
         instance: JobCard
-        job_def: Type[JobDefinition] = instance.job_definition
+        job_def: JobDefinition = instance.job_definition
         session: Session = Session.object_session(job_def)
         session.refresh(job_def)
 
@@ -74,7 +74,7 @@ class JobCard(ComponentWithInternalCallback):
                 }
             """
 
-            param_defs_dict: Dict[str, JobParameterDefinition] = instance.job_definition.get_params_dict()
+            param_defs_dict: Dict[str, JobDefinitionParameter] = instance.job_definition.get_params_dict()
             param_to_value_map = {}
             should_run = True
             for state in callback_context.states_list[0]:
@@ -83,7 +83,7 @@ class JobCard(ComponentWithInternalCallback):
                     if int(instance_id) != instance._instance_id:
                         continue
 
-                    param_def: JobParameterDefinition = param_defs_dict[param_name]
+                    param_def: JobDefinitionParameter = param_defs_dict[param_name]
                     prop = state["property"]
                     if prop not in state or state[prop] is None:
                         # no value was entered
@@ -139,16 +139,12 @@ class JobCard(ComponentWithInternalCallback):
             )
         ]
 
-    def __render_job_card(self, form_messages: Dict[JobParameterDefinition, Optional[str]] = None):
+    def __render_job_card(self, form_messages: Dict[JobDefinitionParameter, Optional[str]] = None):
         if form_messages is None:
             form_messages = {}
 
         job = self.job_definition
         is_in_progress = job.current_prog_container is not None
-
-        job_class: Type[JobDefinition] = type(job)
-        if job_class == JobDefinition:
-            raise Exception("Trying to render JobDefinition instead of child class.")
 
         last_run_error_message = None
 
@@ -171,22 +167,22 @@ class JobCard(ComponentWithInternalCallback):
         else:
             difference_in_days = "N/A"
 
-        parameter_defs: List[JobParameterDefinition] = job_class.get_parameters()
+        parameter_defs: List[JobDefinitionParameter] = job.parameters
         rendered_params = []
         for param in parameter_defs:
             rendered_params.append(
                 SimpleLabelledInput(
-                    label=param.param_name,
+                    label=param.user_facing_param_name,
                     input_id={
                         "type": JOB_CARD_PARAM_INPUT_ID,
-                        "index": f"{self._instance_id}{INDEX_DELIMITER}{param.param_name}"
+                        "index": f"{self._instance_id}{INDEX_DELIMITER}{param.variable_name}"
                     },
                     input_type="number" if param.param_type in [int, float] else "text",
                     placeholder=param.placeholder,
                     initial_validity=None if param not in form_messages else False,
                     invalid_form_feedback=form_messages[param] if param in form_messages else None,
-                    disabled=not param.editable,
-                    starting_value=param.starting_value
+                    disabled=param.editable is False,
+                    starting_value=param.default_value
                 ).render()
             )
 

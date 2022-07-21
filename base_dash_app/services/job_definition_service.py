@@ -1,6 +1,7 @@
 import datetime
+import json
 from concurrent.futures import ThreadPoolExecutor
-from typing import Type
+from typing import Type, List, Dict
 
 from sqlalchemy.orm import Session
 
@@ -24,7 +25,10 @@ class JobDefinitionService(BaseService):
 
         self.threadpool_executor = ThreadPoolExecutor(max_workers=5)
 
-    def run_job(self, *args, job_def, **kwargs):
+    def run_job(self, *args, job_def, parameter_values: Dict = None, **kwargs):
+        if parameter_values is None:
+            parameter_values = {}
+
         job_class = type(job_def)
 
         if not issubclass(job_class, JobDefinition):
@@ -42,6 +46,7 @@ class JobDefinitionService(BaseService):
         current_instance.start_time = datetime.datetime.now()
         current_instance.date = current_instance.start_time
         current_instance.completion_criteria_status_id = StatusesEnum.IN_PROGRESS.value.id
+        current_instance.parameters = json.dumps(parameter_values)
         self.save(current_instance)
 
         # todo: I don't like this flow - improve this
@@ -58,6 +63,7 @@ class JobDefinitionService(BaseService):
         job_def.current_prog_container = job_progress_container
 
         kwargs["prog_container"] = job_progress_container
+        kwargs["parameter_values"] = parameter_values
 
         def handle_completion(future):
             current_instance.progress = job_progress_container.progress
@@ -99,7 +105,10 @@ class JobDefinitionService(BaseService):
             return prereq_status
 
     def __do_execution(
-            self, *args, job_def: JobDefinition, prog_container: VirtualJobProgressContainer, **kwargs
+            self, *args, job_def: JobDefinition,
+            prog_container: VirtualJobProgressContainer,
+            parameter_values: Dict,
+            **kwargs
     ):
         session: Session = self.dbm.new_session()
 
@@ -109,7 +118,9 @@ class JobDefinitionService(BaseService):
             self.logger.info("checking prerequisites...")
 
             prerequisites_status: StatusesEnum = job_def.check_prerequisites(
-                *args, session=session, prog_container=prog_container, **kwargs
+                *args, session=session, prog_container=prog_container,
+                parameter_values=parameter_values,
+                **kwargs
             )
 
             prog_container.prerequisites_status = prerequisites_status
@@ -118,7 +129,9 @@ class JobDefinitionService(BaseService):
             if prerequisites_status in [StatusesEnum.WARNING, StatusesEnum.SUCCESS]:
                 self.logger.info(f"executing job...")
                 execution_status: StatusesEnum = job_def.start(
-                    *args, session=session, prog_container=prog_container, **kwargs
+                    *args, session=session, prog_container=prog_container,
+                    parameter_values=parameter_values,
+                    **kwargs
                 )
 
                 prog_container.execution_status = execution_status
@@ -127,7 +140,9 @@ class JobDefinitionService(BaseService):
                 self.logger.info(f"checking completion criteria...")
 
                 completion_criteria_status = job_def.check_completion_criteria(
-                    *args, session=session, prog_container=prog_container, **kwargs
+                    *args, session=session, prog_container=prog_container,
+                    parameter_values=parameter_values,
+                    **kwargs
                 )
 
                 prog_container.completion_criteria_status = completion_criteria_status

@@ -2,7 +2,7 @@ import datetime
 import random
 import re
 import time
-from typing import Callable, List
+from typing import Callable, List, Dict
 
 from dash.dependencies import Output, Input, State
 from dash.exceptions import PreventUpdate
@@ -18,6 +18,7 @@ from base_dash_app.components.details.details import DetailTextItem
 from base_dash_app.components.lists.todo_list.todo_list import TodoList
 from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.models.job_definition import JobDefinition
+from base_dash_app.models.job_definition_parameter import JobDefinitionParameter
 from base_dash_app.models.job_instance import JobInstance
 from base_dash_app.models.task import Task
 from base_dash_app.services.job_definition_service import JobDefinitionService
@@ -42,28 +43,63 @@ TEST_ALERT_BTN_ID = "test-alert-btn-id"
 
 
 class TestJobDef(JobDefinition):
-    parameters = [
-        JobParameterDefinition(param_name="Param 1", param_type=str, required=True, variable_name="param_1"),
-        JobParameterDefinition(param_name="Param 2", param_type=int, variable_name="param_2"),
-        JobParameterDefinition(param_name="Param 3", param_type=bool, variable_name="param_3"),
-    ]
+    __mapper_args__ = {
+        "polymorphic_identity": "TestJobDef"
+    }
+
+    @classmethod
+    def force_update(cls):
+        return True
+
+    @classmethod
+    def construct_instance(cls, **kwargs):
+        instance = TestJobDef(**kwargs)
+        instance.name = "Test Job Definition"
+        instance.job_class = "TestJobDef"
+        instance.parameters = TestJobDef.get_general_params()
+        for param in instance.parameters:
+            param.job_definition = instance
+
+        instance.description = "A test job that showcases the capabilities of a job definition, and how to extend it."\
+                               " This job doesn't actually do anything. It has a ~50% chance of failure."
+        return instance
+
+    @classmethod
+    def autoinitialize(cls):
+        return True
+
+    @classmethod
+    def get_general_params(cls):
+        jdp1 = JobDefinitionParameter()
+        jdp1.user_facing_param_name = "Param 1"
+        jdp1.set_param_type(str)
+        jdp1.variable_name = "param_1"
+        jdp1.placeholder = "Some string"
+
+        jdp2 = JobDefinitionParameter()
+        jdp2.user_facing_param_name = "Param 2"
+        jdp2.set_param_type(int)
+        jdp2.variable_name = "param_2"
+        jdp2.placeholder = "Some integer"
+
+        jdp3 = JobDefinitionParameter()
+        jdp3.user_facing_param_name = "Param 3"
+        jdp3.set_param_type(bool)
+        jdp3.variable_name = "param_3"
+        jdp3.placeholder = "Some Boolean"
+
+        return [jdp1, jdp2, jdp3]
 
     def __init__(self, *args, **kwargs):
-        super().__init__(
-            *args,
-            description="This is a test job that doesn't do anything. It has a 50% chance of failure.",
-            **kwargs
-        )
+        super().__init__(*args, **kwargs)
 
     def check_completion_criteria(self, *args, prog_container: VirtualJobProgressContainer, **kwargs) -> StatusesEnum:
         return prog_container.execution_status
 
-    def check_prerequisites(self, *args, prog_container: VirtualJobProgressContainer, **kwargs) -> StatusesEnum:
+    def check_prerequisites(self, *args, prog_container: VirtualJobProgressContainer, parameter_values: Dict, **kwargs) -> StatusesEnum:
         self.logger.info("starting prereq. check")
 
-        if "session" not in kwargs:
-            prog_container.end_reason = "Session not found in kwargs."
-            return StatusesEnum.FAILURE
+        self.logger.info("got param values = " + str(parameter_values))
 
         prog_container.result = 1
         return StatusesEnum.SUCCESS

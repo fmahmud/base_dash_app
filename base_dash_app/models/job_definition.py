@@ -6,24 +6,27 @@ from sqlalchemy.orm import relationship
 
 from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.models.base_model import BaseModel
+from base_dash_app.models.job_definition_parameter import JobDefinitionParameter
 from base_dash_app.models.job_instance import JobInstance
 from base_dash_app.virtual_objects.interfaces.resultable_event_series import ResultableEventSeries, \
     CachedResultableEventSeries
 from base_dash_app.virtual_objects.interfaces.startable import Startable
 from base_dash_app.virtual_objects.interfaces.stoppable import Stoppable
-from base_dash_app.virtual_objects.job_parameter import JobParameterDefinition
 from base_dash_app.virtual_objects.job_progress_container import VirtualJobProgressContainer
+from base_dash_app.virtual_objects.virtual_framework_obj import VirtualFrameworkObject
 
 
-class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel):
+class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel, VirtualFrameworkObject):
     __tablename__ = "job_definitions"
 
     id = Column(Integer, Sequence("job_definitions_id_seq"), primary_key=True)
     name = Column(String)
     job_class = Column(String)
     job_instances = relationship("JobInstance", back_populates="job_definition")
-    repeats = Column(Boolean)
-    seconds_between_runs = Column(Integer)
+    parameters = relationship("JobDefinitionParameter", back_populates="job_definition")
+
+    repeats = Column(Boolean, default=False)
+    seconds_between_runs = Column(Integer, default=0)
     description = Column(String)
 
     __mapper_args__ = {
@@ -46,21 +49,40 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
     def __str__(self):
         pass
 
-    def set_base_service_args(self, *args, service_provider, api_provider, **kwargs):
-        self.service_provider = service_provider
-        self.api_provider = api_provider
+    @classmethod
+    def force_update(cls):
+        return False
 
-    def __init__(self, *args, service_provider, api_provider, description: str = None, **kwargs):
+    @classmethod
+    def construct_instance(cls, **kwargs):
+        if cls == JobDefinition:
+            raise Exception("Cannot make instance of class JobDefinition.")
+
+        raise Exception(f"Class {cls} needs to override construct_instance function.")
+
+    @classmethod
+    def autoinitialize(cls):
+        """
+        If True, at runtime, the system checks if there is an instance of this class in the DB.
+            If there is no instance in the DB, application will use construct_instance method
+            to create default instance and save to DB. If method is not defined, or not overridden,
+            an exception will be raised and the application will fail to start.
+        """
+        return False
+
+    @classmethod
+    def get_general_params(cls):
+        return []
+
+    def __init__(self, *args, **kwargs):
         ResultableEventSeries.__init__(self)
         Startable.__init__(self)
         Stoppable.__init__(self)
+        VirtualFrameworkObject.__init__(self, **kwargs)
 
-        self.description = description
         self.__current_job_instance: Optional[JobInstance] = None
         self.current_prog_container: Optional[VirtualJobProgressContainer] = None
         self.logger = logging.getLogger(self.name)
-        self.service_provider = service_provider
-        self.api_provider = api_provider
 
     @orm.reconstructor
     def init_on_load(self):
@@ -86,18 +108,22 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
         if self.is_in_progress():
             return self.current_prog_container.progress
 
-    @classmethod
-    def get_parameters(cls) -> List[JobParameterDefinition]:
-        return []
+    def get_parameters(self) -> List[JobDefinitionParameter]:
+        return self.parameters
 
-    @classmethod
-    def get_params_dict(cls) -> Dict[str, JobParameterDefinition]:
-        return {jpd.param_name: jpd for jpd in cls.get_parameters()}
+    def get_params_dict(self) -> Dict[str, JobDefinitionParameter]:
+        if len(self.parameters) > 0:
+            return {jpd.variable_name: jpd for jpd in self.parameters}
+        return {}
 
-    def check_completion_criteria(self, *args, prog_container: VirtualJobProgressContainer, **kwargs) -> StatusesEnum:
+    def check_completion_criteria(
+            self, *args, prog_container: VirtualJobProgressContainer, parameter_values: Dict,
+            **kwargs
+    ) -> StatusesEnum:
         """
         Default completion criteria relies on prerequisites and execution statuses
 
+        :param parameter_values:
         :param args:
         :param prog_container:
         :param kwargs:
@@ -111,25 +137,20 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
 
         return StatusesEnum.SUCCESS
 
-    def check_prerequisites(self, *args, prog_container: VirtualJobProgressContainer, **kwargs) -> StatusesEnum:
+    def check_prerequisites(
+        self, *args, prog_container: VirtualJobProgressContainer, parameter_values: Dict,
+        **kwargs
+    ) -> StatusesEnum:
         pass
 
-    def start(self, *args, prog_container: VirtualJobProgressContainer, **kwargs) -> StatusesEnum:
+    def start(
+        self, *args, prog_container: VirtualJobProgressContainer, parameter_values: Dict,
+        **kwargs
+    ) -> StatusesEnum:
         pass
 
-    def stop(self, *args, prog_container: VirtualJobProgressContainer, **kwargs) -> StatusesEnum:
+    def stop(
+        self, *args, prog_container: VirtualJobProgressContainer, parameter_values: Dict,
+        **kwargs
+    ) -> StatusesEnum:
         pass
-
-    # def run_job(self, *args, **kwargs):
-    #     global threadpool_executor
-    #
-    #     if self.__current_thread is not None or self.__current_job_instance is not None:
-    #         raise Exception("Can't run two instances of the same job at the same time")
-    #
-    #     self.__current_job_instance = JobInstance(self, len(self.events) + 1)
-    #     try:
-    #         self.__current_thread = threadpool_executor.submit(
-    #             self.__current_job_instance.start, *args, **kwargs
-    #         )
-    #     except Exception as e:
-    #         raise e

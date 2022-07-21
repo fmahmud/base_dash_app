@@ -15,7 +15,10 @@ class LineGraph(BaseComponent):
     def add_series(self, name, graphables: List[Graphable]):
         self.series[name] = graphables
 
-    def render(self):
+    def render(self, style=None):
+        if style is None:
+            style = {}
+
         scatters = []
         for k, v in self.series.items():
             X = []
@@ -55,6 +58,6 @@ class LineGraph(BaseComponent):
                 'displayModeBar': False,
                 # 'hovermode': 'x',
             },
-            style={"width": "50%", "position": "relative", "float": "left"}
+            style={"width": "50%", "position": "relative", "float": "left", **style}
         )
 

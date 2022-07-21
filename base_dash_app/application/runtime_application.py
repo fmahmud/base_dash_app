@@ -53,7 +53,6 @@ class RuntimeApplication:
         self.active_alerts: List[Alert] = []
         self.services: Dict[Type, BaseService] = {}
         self.apis: Dict[Type, API] = {}
-        self.job_definitions: Dict[Type, JobDefinition] = {}
         self.views: List[BaseView] = []
 
         def push_new_alert(alert: Alert):
@@ -74,12 +73,6 @@ class RuntimeApplication:
         def get_all_apis() -> Dict[Type, API]:
             return self.apis
 
-        def get_job_by_type(jd_class: Type) -> JobDefinition:
-            return self.job_definitions.get(jd_class)
-
-        def get_all_jobs() -> Dict[Type, JobDefinition]:
-            return self.job_definitions
-
         if app_descriptor.db_file is not None:
             self.dbm = DbManager(app_descriptor.db_file)
 
@@ -90,42 +83,33 @@ class RuntimeApplication:
             "dbm": self.dbm,
             "service_provider": get_service_by_type,
             "api_provider": get_api_by_type,
-            "job_provider": get_job_by_type,
-            "all_jobs": get_all_jobs,
             "all_apis": get_all_apis,
             "register_callback_func": self.register_callback,
             "push_alert": push_new_alert,
             "remove_alert": remove_alert,
         }
 
-        job_def_service: JobDefinitionService = JobDefinitionService(**base_service_args)
-        all_jobs_from_db: List[JobDefinition] = job_def_service.get_all()
-
         for api_type in app_descriptor.apis:
             self.apis[api_type] = api_type(**base_service_args)  # parent constructor vars will come from child
 
-        # for job_type in app_descriptor.jobs:  # parent constructor vars will come from child
-        #     self.job_definitions[job_type] = job_type(**base_service_args)
+        job_def_service: JobDefinitionService = JobDefinitionService(**base_service_args)
+        all_jobs_from_db: List[JobDefinition] = job_def_service.get_all()
+        all_job_classes = set([type(jd) for jd in all_jobs_from_db])
 
         required_job_to_class_map = {job_type.__name__: job_type for job_type in app_descriptor.jobs}
 
-        for jd in all_jobs_from_db:
-            if jd.job_class in required_job_to_class_map:
-                actual_type = required_job_to_class_map[jd.job_class]
-                jd.__class__ = actual_type
-                jd.set_base_service_args(**base_service_args)
-                self.job_definitions[actual_type] = jd
-
         for class_name, job_class in required_job_to_class_map.items():
-            if job_class not in self.job_definitions:
-                # job was never saved to DB
-                job = job_class(**base_service_args)
-                job.job_class = job_class.__name__  # todo: what's the point if they're both the same?
-                job.name = job_class.__name__
-                job_def_service.save(job)
+            if issubclass(job_class, JobDefinition) and job_class.autoinitialize():
+                if job_class not in all_job_classes:
+                    # job was never saved to DB and it should be autoinitialized
+                    job = job_class.construct_instance(**base_service_args)
+                    job_def_service.save(job)
 
-                # job.__class__ = job_class
-                self.job_definitions[job_class] = job
+                    all_jobs_from_db.append(job)
+                    all_job_classes.add(job_class)
+                elif job_class.force_update():
+
+                    pass
 
         for s in app_descriptor.service_classes:
             self.services[s] = s(**base_service_args)

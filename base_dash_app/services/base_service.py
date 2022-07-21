@@ -21,6 +21,7 @@ class BaseService(ABC, Generic[T]):
             job_provider: Callable = None,
             all_apis=None,
             all_jobs=None,
+            **kwargs,
     ):
         self.dbm: Optional[DbManager] = dbm
         self.__service_name = service_name if service_name is not None else self.__class__.__name__
