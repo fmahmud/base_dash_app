@@ -3,6 +3,7 @@ from typing import List, Type, Hashable, Any, Dict
 from base_dash_app.apis.api import API
 from base_dash_app.components.callback_utils.mappers import InputToState
 from base_dash_app.services.base_service import BaseService
+from base_dash_app.utils.env_vars.env_var_def import EnvVarDefinition
 from base_dash_app.views.base_view import BaseView
 from base_dash_app.models.job_definition import JobDefinition
 
@@ -26,7 +27,8 @@ class AppDescriptor:
             logging_format=None,
             log_level=None,
             jobs: List[Type[JobDefinition]] = None,
-            upgrade_db=False
+            upgrade_db=False,
+            env_vars: List[EnvVarDefinition] = None
     ):
         """
         :param db_file: Optional - location of an sqlite db file
@@ -53,3 +55,4 @@ class AppDescriptor:
         self.log_level = log_level
         self.jobs: List[Type[JobDefinition]] = jobs if jobs is not None else []
         self.upgrade_db = upgrade_db
+        self.env_vars = env_vars if env_vars is not None else []

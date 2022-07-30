@@ -1,3 +1,4 @@
+import os
 import traceback
 from typing import List, Callable, Dict, Type, Union
 from urllib.parse import unquote
@@ -22,6 +23,7 @@ from base_dash_app.services.base_service import BaseService
 from base_dash_app.services.global_state_service import GlobalStateService
 from base_dash_app.services.job_definition_service import JobDefinitionService
 from base_dash_app.utils.db_utils import DbManager
+from base_dash_app.utils.env_vars.env_var_def import EnvVarDefinition
 from base_dash_app.views.base_view import BaseView
 from base_dash_app.virtual_objects.interfaces.startable import Startable, ExternalTriggerEvent
 from base_dash_app.models.job_definition import JobDefinition
@@ -54,6 +56,13 @@ class RuntimeApplication:
         self.services: Dict[Type, BaseService] = {}
         self.apis: Dict[Type, API] = {}
         self.views: List[BaseView] = []
+        self.env_vars: Dict[str, EnvVarDefinition] = {}
+        for e in self.app_descriptor.env_vars:
+            e.value = e.var_type(os.getenv(e.name))
+            if e.value is None and e.required:
+                raise Exception(f"Could not find required environment variable: {e.name}.")
+
+            self.env_vars[e.name] = e
 
         def push_new_alert(alert: Alert):
             if type(alert) != Alert:
@@ -87,6 +96,7 @@ class RuntimeApplication:
             "register_callback_func": self.register_callback,
             "push_alert": push_new_alert,
             "remove_alert": remove_alert,
+            "env_vars": self.env_vars
         }
 
         for api_type in app_descriptor.apis:

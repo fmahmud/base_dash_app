@@ -9,7 +9,7 @@ from dash.exceptions import PreventUpdate
 from sqlalchemy.orm import Session
 
 from base_dash_app.components.alerts import Alert
-from base_dash_app.components.callback_utils.mappers import InputToState, InputMapping
+from base_dash_app.components.callback_utils.mappers import InputToState, InputMapping, StateMapping
 from base_dash_app.components.cards.special_cards.job_card import JobCard
 from base_dash_app.components.data_visualization import ratio_bar
 from base_dash_app.components.data_visualization.ratio_bar import StatusToCount
@@ -144,6 +144,18 @@ class DemoView(BaseView):
                     ),
                     states=[]
                 ),
+                InputToState(
+                    input_mapping=InputMapping(
+                        input_id=SEARCH_BUTTON_ID,
+                        input_property="n_clicks"
+                    ),
+                    states=[
+                        StateMapping(
+                            state_id=SEARCH_BAR_ID,
+                            state_property="value"
+                        )
+                    ]
+                )
             ]
         )
         self.todo_list_component = TodoList(
@@ -172,6 +184,14 @@ class DemoView(BaseView):
     def handle_any_input(self, *args, triggering_id, index):
         if triggering_id.startswith(TEST_ALERT_BTN_ID):
             self.push_alert(Alert("Test Alert!"))
+        elif triggering_id.startswith(SEARCH_BUTTON_ID):
+            state_mapping = self.get_callback_state(SEARCH_BUTTON_ID, args)
+            search_value = state_mapping[SEARCH_BAR_ID]
+
+            stock_quote = self.finnhub_client.quote(search_value)
+            if "c" in stock_quote and "o" in stock_quote:
+                stock_quote['symbol'] = search_value
+                self.watchlist.append(stock_quote)
 
         job_def_service: JobDefinitionService = self.get_service(JobDefinitionService)
         job_def: JobDefinition = job_def_service.get_by_id(self.test_job_id)
@@ -183,19 +203,6 @@ class DemoView(BaseView):
                 job_def_service
             )
         ]
-
-    def handle_search(self, n_clicks, search_value):
-        if n_clicks == 0 or n_clicks is None:
-            raise PreventUpdate()
-        if search_value is None or search_value == '':
-            raise PreventUpdate()
-
-        stock_quote = self.finnhub_client.quote(search_value)
-        if "c" in stock_quote and "o" in stock_quote:
-            stock_quote['symbol'] = search_value
-            self.watchlist.append(stock_quote)
-
-        return DemoView.render_watchlist(self.watchlist)
 
     @staticmethod
     def render_watchlist(watchlist):
@@ -242,7 +249,11 @@ class DemoView(BaseView):
                 dbc.Button("Test Alerts", id=TEST_ALERT_BTN_ID, style=test_button_style),
                 JobCard(job, job_def_service).render(),
                 search_bar,
-                html.Div(children=[], id=SEARCH_RESULT_DIV_ID, style={"marginTop": "40px"}),
+                html.Div(
+                    children=DemoView.render_watchlist(watchlist),
+                    id=SEARCH_RESULT_DIV_ID,
+                    style={"marginTop": "40px"}
+                ),
                 ratio_bar.render_from_stc_list([
                     StatusToCount(state_name="A", count=5, color=StatusesEnum.PENDING),
                     StatusToCount(state_name="B", count=5, color=StatusesEnum.IN_PROGRESS)

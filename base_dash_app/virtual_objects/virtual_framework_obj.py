@@ -8,3 +8,4 @@ class VirtualFrameworkObject:
         self.register_callback_func = kwargs["register_callback_func"] if "register_callback_func" in kwargs else None
         self.push_alert = kwargs["push_alert"] if "push_alert" in kwargs else None
         self.remove_alert = kwargs["remove_alert"] if "remove_alert" in kwargs else None
+        self.env_vars = kwargs["env_vars"] if "env_vars" in kwargs else None
