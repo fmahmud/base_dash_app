@@ -8,10 +8,14 @@ from base_dash_app.virtual_objects.interfaces.listable import Listable
 def render_list_card(
         listables: List[Listable],
         title: str,
-        buttons: List = None
+        buttons: List = None,
+        style=None
 ):
     if buttons is None:
         buttons = []
+
+    if style is None:
+        style = {}
 
     return dbc.Card(
         children=[
@@ -31,6 +35,6 @@ def render_list_card(
         ],
         style={
             "width": "30%", "position": "relative", "float": "left",
-            "margin": "20px", "minWidth": "300px"
+            "margin": "20px", "minWidth": "300px", **style
         },
     )
