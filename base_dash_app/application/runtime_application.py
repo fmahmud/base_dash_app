@@ -17,7 +17,6 @@ from base_dash_app.components.callback_utils.mappers import InputToState
 from base_dash_app.components.callback_utils.utils import get_triggering_id_from_callback_context, \
     get_state_values_for_input_from_args_list, invalid_n_clicks
 from base_dash_app.components.cards.special_cards.job_card import JobCard
-from base_dash_app.components.lists.todo_list.todo_list_item import TaskGroup
 from base_dash_app.components.navbar import NavBar, NavDefinition, NavGroup
 from base_dash_app.services.base_service import BaseService
 from base_dash_app.services.global_state_service import GlobalStateService
@@ -57,6 +56,7 @@ class RuntimeApplication:
         self.apis: Dict[Type, API] = {}
         self.views: List[BaseView] = []
         self.env_vars: Dict[str, EnvVarDefinition] = {}
+        self.jobs: Dict[Type, JobDefinition] = {}
         for e in self.app_descriptor.env_vars:
             e.value = e.var_type(os.getenv(e.name))
             if e.value is None and e.required:
@@ -82,8 +82,11 @@ class RuntimeApplication:
         def get_all_apis() -> Dict[Type, API]:
             return self.apis
 
-        if app_descriptor.db_file is not None:
-            self.dbm = DbManager(app_descriptor.db_file)
+        def get_job_by_class(clazz):
+            return self.jobs[clazz]
+
+        if app_descriptor.db_descriptor is not None:
+            self.dbm = DbManager(app_descriptor.db_descriptor)
 
         if self.dbm is not None and app_descriptor.upgrade_db:
             self.dbm.upgrade_db()
@@ -96,7 +99,8 @@ class RuntimeApplication:
             "register_callback_func": self.register_callback,
             "push_alert": push_new_alert,
             "remove_alert": remove_alert,
-            "env_vars": self.env_vars
+            "env_vars": self.env_vars,
+            "job_provider": get_job_by_class
         }
 
         for api_type in app_descriptor.apis:
@@ -118,7 +122,7 @@ class RuntimeApplication:
                     all_jobs_from_db.append(job)
                     all_job_classes.add(job_class)
                 elif job_class.force_update():
-
+                    # todo
                     pass
 
         for s in app_descriptor.service_classes:

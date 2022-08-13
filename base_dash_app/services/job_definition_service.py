@@ -25,6 +25,12 @@ class JobDefinitionService(BaseService):
 
         self.threadpool_executor = ThreadPoolExecutor(max_workers=5)
 
+    def get_by_class(self, clazz):
+        session: Session = self.dbm.get_session()
+        job_def = session.query(clazz).filter_by(job_class=clazz.__name__).first()
+        job_def.set_vars_from_kwargs(**self.produce_kwargs())
+        return job_def
+
     def run_job(self, *args, job_def, parameter_values: Dict = None, **kwargs):
         if parameter_values is None:
             parameter_values = {}
@@ -76,6 +82,8 @@ class JobDefinitionService(BaseService):
             current_instance.result = Result(
                 job_progress_container.result, job_progress_container.completion_criteria_status
             )
+            current_instance.extras = json.dumps(job_progress_container.extras)
+            current_instance.logs = json.dumps(job_progress_container.logs)
 
             self.save(current_instance)
             job_def.process_cached_result(current_instance)

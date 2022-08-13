@@ -13,7 +13,9 @@ dash-core-components==2.0.0
 dash-html-components==2.0.0
 dash-renderer==1.8.0
 dash-table==5.0.0
+distlib==0.3.5
 docutils==0.18
+filelock==3.8.0
 finnhub-python==2.4.8
 Flask==1.1.2
 Flask-Compress==1.5.0
@@ -30,10 +32,13 @@ mysql-connector-python==8.0.21
 numpy==1.22.1
 packaging==21.3
 pandas==1.4.0
+pipenv==2022.8.5
 pipx==0.16.4
 pkginfo==1.8.1
+platformdirs==2.5.2
 plotly==5.6.0
 protobuf==3.13.0
+psycopg2==2.9.3
 Pygments==2.10.0
 pyparsing==3.0.6
 python-dateutil==2.8.2
@@ -55,6 +60,8 @@ uplink==0.9.7
 uritemplate==4.1.1
 urllib3==1.26.7
 userpath==1.7.0
+virtualenv==20.16.3
+virtualenv-clone==0.5.7
 webencodings==0.5.1
 Werkzeug==1.0.1
 zipp==3.6.0

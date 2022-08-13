@@ -1,35 +1,27 @@
-import datetime
+import random
 import random
 import re
 import time
-from typing import Callable, List, Dict
+from typing import List, Dict
 
-from dash.dependencies import Output, Input, State
-from dash.exceptions import PreventUpdate
-from sqlalchemy.orm import Session
+import dash_bootstrap_components as dbc
+import finnhub
+from dash import html
 
 from base_dash_app.components.alerts import Alert
 from base_dash_app.components.callback_utils.mappers import InputToState, InputMapping, StateMapping
 from base_dash_app.components.cards.special_cards.job_card import JobCard
 from base_dash_app.components.data_visualization import ratio_bar
 from base_dash_app.components.data_visualization.ratio_bar import StatusToCount
-from base_dash_app.components.details import details
-from base_dash_app.components.details.details import DetailTextItem
 from base_dash_app.components.lists.todo_list.todo_list import TodoList
 from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.models.job_definition import JobDefinition
 from base_dash_app.models.job_definition_parameter import JobDefinitionParameter
-from base_dash_app.models.job_instance import JobInstance
 from base_dash_app.models.task import Task
 from base_dash_app.services.job_definition_service import JobDefinitionService
-from base_dash_app.virtual_objects.job_progress_container import VirtualJobProgressContainer
-from base_dash_app.utils.db_utils import DbManager
 from base_dash_app.views.base_view import BaseView
-from dash import html
-import dash_bootstrap_components as dbc
-import finnhub
-
 from base_dash_app.virtual_objects.job_parameter import JobParameterDefinition
+from base_dash_app.virtual_objects.job_progress_container import VirtualJobProgressContainer
 
 RUN_TEST_JOB_BTN_ID = "run-test-job-btn-id"
 
@@ -66,7 +58,7 @@ class TestJobDef(JobDefinition):
 
     @classmethod
     def autoinitialize(cls):
-        return True
+        return False
 
     @classmethod
     def get_general_params(cls):

@@ -100,7 +100,7 @@ class JobCard(ComponentWithInternalCallback):
 
             if should_run:
                 instance.progress_container = instance.job_def_service.run_job(
-                    job_def=instance.job_definition, **param_to_value_map
+                    job_def=instance.job_definition, parameter_values=param_to_value_map
                 )
 
         return [instance.__render_job_card(form_messages=error_messages)]

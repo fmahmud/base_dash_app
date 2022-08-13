@@ -26,7 +26,7 @@ def __make_call(url, func, headers=get_base_header(), body={}, url_params={}, au
         try:
             response = func(
                 url=url, headers=headers,
-                data=json.dumps(body), params=url_params, auth=auth, timeout=200
+                data=None if body is None else json.dumps(body), params=url_params, auth=auth, timeout=200
             )
             if hasattr(response, 'status_code'):
                 status_code = response.status_code
@@ -48,6 +48,9 @@ def __make_call(url, func, headers=get_base_header(), body={}, url_params={}, au
 
         if i == max_retries:
             raise exception
+
+    if type(response) is dict:
+        return {}, status_code
 
     return response.json(), status_code
 

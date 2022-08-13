@@ -35,26 +35,67 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
     }
 
     def __lt__(self, other):
+        # todo
         pass
 
     def __eq__(self, other):
+        # todo
         pass
 
     def __hash__(self):
+        # todo
         pass
 
     def __repr__(self):
-        pass
+        return vars(self)
 
     def __str__(self):
+        # todo
         pass
+
+    def info_log(self, message):
+        self.logger.info(message)
+        if self.current_prog_container is not None:
+            self.current_prog_container.logs.append(f"[INFO]{message}")
+
+    def error_log(self, message):
+        self.logger.error(message)
+        if self.current_prog_container is not None:
+            self.current_prog_container.logs.append(f"[ERROR]{message}")
+
+    def critical_log(self, message):
+        self.logger.critical(message)
+        if self.current_prog_container is not None:
+            self.current_prog_container.logs.append(f"[CRITICAL]{message}")
+
+    def debug_log(self, message):
+        self.logger.debug(message)
+        if self.current_prog_container is not None:
+            self.current_prog_container.logs.append(f"[DEBUG]{message}")
+
+    def warn_log(self, message):
+        self.logger.warn(message)
+        if self.current_prog_container is not None:
+            self.current_prog_container.logs.append(f"[WARN]{message}")
 
     @classmethod
     def force_update(cls):
+        """
+        NOT IN USE ATM.
+        At runtime, if autoinitialize returns True for this child class, the existing instance
+        in the DB will have its data overridden by the data present in this instance. If False,
+        no action will be taken.
+        :return:
+        """
         return False
 
     @classmethod
     def construct_instance(cls, **kwargs):
+        """
+        Child classes of JobDefinition must implement this function.
+        :param kwargs:
+        :return:
+        """
         if cls == JobDefinition:
             raise Exception("Cannot make instance of class JobDefinition.")
 

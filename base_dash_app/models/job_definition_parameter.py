@@ -4,6 +4,10 @@ from sqlalchemy.orm import relationship
 from base_dash_app.models.base_model import BaseModel
 
 
+TRUES = ["True", "true"]
+FALSES = ["False", "false"]
+
+
 class JobDefinitionParameter(BaseModel):
     __tablename__ = "job_definition_parameters"
 
@@ -76,3 +80,29 @@ class JobDefinitionParameter(BaseModel):
 
     def __str__(self):
         pass
+
+    def __helper_convert_to_type(self, x):
+        if self.param_type != str and type(x) == str:
+            x = x.replace(" ", "").strip()
+
+        if type(x) != self.param_type:
+
+            if self.param_type == bool:
+                if x not in (TRUES + FALSES):
+                    raise Exception("Invalid input for type boolean.")
+                else:
+                    x = x in TRUES
+            else:
+                x = self.param_type(x)
+        return x
+
+    def convert_to_correct_type(self, user_input):
+        if self.is_list:
+            to_return = []
+            input_split = user_input.split(",")
+            for x in input_split:
+                to_return.append(self.__helper_convert_to_type(x))
+
+            return to_return
+        else:
+            return self.__helper_convert_to_type(user_input)
