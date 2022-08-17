@@ -85,7 +85,7 @@ class JobCard(ComponentWithInternalCallback):
 
                     param_def: JobDefinitionParameter = param_defs_dict[param_name]
                     prop = state["property"]
-                    if prop not in state or state[prop] is None:
+                    if prop not in state or state[prop] is None or state[prop] == "":
                         # no value was entered
                         if param_def.required:
                             error_messages[param_def] = "This parameter is required."
@@ -105,12 +105,18 @@ class JobCard(ComponentWithInternalCallback):
 
         return [instance.__render_job_card(form_messages=error_messages)]
 
-    def render(self, *args, **kwargs):
+    def render(self, wrapper_style_override=None):
+        if wrapper_style_override is None:
+            wrapper_style_override = {}
+
         return html.Div(
             children=[
                 self.__render_job_card()
             ],
-            style={"width": "660px", "position": "relative", "float": "left", "marginRight": "20px"},
+            style={
+                "width": "660px", "position": "relative", "float": "left", "margin": "20px",
+                **wrapper_style_override
+            },
             id={"type": JobCard.get_wrapper_div_id(), "index": self._instance_id}
         )
 

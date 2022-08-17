@@ -43,7 +43,8 @@ class RuntimeApplication:
         self.app_descriptor = app_descriptor
 
         self.app = dash.Dash(
-            title=app_descriptor.title, external_stylesheets=app_descriptor.external_stylesheets,
+            title=app_descriptor.title,
+            external_stylesheets=app_descriptor.external_stylesheets,
             suppress_callback_exceptions=True,
             assets_folder='./base_dash_app/assets'
         )
@@ -89,7 +90,7 @@ class RuntimeApplication:
             self.dbm = DbManager(app_descriptor.db_descriptor)
 
         if self.dbm is not None and app_descriptor.upgrade_db:
-            self.dbm.upgrade_db()
+            self.dbm.upgrade_db(drop_first=app_descriptor.drop_tables)
 
         base_service_args = {
             "dbm": self.dbm,

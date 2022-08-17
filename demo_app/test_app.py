@@ -12,22 +12,16 @@ external_stylesheets = [
 ]
 
 db_descriptor: DbDescriptor = DbDescriptor(
-    db_uri="sxr-global-postgres.cpdy9vzkhoep.ap-south-1.rds.amazonaws.com",
-    engine_type=DbEngineTypes.POSTGRES,
-    username="postgres", password="Six3rD3v",
-    schema="allocations"
+    db_uri="./temp.db",
+    engine_type=DbEngineTypes.SQLITE
 )
-
-# db_descriptor: DbDescriptor = DbDescriptor(
-#     db_uri="./temp.db",
-#     engine_type=DbEngineTypes.SQLITE
-# )
 
 my_app_descriptor = AppDescriptor(
     db_descriptor=db_descriptor,
     title="Test App", external_stylesheets=external_stylesheets,
     views=[DemoView], view_groups={"Test": [DemoView]},
-    jobs=[TestJobDef], upgrade_db=False
+    jobs=[TestJobDef], upgrade_db=True,
+    drop_tables=True
 )
 
 app = RuntimeApplication(my_app_descriptor)
