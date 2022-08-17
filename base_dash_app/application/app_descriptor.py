@@ -32,7 +32,9 @@ class AppDescriptor:
             upgrade_db=False,
             env_vars: List[EnvVarDefinition] = None,
             env_file_location: str = None,
-            drop_tables: bool = None
+            drop_tables: bool = None,
+            use_auth: bool = None,
+            valid_user_pairs: Dict[str, str] = None
     ):
         """
         :param db_descriptor: Optional - location of an sqlite db file
@@ -82,3 +84,5 @@ class AppDescriptor:
         self.env_vars: List[EnvVarDefinition] = env_vars or []
         self.env_file_location: str = env_file_location
         self.drop_tables: bool = drop_tables
+        self.use_auth: bool = use_auth
+        self.valid_user_pairs: Dict[str, str] = valid_user_pairs or {}

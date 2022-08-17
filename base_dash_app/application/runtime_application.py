@@ -4,6 +4,7 @@ from typing import List, Callable, Dict, Type, Union
 from urllib.parse import unquote
 
 import dash
+import dash_auth
 from dash import dcc, html
 from dash.dependencies import Output, Input, State, ALL
 from dash.exceptions import PreventUpdate
@@ -48,6 +49,12 @@ class RuntimeApplication:
             suppress_callback_exceptions=True,
             assets_folder='./base_dash_app/assets'
         )
+
+        if app_descriptor.use_auth:
+            self.auth = dash_auth.BasicAuth(
+                self.app,
+                app_descriptor.valid_user_pairs
+            )
 
         self.server = self.app.server
         self.dbm = None

@@ -21,7 +21,9 @@ my_app_descriptor = AppDescriptor(
     title="Test App", external_stylesheets=external_stylesheets,
     views=[DemoView], view_groups={"Test": [DemoView]},
     jobs=[TestJobDef], upgrade_db=True,
-    drop_tables=True
+    drop_tables=True,
+    use_auth=True,
+    valid_user_pairs={"test": "test"}
 )
 
 app = RuntimeApplication(my_app_descriptor)
