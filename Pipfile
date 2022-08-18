@@ -64,6 +64,7 @@ webencodings = "==0.5.1"
 werkzeug = "==1.0.1"
 zipp = "==3.6.0"
 psycopg2-binary = "*"
+dash-auth = "*"
 
 [dev-packages]
 pre-commit = "*"

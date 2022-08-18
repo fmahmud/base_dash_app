@@ -4,6 +4,7 @@ from typing import List, Callable, Dict, Type, Union
 from urllib.parse import unquote
 
 import dash
+import dash_auth
 from dash import dcc, html
 from dash.dependencies import Output, Input, State, ALL
 from dash.exceptions import PreventUpdate
@@ -43,10 +44,17 @@ class RuntimeApplication:
         self.app_descriptor = app_descriptor
 
         self.app = dash.Dash(
-            title=app_descriptor.title, external_stylesheets=app_descriptor.external_stylesheets,
+            title=app_descriptor.title,
+            external_stylesheets=app_descriptor.external_stylesheets,
             suppress_callback_exceptions=True,
             assets_folder='./base_dash_app/assets'
         )
+
+        if app_descriptor.use_auth:
+            self.auth = dash_auth.BasicAuth(
+                self.app,
+                app_descriptor.valid_user_pairs
+            )
 
         self.server = self.app.server
         self.dbm = None
@@ -89,7 +97,7 @@ class RuntimeApplication:
             self.dbm = DbManager(app_descriptor.db_descriptor)
 
         if self.dbm is not None and app_descriptor.upgrade_db:
-            self.dbm.upgrade_db()
+            self.dbm.upgrade_db(drop_first=app_descriptor.drop_tables)
 
         base_service_args = {
             "dbm": self.dbm,

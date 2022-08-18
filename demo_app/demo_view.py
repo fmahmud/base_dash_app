@@ -58,7 +58,7 @@ class TestJobDef(JobDefinition):
 
     @classmethod
     def autoinitialize(cls):
-        return False
+        return True
 
     @classmethod
     def get_general_params(cls):
