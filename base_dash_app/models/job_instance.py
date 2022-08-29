@@ -1,14 +1,12 @@
 import datetime
-from typing import Callable, Optional
 
-from sqlalchemy import Column, Integer, Sequence, Float, Date, orm, String, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, Sequence, Float, orm, String, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 
 from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.models.base_model import BaseModel
 from base_dash_app.virtual_objects.interfaces.progressable import Progressable
-from base_dash_app.virtual_objects.interfaces.resultable import Resultable
-from base_dash_app.virtual_objects.interfaces.resultable_event import ResultableEvent, CachedResultableEvent
+from base_dash_app.virtual_objects.interfaces.resultable_event import CachedResultableEvent
 from base_dash_app.virtual_objects.interfaces.startable import Startable
 from base_dash_app.virtual_objects.interfaces.stoppable import Stoppable
 from base_dash_app.virtual_objects.result import Result
@@ -39,10 +37,20 @@ class JobInstance(CachedResultableEvent, Progressable, BaseModel):
     logs = Column(String)
 
     def __repr__(self):
-        pass
+        return vars(self)
 
     def __str__(self):
         pass
+
+    def get_formatted_start_time(self, format="%Y-%m-%d %H:%M"):
+        if self.start_time is not None:
+            return self.start_time.strftime(format)
+        return "Unknown"
+
+    def get_formatted_end_time(self, format="%Y-%m-%d %H:%M"):
+        if self.end_time is not None:
+            return self.end_time.strftime(format)
+        return "Unknown"
 
     def get_progress(self):
         return self.progress

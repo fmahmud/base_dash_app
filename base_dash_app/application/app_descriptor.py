@@ -34,7 +34,8 @@ class AppDescriptor:
             env_file_location: str = None,
             drop_tables: bool = None,
             use_auth: bool = None,
-            valid_user_pairs: Dict[str, str] = None
+            valid_user_pairs: Dict[str, str] = None,
+            silence_routes_logging: bool = True
     ):
         """
         :param db_descriptor: Optional - location of an sqlite db file
@@ -86,3 +87,4 @@ class AppDescriptor:
         self.drop_tables: bool = drop_tables
         self.use_auth: bool = use_auth
         self.valid_user_pairs: Dict[str, str] = valid_user_pairs or {}
+        self.silence_routes_logging: bool = silence_routes_logging
