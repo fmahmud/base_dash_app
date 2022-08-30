@@ -275,7 +275,9 @@ class RuntimeApplication:
                     }
                 ),
                 dcc.Interval(
-                    id=ALERTS_WRAPPER_INTERVAL_ID, interval=1000, disabled=False
+                    id=ALERTS_WRAPPER_INTERVAL_ID,
+                    interval=self.app_descriptor.alerts_refresh_timeout or 1000,
+                    disabled=False
                 ),
                 html.Div(
                     id="page-content",
@@ -283,14 +285,6 @@ class RuntimeApplication:
                         "height": "100%", "padding": "20px", "margin": "0 auto",
                     }
                 ),
-                # todo - global alerts div (issue #16)
-                # html.Div(
-                #     id="alerts-div",
-                #     style={
-                #         "position": "fixed", "top": "30px", "width": "500px", "margin": "0 auto", "height": "400px",
-                #         "zIndex": "90000"
-                #     }
-                # )
             ],
             style={"fontFamily": "'Roboto', sans-serif"}
         )
