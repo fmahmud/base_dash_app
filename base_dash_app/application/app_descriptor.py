@@ -35,20 +35,10 @@ class AppDescriptor:
             drop_tables: bool = None,
             use_auth: bool = None,
             valid_user_pairs: Dict[str, str] = None,
-            silence_routes_logging: bool = True
+            silence_routes_logging: bool = True,
+            alerts_refresh_timeout: int = 1000,
     ):
         """
-        :param db_descriptor: Optional - location of an sqlite db file
-        :param title: Optional - Title of app
-        :param service_classes: Optional - list of all uninitialized service classes that extend BaseService
-        :param external_stylesheets:
-        :param views: Optional - List of all uninitialized view classes that extend BaseView that could be rendered in
-            the app
-        :param initial_global_state: Sets the initial global state in the global state service
-        :param extra_nav_bar_components: Appends any provided rendered components to the right side of the nav bar
-        """
-        """
-         
         :param global_inputs: 
         :param view_groups: 
         :param apis: 
@@ -88,3 +78,4 @@ class AppDescriptor:
         self.use_auth: bool = use_auth
         self.valid_user_pairs: Dict[str, str] = valid_user_pairs or {}
         self.silence_routes_logging: bool = silence_routes_logging
+        self.alerts_refresh_timeout: int = alerts_refresh_timeout
