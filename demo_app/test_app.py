@@ -26,7 +26,8 @@ my_app_descriptor = AppDescriptor(
     drop_tables=True,
     use_auth=True,
     valid_user_pairs={"test": "test"},
-    log_level=logging.WARN
+    log_level=logging.WARN,
+    alerts_refresh_timeout=2000
 )
 
 app = RuntimeApplication(my_app_descriptor)

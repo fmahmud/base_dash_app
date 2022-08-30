@@ -127,7 +127,7 @@ class TestJobDef(JobDefinition):
 class DemoView(BaseView):
     def __init__(self, **kwargs):
         super().__init__(
-            "Demo View", re.compile("^/demo$"), show_in_navbar=True, nav_url="/demo", **kwargs,
+            "Demo View", re.compile("^/demo$|^/$"), show_in_navbar=True, nav_url="/demo", **kwargs,
             input_to_states_map=[
                 InputToState(
                     input_mapping=InputMapping(

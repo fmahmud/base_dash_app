@@ -42,7 +42,7 @@ class RuntimeApplication:
             log_level=app_descriptor.log_level
         )
 
-        self.app_descriptor = app_descriptor
+        self.app_descriptor: AppDescriptor = app_descriptor
 
         self.app = dash.Dash(
             title=app_descriptor.title,

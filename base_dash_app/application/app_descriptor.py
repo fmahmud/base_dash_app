@@ -36,7 +36,7 @@ class AppDescriptor:
             use_auth: bool = None,
             valid_user_pairs: Dict[str, str] = None,
             silence_routes_logging: bool = True,
-            alerts_refresh_timeout: int = 1000
+            alerts_refresh_timeout: int = 1000,
     ):
         """
         :param global_inputs: 
