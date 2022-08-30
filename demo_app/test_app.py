@@ -1,3 +1,5 @@
+import logging
+
 import dash_bootstrap_components as dbc
 
 from base_dash_app.application.runtime_application import RuntimeApplication
@@ -23,7 +25,8 @@ my_app_descriptor = AppDescriptor(
     jobs=[TestJobDef], upgrade_db=True,
     drop_tables=True,
     use_auth=True,
-    valid_user_pairs={"test": "test"}
+    valid_user_pairs={"test": "test"},
+    log_level=logging.WARN
 )
 
 app = RuntimeApplication(my_app_descriptor)

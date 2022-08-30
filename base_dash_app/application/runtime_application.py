@@ -1,3 +1,4 @@
+import logging
 import os
 import traceback
 from typing import List, Callable, Dict, Type, Union
@@ -49,6 +50,9 @@ class RuntimeApplication:
             suppress_callback_exceptions=True,
             assets_folder='./base_dash_app/assets'
         )
+
+        self.app.logger.handlers.clear()
+        self.app.logger.setLevel(app_descriptor.log_level or logging.INFO)
 
         if app_descriptor.use_auth:
             self.auth = dash_auth.BasicAuth(
@@ -215,7 +219,10 @@ class RuntimeApplication:
         for startable in Startable.STARTABLE_DICT[ExternalTriggerEvent.SERVER_START]:
             startable.start()
         try:
-            self.app.run_server(debug=debug, host=host, port=port)
+            self.app.run_server(
+                debug=debug, host=host, port=port,
+                dev_tools_silence_routes_logging=self.app_descriptor.silence_routes_logging
+            )
         except:
             raise
         finally:

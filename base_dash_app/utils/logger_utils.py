@@ -1,4 +1,5 @@
 import logging
+import sys
 from enum import Enum
 
 
@@ -18,14 +19,17 @@ class BColors(Enum):
         return self.value
 
 
-LOGGING_FORMAT = f'{BColors.WHITE}[%(asctime)s]{BColors.ENDC}{BColors.OKCYAN}[%(name)20s]{BColors.ENDC}: %(message)s'
+LOGGING_FORMAT = f'{BColors.WHITE}[%(asctime)s]{BColors.ENDC}' \
+                 f'{BColors.OKCYAN}[%(name)30s]{BColors.ENDC}:' \
+                 f'{BColors.WARNING}[%(levelname)10s]{BColors.ENDC}:' \
+                 f'%(message)s'
 
 
-def configure_logging(logging_format=None, log_level=None):
+def configure_logging(logging_format=None, log_level=None, stream=sys.stdout):
     if logging_format is None:
         logging_format = LOGGING_FORMAT
 
     if log_level is None:
         log_level = logging.INFO
 
-    logging.basicConfig(format=logging_format, level=log_level)
+    logging.basicConfig(format=logging_format, level=log_level, stream=stream)

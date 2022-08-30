@@ -256,7 +256,11 @@ class DemoView(BaseView):
 
     def render(self, query_params, *args):
         job_def_service: JobDefinitionService = self.get_service(JobDefinitionService)
-
+        self.logger.debug("This is debug log")
+        self.logger.info("This is info log")
+        self.logger.warn("This is warn log")
+        self.logger.error("This is error log")
+        self.logger.critical("This is critical log")
         return html.Div(
             children=DemoView.raw_render(
                 self.watchlist,
