@@ -1,4 +1,6 @@
 import json
+from json import JSONDecodeError
+
 import requests
 from requests import HTTPError
 import logging
@@ -18,6 +20,7 @@ def __make_call(url, func, headers=get_base_header(), body={}, url_params={}, au
     max_retries = 1
     response = {}
     status_code = 400
+    response_json = {}
 
     for i in range(max_retries):
         exception = None
@@ -31,6 +34,7 @@ def __make_call(url, func, headers=get_base_header(), body={}, url_params={}, au
             if hasattr(response, 'status_code'):
                 status_code = response.status_code
             response.raise_for_status()
+            response_json = response.json()
             break
         except TypeError as e:
             logger.error("TypeError: " + str(e))
@@ -42,6 +46,9 @@ def __make_call(url, func, headers=get_base_header(), body={}, url_params={}, au
         except requests.exceptions.ConnectionError as e:
             logger.error("Connection error " + str(e))
             exception = e
+        except JSONDecodeError as e:
+            logger.error(f"JSONDecode error {e}")
+            exception = e
         except Exception as e:
             logger.error("General Error " + str(e))
             exception = e
@@ -52,7 +59,7 @@ def __make_call(url, func, headers=get_base_header(), body={}, url_params={}, au
     if type(response) is dict:
         return {}, status_code
 
-    return response.json(), status_code
+    return response_json, status_code
 
 
 def make_request(call: Request):
