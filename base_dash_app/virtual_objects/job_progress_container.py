@@ -1,5 +1,6 @@
 from typing import Optional
 
+from base_dash_app.enums.log_levels import LogLevelsEnum, LogLevel
 from base_dash_app.enums.status_colors import StatusesEnum
 
 passing_statuses = [StatusesEnum.WARNING, StatusesEnum.SUCCESS]
@@ -24,6 +25,7 @@ class VirtualJobProgressContainer:
         self.completed: bool = False
         self.extras = {}
         self.logs = []
+        self.log_level: LogLevel = LogLevelsEnum.INFO.value
 
     def get_status(self):
         if self.prerequisites_status in passing_statuses:

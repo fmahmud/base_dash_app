@@ -10,12 +10,16 @@ from sqlalchemy.orm import Session
 from base_dash_app.components.base_component import ComponentWithInternalCallback
 from base_dash_app.components.callback_utils.mappers import InputToState, InputMapping, StateMapping
 from base_dash_app.components.cards.small_card import SmallCard
+from base_dash_app.components.forms.simple_selector import SimpleSelector
 from base_dash_app.components.historicals import historical_dots
 from base_dash_app.components.inputs.simple_labelled_input import SimpleLabelledInput
+from base_dash_app.enums.log_levels import LogLevelsEnum, LogLevel
 from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.models.job_definition import JobDefinition
 from base_dash_app.models.job_definition_parameter import JobDefinitionParameter
 from base_dash_app.services.job_definition_service import JobDefinitionService
+
+JOB_CARD_LOG_LEVEL_SELECTOR_ID = "job-card-log-level-selector-id"
 
 INDEX_DELIMITER = "||||"
 
@@ -77,6 +81,7 @@ class JobCard(ComponentWithInternalCallback):
             param_defs_dict: Dict[str, JobDefinitionParameter] = instance.job_definition.get_params_dict()
             param_to_value_map = {}
             should_run = True
+            log_level: LogLevel = LogLevelsEnum.INFO.value
             for state in callback_context.states_list[0]:
                 if 'id' in state and 'index' in state['id']:
                     instance_id, param_name = tuple(state['id']['index'].split(INDEX_DELIMITER))
@@ -98,9 +103,21 @@ class JobCard(ComponentWithInternalCallback):
                         error_messages[param_def] = str(e)
                         should_run = False
 
+            if len(callback_context.states_list) >= 2:
+                # find log level at index 1
+                if len(callback_context.states_list[1]) > 0:
+                    # some value exists
+                    log_level_state_dict = callback_context.states_list[1][0]
+                    if 'id' in log_level_state_dict and 'type' in log_level_state_dict['id'] \
+                        and log_level_state_dict['id']['type'] == JOB_CARD_LOG_LEVEL_SELECTOR_ID:
+                        # found log level selector
+                        if 'value' in log_level_state_dict and log_level_state_dict['value'] != '':
+                            log_level = LogLevelsEnum.get_by_id(int(log_level_state_dict['value']))
+
             if should_run:
                 instance.progress_container = instance.job_def_service.run_job(
-                    job_def=instance.job_definition, parameter_values=param_to_value_map
+                    job_def=instance.job_definition, parameter_values=param_to_value_map,
+                    log_level=log_level
                 )
 
         return [instance.__render_job_card(form_messages=error_messages)]
@@ -133,7 +150,12 @@ class JobCard(ComponentWithInternalCallback):
                         state_id=JOB_CARD_PARAM_INPUT_ID,
                         state_property="value",
                         index=ALL
-                    )
+                    ),
+                    StateMapping(
+                        state_id=JOB_CARD_LOG_LEVEL_SELECTOR_ID,
+                        state_property="value",
+                        index=ALL
+                    ),
                 ]
             ),
             InputToState(
@@ -160,7 +182,7 @@ class JobCard(ComponentWithInternalCallback):
             difference = datetime.datetime.now() - last_run_date
             difference_in_days = f"{difference / datetime.timedelta(days=1):.1f} day(s) ago"
 
-            if job_instance.result.status != StatusesEnum.SUCCESS:
+            if job_instance.result.status in [StatusesEnum.FAILURE, StatusesEnum.WARNING]:
                 last_run_error_message = html.Div(
                     children=[
                         dbc.Alert(
@@ -168,7 +190,7 @@ class JobCard(ComponentWithInternalCallback):
                             color=job_instance.result.status.value.hex_color
                         )
                     ],
-                    style={"marginTop": "20px", "marginLeft": "10px", "width": "calc(100% - 20px)", "float": "left"}
+                    style={"marginTop": "20px", "width": "100%", "float": "left"}
                 )
         else:
             difference_in_days = "N/A"
@@ -192,6 +214,8 @@ class JobCard(ComponentWithInternalCallback):
                 ).render()
             )
 
+        num_historical_dots = 15
+        margin_right = 4
         progress = job.current_prog_container.progress if is_in_progress else 0
         job_card = SmallCard(
             title=html.H3(job.name),
@@ -202,8 +226,11 @@ class JobCard(ComponentWithInternalCallback):
                     html.Div(
                         children=[
                             historical_dots.render_from_resultable_events(
-                                job.events[-10:],
-                                dot_style_override={"borderRadius": "0px", "marginRight": "4px", "width": "45px"},
+                                job.events[-num_historical_dots:],
+                                dot_style_override={
+                                    "marginRight": f"{margin_right}px",
+                                    "width": f"calc((100% - {margin_right}px "
+                                             f"* {num_historical_dots}) / {num_historical_dots})"},
                                 use_tooltips=True
                             )
                         ]
@@ -224,17 +251,27 @@ class JobCard(ComponentWithInternalCallback):
                                 value=progress,
                                 style={
                                     "position": "relative", "float": "left",
-                                    "width": "calc(100% - 120px)", "margin": "10px"
-                                }
+                                    "width": "calc(100% - 116px)", "marginLeft": "10px",
+                                    "marginTop": "10px"
+                                },
+                                label=f"{(progress / 100) or 0:.1%}",
+                                hide_label=not is_in_progress or progress is None or progress == 0
                             ),
                             dcc.Interval(
                                 interval=1000,
                                 disabled=not is_in_progress,
                                 id={"type": JOB_CARD_INTERVAL_ID, "index": self._instance_id}
                             ),
+                            SimpleSelector(
+                                comp_id={"type": JOB_CARD_LOG_LEVEL_SELECTOR_ID, "index": self._instance_id},
+                                selectables=[level.value for level in LogLevelsEnum],
+                                placeholder="Log Level",
+                                style={"width": "100%", "position": "relative", "float": "left", "marginTop": "20px"}
+                            ).render(),
+                            last_run_error_message,
                             html.Div(
                                 children=rendered_params,
-                                style={"width": "100%", "position": "relative", "float": "left", "marginTop": "10px"}
+                                style={"width": "100%", "position": "relative", "float": "left", "marginBottom": "10px"}
                             ) if len(rendered_params) > 0 else None
                         ],
                         style={
