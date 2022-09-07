@@ -89,9 +89,12 @@ class TestJobDef(JobDefinition):
         return prog_container.execution_status
 
     def check_prerequisites(self, *args, prog_container: VirtualJobProgressContainer, parameter_values: Dict, **kwargs) -> StatusesEnum:
-        self.logger.info("starting prereq. check")
-
-        self.logger.info("got param values = " + str(parameter_values))
+        self.info_log("starting prereq. check")
+        self.info_log("Example info log")
+        self.debug_log("Example debug log")
+        self.critical_log("Example critical log")
+        self.warn_log("Example warn log")
+        self.error_log("Example error log")
 
         prog_container.result = 1
         return StatusesEnum.SUCCESS
@@ -186,7 +189,7 @@ class DemoView(BaseView):
                 self.watchlist.append(stock_quote)
 
         job_def_service: JobDefinitionService = self.get_service(JobDefinitionService)
-        job_def: JobDefinition = job_def_service.get_by_id(self.test_job_id)
+        job_def: TestJobDef = job_def_service.get_by_id(self.test_job_id)
 
         return [
             DemoView.raw_render(

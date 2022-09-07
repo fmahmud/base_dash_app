@@ -96,7 +96,9 @@ class JobInstance(CachedResultableEvent, Progressable, BaseModel):
             return "Undefined Instance"
         if self.end_reason is None or self.end_reason == "":
             return f"{self.get_string_date()} - {self.result.status.value.name}"
-        return f"{self.get_string_date()} - {self.end_reason}"
+        return f"{self.get_string_date()}" \
+               f" - {self.end_reason[:min(len(self.end_reason), 50)]}" \
+               f"{'...' if len(self.end_reason) > 50 else ''}"
 
     def get_header(self) -> (str, dict):
         return self.get_name(), {}

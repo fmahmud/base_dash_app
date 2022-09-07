@@ -5,6 +5,7 @@ from typing import Type, List, Dict
 
 from sqlalchemy.orm import Session
 
+from base_dash_app.enums.log_levels import LogLevelsEnum, LogLevel
 from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.models.job_definition import JobDefinition
 from base_dash_app.models.job_instance import JobInstance
@@ -31,7 +32,11 @@ class JobDefinitionService(BaseService):
         job_def.set_vars_from_kwargs(**self.produce_kwargs())
         return job_def
 
-    def run_job(self, *args, job_def, parameter_values: Dict = None, **kwargs):
+    def run_job(
+            self, *args, job_def, parameter_values: Dict = None,
+            log_level: LogLevel = LogLevelsEnum.WARNING.value,
+            **kwargs
+    ):
         if parameter_values is None:
             parameter_values = {}
 
@@ -67,6 +72,7 @@ class JobDefinitionService(BaseService):
         )
 
         job_def.current_prog_container = job_progress_container
+        job_progress_container.log_level = log_level
 
         kwargs["prog_container"] = job_progress_container
         kwargs["parameter_values"] = parameter_values

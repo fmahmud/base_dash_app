@@ -4,6 +4,7 @@ from typing import Optional, List, Dict
 from sqlalchemy import Column, Integer, Sequence, String, orm, Boolean
 from sqlalchemy.orm import relationship
 
+from base_dash_app.enums.log_levels import LogLevelsEnum
 from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.models.base_model import BaseModel
 from base_dash_app.models.job_definition_parameter import JobDefinitionParameter
@@ -55,27 +56,32 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
 
     def info_log(self, message):
         self.logger.info(message)
-        if self.current_prog_container is not None:
+        if self.current_prog_container is not None \
+                and self.current_prog_container.log_level <= LogLevelsEnum.INFO.value:
             self.current_prog_container.logs.append(f"[INFO]{message}")
 
     def error_log(self, message):
         self.logger.error(message)
-        if self.current_prog_container is not None:
+        if self.current_prog_container is not None \
+                and self.current_prog_container.log_level <= LogLevelsEnum.ERROR.value:
             self.current_prog_container.logs.append(f"[ERROR]{message}")
 
     def critical_log(self, message):
         self.logger.critical(message)
-        if self.current_prog_container is not None:
+        if self.current_prog_container is not None \
+                and self.current_prog_container.log_level <= LogLevelsEnum.CRITICAL.value:
             self.current_prog_container.logs.append(f"[CRITICAL]{message}")
 
     def debug_log(self, message):
         self.logger.debug(message)
-        if self.current_prog_container is not None:
+        if self.current_prog_container is not None \
+                and self.current_prog_container.log_level <= LogLevelsEnum.DEBUG.value:
             self.current_prog_container.logs.append(f"[DEBUG]{message}")
 
     def warn_log(self, message):
-        self.logger.warn(message)
-        if self.current_prog_container is not None:
+        self.logger.warning(message)
+        if self.current_prog_container is not None \
+                and self.current_prog_container.log_level <= LogLevelsEnum.WARNING.value:
             self.current_prog_container.logs.append(f"[WARN]{message}")
 
     @classmethod
