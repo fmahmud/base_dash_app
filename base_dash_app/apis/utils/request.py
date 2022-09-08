@@ -5,13 +5,20 @@ from base_dash_app.utils.utils import apply
 
 
 class Request:
-    def __init__(self, method: HttpMethod, url, query_params=None, body=None, headers=None, auth=()):
+    def __init__(
+            self, method: HttpMethod,
+            url, query_params=None,
+            body=None, headers=None,
+            timeout: int = 200,
+            auth=()
+    ):
         self.method: HttpMethod = method
         self.url: str = url
         self.query_params: Dict[str, str] = query_params
         self.body = body
         self.headers: Dict[str, str] = headers
         self.auth: Tuple[str, str] = auth
+        self.timeout: int = timeout
 
     def __str__(self):
         return str(self.to_dict())
@@ -27,6 +34,7 @@ class Request:
             "body": self.body,
             "headers": self.headers,
             "auth": self.auth,
+            "timeout": self.timeout
         }
 
     def add_headers(self, headers: Dict[str, str]):

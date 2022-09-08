@@ -20,7 +20,8 @@ class Endpoint:
             *,
             body: str = None,
             additional_headers: Dict[str, str] = None,
-            query_params: Dict[str, Any] = None
+            query_params: Dict[str, Any] = None,
+            timeout: int = 200
     ):
         additional_headers = {} if additional_headers is None else additional_headers
 
@@ -34,6 +35,7 @@ class Endpoint:
             query_params=query_params,
             body=body,
             headers=utils.apply(self.api.common_headers, additional_headers),
+            timeout=timeout
         )
 
         self.api.auth_handler.add_auth_to_request(request)

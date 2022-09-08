@@ -22,6 +22,7 @@ from base_dash_app.services.job_definition_service import JobDefinitionService
 from base_dash_app.views.base_view import BaseView
 from base_dash_app.virtual_objects.job_parameter import JobParameterDefinition
 from base_dash_app.virtual_objects.job_progress_container import VirtualJobProgressContainer
+from demo_app.demo_api import DemoApi
 
 RUN_TEST_JOB_BTN_ID = "run-test-job-btn-id"
 
@@ -100,6 +101,8 @@ class TestJobDef(JobDefinition):
         return StatusesEnum.SUCCESS
 
     def start(self, *args, prog_container: VirtualJobProgressContainer, **kwargs) -> StatusesEnum:
+        api = self.get_api(DemoApi)
+        api.test_func(query_params={"todo_id": 1})
         time.sleep(1)
         prog_container.progress += 20
         time.sleep(1)

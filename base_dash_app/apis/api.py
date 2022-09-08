@@ -67,14 +67,16 @@ class API(VirtualFrameworkObject, ABC):
                 *,
                 body: str = None,
                 additional_headers: Dict[str, str] = None,
-                query_params: Dict[str, Any] = None
+                query_params: Dict[str, Any] = None,
+                timeout: int = 200
         ) -> Tuple[Union[Dict, List], int]:
             return api_utils.make_request(
                 endpoint.get_as_request(
                     path_params=path_params,
                     body=body,
                     additional_headers=additional_headers,
-                    query_params=query_params
+                    query_params=query_params,
+                    timeout=timeout
                 )
             )
 
@@ -82,7 +84,7 @@ class API(VirtualFrameworkObject, ABC):
         return make_request
 
     @staticmethod
-    def endpoint_def(path: str, http_method: HttpMethod):
+    def endpoint_def(path: str, http_method: HttpMethod, timeout: int = 200):
 
         def inner_func(result_handler: Callable[[Union[Dict, List], int], Any]):
 
@@ -114,7 +116,8 @@ class API(VirtualFrameworkObject, ABC):
                         path_params=path_params,
                         body=body,
                         additional_headers=additional_headers,
-                        query_params=query_params
+                        query_params=query_params,
+                        timeout=timeout
                     )
                 )
 

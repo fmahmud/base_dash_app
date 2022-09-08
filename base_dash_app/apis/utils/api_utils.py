@@ -15,7 +15,7 @@ def get_base_header():
     return apply({}, {'Content-Type': 'application/json', 'Connection': 'keep-alive'})
 
 
-def __make_call(url, func, headers=get_base_header(), body={}, url_params={}, auth=()):
+def __make_call(url, func, headers=get_base_header(), body={}, url_params={}, auth=(), timeout=200):
     logger.info('making call to ' + url)
     max_retries = 1
     response = {}
@@ -29,7 +29,8 @@ def __make_call(url, func, headers=get_base_header(), body={}, url_params={}, au
         try:
             response = func(
                 url=url, headers=headers,
-                data=None if body is None else json.dumps(body), params=url_params, auth=auth, timeout=200
+                data=None if body is None else json.dumps(body),
+                params=url_params, auth=auth, timeout=timeout
             )
             if hasattr(response, 'status_code'):
                 status_code = response.status_code
@@ -64,5 +65,8 @@ def __make_call(url, func, headers=get_base_header(), body={}, url_params={}, au
 
 def make_request(call: Request):
     logger.debug("Making request: %s", str(call))
-    return __make_call(url=call.url, func=call.method.function,
-                       headers=call.headers, body=call.body, url_params=call.query_params, auth=call.auth)
+    return __make_call(
+        url=call.url, func=call.method.function,
+        headers=call.headers, body=call.body, url_params=call.query_params,
+        auth=call.auth, timeout=call.timeout
+    )
