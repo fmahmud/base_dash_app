@@ -282,7 +282,11 @@ class RuntimeApplication:
                 html.Div(
                     id="page-content",
                     style={
-                        "height": "100%", "padding": "20px", "margin": "0 auto",
+                        "padding": "20px", "margin": "0 auto",
+                        "position": "relative", "float": "left",
+                        "minWidth": "100vw", "maxWidth": "100vw",
+                        "minHeight": "calc(100vh - 55px)", "maxHeight": "calc(100vh - 55px)",
+                        "overflow": "scroll"
                     }
                 ),
             ],
