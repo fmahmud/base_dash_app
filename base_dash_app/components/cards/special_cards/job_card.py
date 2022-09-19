@@ -167,9 +167,15 @@ class JobCard(ComponentWithInternalCallback):
             )
         ]
 
-    def __render_job_card(self, form_messages: Dict[JobDefinitionParameter, Optional[str]] = None):
+    def __render_job_card(
+            self, form_messages: Dict[JobDefinitionParameter, Optional[str]] = None,
+            footer_buttons=None
+    ):
         if form_messages is None:
             form_messages = {}
+
+        if footer_buttons is None:
+            footer_buttons = []
 
         job = self.job_definition
         is_in_progress = job.current_prog_container is not None
@@ -272,7 +278,10 @@ class JobCard(ComponentWithInternalCallback):
                             html.Div(
                                 children=rendered_params,
                                 style={"width": "100%", "position": "relative", "float": "left", "marginBottom": "10px"}
-                            ) if len(rendered_params) > 0 else None
+                            ) if len(rendered_params) > 0 else None,
+                            dbc.CardFooter(
+                                dbc.ButtonGroup(footer_buttons),
+                            ) if len(footer_buttons) > 0 else None
                         ],
                         style={
                             "position": "relative", "float": "left",
