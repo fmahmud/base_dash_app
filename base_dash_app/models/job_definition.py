@@ -2,7 +2,7 @@ import logging
 from typing import Optional, List, Dict
 
 from sqlalchemy import Column, Integer, Sequence, String, orm, Boolean
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Session
 
 from base_dash_app.enums.log_levels import LogLevelsEnum
 from base_dash_app.enums.status_colors import StatusesEnum
@@ -85,6 +85,18 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
             self.current_prog_container.logs.append(f"[WARN]{message}")
 
     @classmethod
+    def get_cached_selectables_by_param_name(cls, param_name, session: Session):
+        """
+        Child classes of JobDefinition must implement this function.
+        :param kwargs:
+        :return:
+        """
+        if cls == JobDefinition:
+            raise Exception("Cannot make instance of class JobDefinition.")
+
+        raise Exception(f"Class {cls} needs to override get_cached_selectables_by_param_name function.")
+
+    @classmethod
     def force_update(cls):
         """
         NOT IN USE ATM.
@@ -144,6 +156,7 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
         self.rehydrate_events_from_db()
 
     def rehydrate_events_from_db(self):
+        self.clear_all()
         for ji in self.job_instances:
             ji: JobInstance
             self.process_result(ji.get_result(), ji)
@@ -154,6 +167,14 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
     def get_progress(self):
         if self.is_in_progress():
             return self.current_prog_container.progress
+
+        return 0
+
+    def get_current_duration(self):
+        if self.is_in_progress():
+            return int(self.current_prog_container.get_duration())
+
+        return 0
 
     def get_parameters(self) -> List[JobDefinitionParameter]:
         return self.parameters

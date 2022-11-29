@@ -7,7 +7,7 @@ from dash.exceptions import PreventUpdate
 
 from base_dash_app.components.base_component import BaseComponent
 from base_dash_app.components.details import details
-from base_dash_app.components.details.details import DetailTextItem
+from base_dash_app.components.details.detail_text_item import DetailTextItem
 from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.enums.task_repeat_period_enum import TaskRepeatPeriodEnum
 from base_dash_app.enums.todo_status_enum import TodoStatusEnum

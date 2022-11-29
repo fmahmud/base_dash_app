@@ -30,7 +30,10 @@ class SimpleLabelledInput(BaseComponent):
         self.disabled = disabled
         self.starting_value = starting_value
 
-    def render(self, *args, **kwargs):
+    def render(self, *args, wrapper_style_override=None, **kwargs):
+        if wrapper_style_override is None:
+            wrapper_style_override = {}
+
         input_params = {
             "placeholder": self.placeholder,
             "id": self.input_id,
@@ -71,5 +74,5 @@ class SimpleLabelledInput(BaseComponent):
                 dbc.FormFeedback(self.invalid_form_feedback, type="invalid")
                 if self.invalid_form_feedback is not None else None,
             ],
-            style={"marginTop": "15px"}
+            style={"marginTop": "15px", **wrapper_style_override}
         )

@@ -29,6 +29,25 @@ class CachedResultableEvent(ResultableEvent):
     def get_tooltip_id(self):
         return self.tooltip_id
 
+    def get_event_dot(self, style_override=None):
+        if style_override is None:
+            style_override = {}
+
+        from base_dash_app.components.historicals.historical_dots import render_event_rectangle
+        return render_event_rectangle(
+            self.get_status_color(),
+            dot_style_override={
+                "borderRadius": "7px",
+                "marginRight": "10px",
+                "marginLeft": "10px",
+                "animation": "blinker_animation 0.6s cubic-bezier(1, 0, 0, 1) infinite alternate"
+                if self.result.status == StatusesEnum.IN_PROGRESS
+                else "none",
+                **style_override
+            },
+            tooltip_id=self.tooltip_id
+        )
+
     def get_status_color(self, *, perspective=None) -> StatusesEnum:
         return self.result.status
 

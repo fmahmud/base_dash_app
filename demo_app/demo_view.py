@@ -1,3 +1,4 @@
+import datetime
 import random
 import random
 import re
@@ -7,21 +8,30 @@ from typing import List, Dict
 import dash_bootstrap_components as dbc
 import finnhub
 from dash import html
+from dash.dash_table.Format import Format, Scheme
+from sqlalchemy import Column, Integer, Sequence, String
+from sqlalchemy.orm import Session
 
 from base_dash_app.components.alerts import Alert
 from base_dash_app.components.callback_utils.mappers import InputToState, InputMapping, StateMapping
 from base_dash_app.components.cards.special_cards.job_card import JobCard
 from base_dash_app.components.data_visualization import ratio_bar
 from base_dash_app.components.data_visualization.ratio_bar import StatusToCount
+from base_dash_app.components.datatable.datatable_wrapper import DataTableWrapper
 from base_dash_app.components.lists.todo_list.todo_list import TodoList
 from base_dash_app.enums.status_colors import StatusesEnum
+from base_dash_app.models.base_model import BaseModel
 from base_dash_app.models.job_definition import JobDefinition
 from base_dash_app.models.job_definition_parameter import JobDefinitionParameter
 from base_dash_app.models.task import Task
+from base_dash_app.services.base_service import BaseService
 from base_dash_app.services.job_definition_service import JobDefinitionService
 from base_dash_app.views.base_view import BaseView
+from base_dash_app.virtual_objects.dashboard_definition import StatisticCard, LabelledValueDiv, StatCardWithSparkline
+from base_dash_app.virtual_objects.interfaces.selectable import Selectable, CachedSelectable
 from base_dash_app.virtual_objects.job_parameter import JobParameterDefinition
 from base_dash_app.virtual_objects.job_progress_container import VirtualJobProgressContainer
+from base_dash_app.virtual_objects.time_series_data_point import TimeSeriesDataPoint
 from demo_app.demo_api import DemoApi
 
 RUN_TEST_JOB_BTN_ID = "run-test-job-btn-id"
@@ -35,10 +45,52 @@ SEARCH_RESULT_DIV_ID = "search-result-div-id"
 TEST_ALERT_BTN_ID = "test-alert-btn-id"
 
 
+class MySelectableModel(BaseModel, Selectable):
+    __tablename__ = "my_selectables"
+
+    id = Column(Integer, Sequence("my_selectables_id_seq"), primary_key=True)
+    name = Column(String)
+
+    def __lt__(self, other):
+        pass
+
+    def __eq__(self, other):
+        pass
+
+    def __hash__(self):
+        pass
+
+    def __repr__(self):
+        pass
+
+    def __str__(self):
+        pass
+
+    def get_label(self):
+        return self.name
+
+    def get_value(self):
+        return self.id
+
+
+class MySelectablesService(BaseService):
+    def __init__(self, **kwargs):
+        super().__init__(
+            object_type=MySelectableModel,
+            **kwargs
+        )
+
+
 class TestJobDef(JobDefinition):
     __mapper_args__ = {
         "polymorphic_identity": "TestJobDef"
     }
+
+    @classmethod
+    def get_cached_selectables_by_param_name(cls, variable_name, session: Session):
+        if variable_name == "param_4":
+            all_selectables = session.query(MySelectableModel).all()
+            return [CachedSelectable.from_selectable(s) for s in all_selectables]
 
     @classmethod
     def force_update(cls):
@@ -81,7 +133,13 @@ class TestJobDef(JobDefinition):
         jdp3.variable_name = "param_3"
         jdp3.placeholder = "Some Boolean"
 
-        return [jdp1, jdp2, jdp3]
+        jdp4 = JobDefinitionParameter()
+        jdp4.user_facing_param_name = "Param 4"
+        jdp4.set_param_type(Selectable)
+        jdp4.variable_name = "param_4"
+        jdp4.placeholder = "Some Selectable"
+
+        return [jdp1, jdp2, jdp3, jdp4]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -100,18 +158,35 @@ class TestJobDef(JobDefinition):
         prog_container.result = 1
         return StatusesEnum.SUCCESS
 
-    def start(self, *args, prog_container: VirtualJobProgressContainer, **kwargs) -> StatusesEnum:
-        api = self.get_api(DemoApi)
-        api.test_func(query_params={"todo_id": 1})
+    def start(self, *args, prog_container: VirtualJobProgressContainer, parameter_values: Dict, **kwargs) -> StatusesEnum:
+        if "session" not in kwargs:
+            prog_container.end_reason = "Didn't receive session!"
+            self.critical_log("Didn't receive session.")
+            return StatusesEnum.FAILURE
+
+        session: Session = kwargs["session"]
+
         time.sleep(1)
         prog_container.progress += 20
+        self.info_log("1 second passed")
         time.sleep(1)
         prog_container.progress += 20
+        self.info_log("2 seconds passed")
         time.sleep(1)
         prog_container.progress += 20
+        self.info_log("3 seconds passed")
         time.sleep(1)
         prog_container.progress += 20
+        self.info_log("4 seconds passed")
+
+        if "param_4" in parameter_values:
+            my_selectable: MySelectableModel = session.query(MySelectableModel)\
+                .filter_by(id=int(parameter_values["param_4"])).first()
+            self.info_log(my_selectable.get_label())
+
+
         time.sleep(1)
+
         ran = random.random()
         if ran < 0.5:
             prog_container.end_reason = "Failed Successfully!"
@@ -175,6 +250,7 @@ class DemoView(BaseView):
         #     state=[State(SEARCH_BAR_ID, "value")],
         #     function=self.handle_search.__get__(self, self.__class__)
         # )
+        self.data_tables = []
 
     def validate_state_on_trigger(self):
         return
@@ -222,8 +298,13 @@ class DemoView(BaseView):
         ]
 
     @staticmethod
-    def raw_render(watchlist, job: JobDefinition, job_def_service: JobDefinitionService):
+    def raw_render(
+            watchlist, job: JobDefinition, job_def_service: JobDefinitionService,
+            data_tables: List[DataTableWrapper] = None
+    ):
         # return todo_list_component.render()
+        if data_tables is None:
+            data_tables = []
 
         search_bar = dbc.Row(
             [
@@ -242,10 +323,12 @@ class DemoView(BaseView):
 
         test_button_style = {"position": "relative", "float": "left", "margin": "10px"}
 
+
+
         return html.Div(
             children=[
                 dbc.Button("Test Alerts", id=TEST_ALERT_BTN_ID, style=test_button_style),
-                JobCard(job, job_def_service).render(),
+                JobCard(job, job_def_service, footer="footer").render(),
                 search_bar,
                 html.Div(
                     children=DemoView.render_watchlist(watchlist),
@@ -255,23 +338,92 @@ class DemoView(BaseView):
                 ratio_bar.render_from_stc_list([
                     StatusToCount(state_name="A", count=5, color=StatusesEnum.PENDING),
                     StatusToCount(state_name="B", count=5, color=StatusesEnum.IN_PROGRESS)
-                ])
+                ]),
+                StatisticCard(
+                    title="Test Statistic Card",
+                    values=[
+                        LabelledValueDiv(label="Test Label", value="234"),
+                        LabelledValueDiv(label="Test Label", value=1235),
+                        LabelledValueDiv(label="Test Label", value="True"),
+                        LabelledValueDiv(label="Test Label", value=203.2),
+                        LabelledValueDiv(label="out of view", value="This value won't be rendered"),
+                    ]
+                ).render(),
+                StatCardWithSparkline(
+                    title="Sparkline Test Stat Card",
+                    graph_height=80,
+                    values=[
+                        LabelledValueDiv(label="Annually", value=90.4),
+                        LabelledValueDiv(label="Monthly", value=96.3),
+                        LabelledValueDiv(label="Weekly", value=100),
+                        LabelledValueDiv(label="Daily", value=100)
+                    ],
+                    series=[
+                        TimeSeriesDataPoint(
+                            date=datetime.datetime(year=2022, month=11, day=1) + datetime.timedelta(days=i),
+                            value=50 - ((random.random() / (i/3 + 1)) * 50) + 50
+                        )
+                        for i in range(50)
+                    ]
+                ).render(),
+                html.Div(
+                    children=[dtw.render() for dtw in data_tables],
+                    style={"position": "relative", "float": "left", "clear": "left", "width": "100%"}
+                )
             ],
             style={"maxWidth": "1280px", "margin": "0 auto", "padding": "20px"}
         )
 
     def render(self, query_params, *args):
+        session: Session = self.dbm.get_session()
+        current_selectables = session.query(MySelectableModel).all()
+        if len(current_selectables) == 0:
+            for i in range(10):
+                new_selectable_model: MySelectableModel = MySelectableModel()
+                new_selectable_model.name = f"MySelectableModel{i}"
+                session.add(new_selectable_model)
+
+            try:
+                session.commit()
+            except:
+                session.rollback()
+
         job_def_service: JobDefinitionService = self.get_service(JobDefinitionService)
         self.logger.debug("This is debug log")
         self.logger.info("This is info log")
         self.logger.warn("This is warn log")
         self.logger.error("This is error log")
         self.logger.critical("This is critical log")
+
+        if len(self.data_tables) == 0:
+            numeric_format = Format(precision=2, scheme=Scheme.fixed).group(True)
+            dtw: DataTableWrapper = DataTableWrapper(
+                title="Data Table 1 ",
+                columns=[
+                    {"id": f"{i}", "type": "numeric", "format": numeric_format, "name": f"Column {i}"}
+                    for i in range(10)
+                ]
+            )
+
+            def fill_data(*args, **kwargs):
+                data = []
+                for row in range(100):
+                    row_data = {f"{col}": random.random() * 100 for col in range(10)}
+                    data.append(row_data)
+
+                return data
+
+            dtw.set_data(fill_data())
+            dtw.reload_data_function = fill_data
+
+            self.data_tables.append(dtw)
+
         return html.Div(
             children=DemoView.raw_render(
                 self.watchlist,
                 job_def_service.get_by_id(self.test_job_id),
                 job_def_service,
+                data_tables=self.data_tables
             ),
             id=self.wrapper_div_id
         )
