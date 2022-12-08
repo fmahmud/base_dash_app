@@ -27,12 +27,16 @@ from base_dash_app.models.task import Task
 from base_dash_app.services.base_service import BaseService
 from base_dash_app.services.job_definition_service import JobDefinitionService
 from base_dash_app.views.base_view import BaseView
-from base_dash_app.virtual_objects.dashboard_definition import StatisticCard, LabelledValueDiv, StatCardWithSparkline
+from base_dash_app.components.labelled_value_chip import LabelledValueChip
+from base_dash_app.components.cards.stat_sparkline_card import StatSparklineCard
+from base_dash_app.components.cards.statistic_card import StatisticCard
 from base_dash_app.virtual_objects.interfaces.selectable import Selectable, CachedSelectable
 from base_dash_app.virtual_objects.job_parameter import JobParameterDefinition
 from base_dash_app.virtual_objects.job_progress_container import VirtualJobProgressContainer
 from base_dash_app.virtual_objects.time_series_data_point import TimeSeriesDataPoint
 from demo_app.demo_api import DemoApi
+
+DEMO_TABS_DIV_ID = "demo-tabs-div-id"
 
 RUN_TEST_JOB_BTN_ID = "run-test-job-btn-id"
 
@@ -251,6 +255,7 @@ class DemoView(BaseView):
         #     function=self.handle_search.__get__(self, self.__class__)
         # )
         self.data_tables = []
+        self.current_tab_id = 'tab-0'
 
     def validate_state_on_trigger(self):
         return
@@ -300,7 +305,8 @@ class DemoView(BaseView):
     @staticmethod
     def raw_render(
             watchlist, job: JobDefinition, job_def_service: JobDefinitionService,
-            data_tables: List[DataTableWrapper] = None
+            data_tables: List[DataTableWrapper] = None,
+            current_tab_id: str = 'tab-0'
     ):
         # return todo_list_component.render()
         if data_tables is None:
@@ -323,12 +329,74 @@ class DemoView(BaseView):
 
         test_button_style = {"position": "relative", "float": "left", "margin": "10px"}
 
-
+        tabs_div = dbc.Tabs(
+            id=DEMO_TABS_DIV_ID,
+            active_tab=current_tab_id,
+            children=[
+                dbc.Tab(
+                    children=[
+                        JobCard(job, job_def_service, footer="footer").render()
+                    ],
+                    label="Job Card Demo",
+                    style={"padding": "20px"}
+                ),
+                dbc.Tab(
+                    children=[
+                        StatisticCard(
+                            title="Test Statistic Card",
+                            values=[
+                                LabelledValueChip(label="Test Label", value="234"),
+                                LabelledValueChip(label="Test Label", value=1235),
+                                LabelledValueChip(label="Test Label", value="True"),
+                                LabelledValueChip(label="Test Label", value=203.2),
+                                LabelledValueChip(label="out of view", value="This value won't be rendered"),
+                            ]
+                        ).render(),
+                        StatSparklineCard(
+                            title="Sparkline Test Stat Card",
+                            graph_height=80,
+                            values=[
+                                LabelledValueChip(label="Annually", value=90.4),
+                                LabelledValueChip(label="Monthly", value=96.3),
+                                LabelledValueChip(label="Weekly", value=100),
+                                LabelledValueChip(label="Daily", value=100)
+                            ],
+                            series=[
+                                TimeSeriesDataPoint(
+                                    date=datetime.datetime(year=2022, month=11, day=1) + datetime.timedelta(days=i),
+                                    value=50 - ((random.random() / (i / 3 + 1)) * 50) + 50
+                                )
+                                for i in range(50)
+                            ]
+                        ).render()
+                    ],
+                    label="Stats Card Demo",
+                    style={"padding": "20px"}
+                ),
+                dbc.Tab(
+                    children=[
+                        html.Div(
+                            children=[dtw.render() for dtw in data_tables],
+                            style={"position": "relative", "float": "left", "clear": "left", "width": "100%"}
+                        )
+                    ],
+                    label="Data Table Demo",
+                    style={"padding": "20px"}
+                )
+            ],
+            style={
+                "position": "relative",
+                "float": "left",
+                "clear": "left",
+                "width": "100%",
+                "overflow": "scroll",
+                "marginTop": "20px",
+            }
+        )
 
         return html.Div(
             children=[
                 dbc.Button("Test Alerts", id=TEST_ALERT_BTN_ID, style=test_button_style),
-                JobCard(job, job_def_service, footer="footer").render(),
                 search_bar,
                 html.Div(
                     children=DemoView.render_watchlist(watchlist),
@@ -339,37 +407,7 @@ class DemoView(BaseView):
                     StatusToCount(state_name="A", count=5, color=StatusesEnum.PENDING),
                     StatusToCount(state_name="B", count=5, color=StatusesEnum.IN_PROGRESS)
                 ]),
-                StatisticCard(
-                    title="Test Statistic Card",
-                    values=[
-                        LabelledValueDiv(label="Test Label", value="234"),
-                        LabelledValueDiv(label="Test Label", value=1235),
-                        LabelledValueDiv(label="Test Label", value="True"),
-                        LabelledValueDiv(label="Test Label", value=203.2),
-                        LabelledValueDiv(label="out of view", value="This value won't be rendered"),
-                    ]
-                ).render(),
-                StatCardWithSparkline(
-                    title="Sparkline Test Stat Card",
-                    graph_height=80,
-                    values=[
-                        LabelledValueDiv(label="Annually", value=90.4),
-                        LabelledValueDiv(label="Monthly", value=96.3),
-                        LabelledValueDiv(label="Weekly", value=100),
-                        LabelledValueDiv(label="Daily", value=100)
-                    ],
-                    series=[
-                        TimeSeriesDataPoint(
-                            date=datetime.datetime(year=2022, month=11, day=1) + datetime.timedelta(days=i),
-                            value=50 - ((random.random() / (i/3 + 1)) * 50) + 50
-                        )
-                        for i in range(50)
-                    ]
-                ).render(),
-                html.Div(
-                    children=[dtw.render() for dtw in data_tables],
-                    style={"position": "relative", "float": "left", "clear": "left", "width": "100%"}
-                )
+                tabs_div
             ],
             style={"maxWidth": "1280px", "margin": "0 auto", "padding": "20px"}
         )
@@ -423,7 +461,7 @@ class DemoView(BaseView):
                 self.watchlist,
                 job_def_service.get_by_id(self.test_job_id),
                 job_def_service,
-                data_tables=self.data_tables
+                data_tables=self.data_tables,
             ),
             id=self.wrapper_div_id
         )
