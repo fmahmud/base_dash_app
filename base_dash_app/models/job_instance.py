@@ -55,6 +55,21 @@ class JobInstance(CachedResultableEvent, Progressable, BaseModel):
     def get_progress(self):
         return self.progress
 
+    def get_duration(self):
+        if self.start_time is None:
+            return 0
+
+        if self.end_time is None:
+            return datetime.datetime.now() - self.start_time
+
+        return self.end_time - self.start_time
+
+    def set_status(self, status: StatusesEnum):
+        self.result.status = status
+
+    def set_result(self, result: Result):
+        self.result = result
+
     def __init__(self, *args, **kwargs):
         Startable.__init__(self)
         Stoppable.__init__(self)
@@ -63,7 +78,6 @@ class JobInstance(CachedResultableEvent, Progressable, BaseModel):
             date=datetime.datetime.now()
         )
 
-        # self.status: StatusesEnum = StatusesEnum.PENDING
         self.job_definition_id = None
         self.id = None
 

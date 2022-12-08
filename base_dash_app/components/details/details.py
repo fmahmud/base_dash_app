@@ -3,31 +3,15 @@ from typing import Dict, List
 from dash import html
 
 from base_dash_app.components.data_visualization import ratio_bar
-from base_dash_app.components.base_component import BaseComponent
 from base_dash_app.components.data_visualization.ratio_bar import StatusToCount
+from base_dash_app.components.details.detail_text_item import DetailTextItem, banner_element_styles
 from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.utils import utils
 from base_dash_app.virtual_objects.interfaces.detailable import Detailable
 import dash_bootstrap_components as dbc
 
-banner_element_styles = {
-    "marginLeft": "14px", "position": "relative", "float": "left", "fontSize": "14px", "height": "55px",
-    "lineHeight": "55px"
-}
 
 # todo: make alternative to detailable which has same features but doesn't rely on details - maybe dbc.Card?
-
-
-class DetailTextItem(BaseComponent):
-    def __init__(self, text, style: Dict[str, str]):
-        self.text = text
-        self.style: Dict[str, str] = utils.apply(banner_element_styles, style)
-
-    def render(self, *args, **kwargs):
-        return html.Div(
-            children=self.text,
-            style=self.style
-        )
 
 
 def render_summary_inner_div_from_detailable(detailable: Detailable):
@@ -42,13 +26,18 @@ def render_summary_inner_div_from_detailable(detailable: Detailable):
     return render_summary_inner_div(
         texts=detailable.get_text_items(),
         show_ratio_bar=detailable.show_ratio_bar(),
-        status_to_count_list=status_to_counts
+        status_to_count_list=status_to_counts,
+        show_progress_bar=detailable.show_progress_bar(),
+        current_progress=detailable.get_progress() if detailable.show_progress_bar() else 0.0
     )
 
 
-def render_summary_inner_div(texts: List[DetailTextItem], successes: int = 0, failures: int = 0, warnings: int = 0,
-                             show_ratio_bar=True, *, status_to_count_list: List[StatusToCount] = None,
-                             wrapper_style_override: Dict[str, str] = None):
+def render_summary_inner_div(
+        texts: List[DetailTextItem], successes: int = 0, failures: int = 0, warnings: int = 0,
+        show_ratio_bar=True, *, status_to_count_list: List[StatusToCount] = None,
+        wrapper_style_override: Dict[str, str] = None,
+        show_progress_bar=False, current_progress=0.0
+):
     rendered_ratio_bar = ''
     max_width = "calc(100% - 18px)"
     if show_ratio_bar:
@@ -57,6 +46,17 @@ def render_summary_inner_div(texts: List[DetailTextItem], successes: int = 0, fa
             rendered_ratio_bar = ratio_bar.render_from_stc_list(status_to_count_list)
         else:
             rendered_ratio_bar = ratio_bar.render(successes=successes, failures=failures, warns=warnings)
+    elif show_progress_bar:
+        max_width = "calc(100% - 315px)"
+        rendered_ratio_bar = dbc.Progress(
+            value=current_progress,
+            style={
+                # "position": "relative", "float": "left",
+                # "width": "100%",
+                "marginRight": "20px", "marginTop": "20px"
+            },
+            label=f"{(current_progress / 100) or 0:.1%}",
+        )
 
     return html.Div(
         children=[

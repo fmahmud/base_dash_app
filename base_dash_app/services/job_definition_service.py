@@ -57,6 +57,7 @@ class JobDefinitionService(BaseService):
         current_instance.start_time = datetime.datetime.now()
         current_instance.date = current_instance.start_time
         current_instance.completion_criteria_status_id = StatusesEnum.IN_PROGRESS.value.id
+        current_instance.set_status(StatusesEnum.IN_PROGRESS)
         current_instance.parameters = json.dumps(parameter_values)
         self.save(current_instance)
 
@@ -70,6 +71,8 @@ class JobDefinitionService(BaseService):
             job_instance_id=current_instance.id,
             job_definition_id=job_def.id
         )
+
+        job_progress_container.start_time = current_instance.start_time
 
         job_def.current_prog_container = job_progress_container
         job_progress_container.log_level = log_level
@@ -92,7 +95,7 @@ class JobDefinitionService(BaseService):
             current_instance.logs = json.dumps(job_progress_container.logs)
 
             self.save(current_instance)
-            job_def.process_cached_result(current_instance)
+            job_def.rehydrate_events_from_db()
             job_def.current_prog_container = None
 
         try:

@@ -37,6 +37,7 @@ class AppDescriptor:
             valid_user_pairs: Dict[str, str] = None,
             silence_routes_logging: bool = True,
             alerts_refresh_timeout: int = 1000,
+            assets_folder_path: str = None
     ):
         """
         :param global_inputs: 
@@ -79,3 +80,4 @@ class AppDescriptor:
         self.valid_user_pairs: Dict[str, str] = valid_user_pairs or {}
         self.silence_routes_logging: bool = silence_routes_logging
         self.alerts_refresh_timeout: int = alerts_refresh_timeout
+        self.assets_folder_path: str = assets_folder_path

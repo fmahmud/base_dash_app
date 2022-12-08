@@ -63,7 +63,7 @@ class DbManager:
 
     def upgrade_db(self, drop_first: bool = False):
         if drop_first:
-            get_base_class().metadata.drop_all(self.__engine, checkfirst=False)
+            get_base_class().metadata.drop_all(self.__engine, checkfirst=True)
 
         get_base_class().metadata.create_all(self.__engine)
 

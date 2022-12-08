@@ -82,6 +82,23 @@ class ResultableEventSeries(ABC):
 
         self.subseries = []
 
+    def clear_all(self):
+        self.events: List[ResultableEvent] = []
+
+        self.success_events: List[ResultableEvent] = []
+        self.warning_events: List[ResultableEvent] = []
+        self.failed_events: List[ResultableEvent] = []
+        self.in_progress_events: List[ResultableEvent] = []
+        self.uncategorized_events: List[ResultableEvent] = []
+
+        self.success_ratio: SuccessRatio = SuccessRatio()
+        self.success_ratio_over_time: StatisticOverTime = StatisticOverTime(self.success_ratio)
+
+        self.best_streak: BestStreak = BestStreak()
+        self.worst_streak: WorstStreak = WorstStreak()
+
+        self.subseries = []
+
     def create_subseries_for_date_range(self, start: datetime.datetime, end: datetime.datetime):
         new_series = ResultableEventSeries()
         new_series.statistics = [type(s)() for s in self.statistics]
@@ -142,6 +159,10 @@ class CachedResultableEventSeries(ResultableEventSeries):
     def __init__(self, *args, **kwargs):
         super().__init__(**kwargs)
 
+        self.events: List[CachedResultableEvent] = []
+
+    def clear_all(self):
+        super().clear_all()
         self.events: List[CachedResultableEvent] = []
 
     def process_result(self, result: Result, resultable_event: ResultableEvent):

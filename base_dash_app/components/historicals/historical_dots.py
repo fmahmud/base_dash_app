@@ -12,22 +12,20 @@ def render_event_rectangle(color: StatusesEnum, *, dot_style_override=None, tool
     if dot_style_override is None:
         dot_style_override = {}
 
+    dot_style = {
+        "height": "20px", "width": "20px", "backgroundColor": color.value.hex_color,
+        "display": "inline-block", "marginRight": "2px", "borderRadius": "30px",
+        "verticalAlign": "middle", **dot_style_override
+    }
+
     if tooltip_id is not None:
         span = html.Span(
-            style={
-                "height": "20px", "width": "20px", "backgroundColor": color.value.hex_color,
-                "display": "inline-block", "marginRight": "2px", "borderRadius": "30px",
-                "verticalAlign": "middle", **dot_style_override
-            },
+            style=dot_style,
             id=tooltip_id
         )
     else:
         span = html.Span(
-            style={
-                "height": "20px", "width": "20px", "backgroundColor": color.value.hex_color,
-                "display": "inline-block", "marginRight": "2px", "borderRadius": "30px",
-                "verticalAlign": "middle", **dot_style_override
-            },
+            style=dot_style,
         )
     return span
 
@@ -55,11 +53,7 @@ def render_from_resultable_events(data: List[CachedResultableEvent], *, dot_styl
         dots = []
         for datum in data:
             dots.append(
-                render_event_rectangle(
-                    color=datum.get_status_color(),
-                    dot_style_override=dot_style_override,
-                    tooltip_id=datum.get_tooltip_id()
-                )
+                datum.get_event_dot(style_override=dot_style_override)
             )
 
             tooltips.append(dbc.Tooltip(datum.get_name(), target=datum.get_tooltip_id(), placement="bottom"))
@@ -67,7 +61,7 @@ def render_from_resultable_events(data: List[CachedResultableEvent], *, dot_styl
         dots = [*dots, *tooltips]
     else:
         dots = [
-            render_event_rectangle(datum.get_status_color(), dot_style_override=dot_style_override)
+            datum.get_event_dot(style_override=dot_style_override)
             for datum in data
         ]
 

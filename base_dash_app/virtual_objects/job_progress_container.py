@@ -1,3 +1,4 @@
+import datetime
 from typing import Optional
 
 from base_dash_app.enums.log_levels import LogLevelsEnum, LogLevel
@@ -19,6 +20,7 @@ class VirtualJobProgressContainer:
         self.prerequisites_status: Optional[StatusesEnum] = StatusesEnum.PENDING
         self.completion_criteria_status: Optional[StatusesEnum] = StatusesEnum.PENDING
         self.result = 0
+        self.start_time = None
         self.end_time = None
         self.end_reason = None
         self.progress: float = 0.0
@@ -35,3 +37,12 @@ class VirtualJobProgressContainer:
                 return self.execution_status
         else:
             return self.prerequisites_status
+
+    def get_duration(self):
+        if self.start_time is None:
+            return 0
+
+        if self.end_time is None:
+            return (datetime.datetime.now() - self.start_time).total_seconds()
+
+        return (self.end_time - self.start_time).total_seconds()

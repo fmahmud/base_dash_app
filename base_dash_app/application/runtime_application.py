@@ -19,6 +19,7 @@ from base_dash_app.components.callback_utils.mappers import InputToState
 from base_dash_app.components.callback_utils.utils import get_triggering_id_from_callback_context, \
     get_state_values_for_input_from_args_list, invalid_n_clicks
 from base_dash_app.components.cards.special_cards.job_card import JobCard
+from base_dash_app.components.datatable.datatable_wrapper import DataTableWrapper
 from base_dash_app.components.navbar import NavBar, NavDefinition, NavGroup
 from base_dash_app.services.base_service import BaseService
 from base_dash_app.services.global_state_service import GlobalStateService
@@ -48,7 +49,7 @@ class RuntimeApplication:
             title=app_descriptor.title,
             external_stylesheets=app_descriptor.external_stylesheets,
             suppress_callback_exceptions=True,
-            assets_folder='./base_dash_app/assets'
+            assets_folder=app_descriptor.assets_folder_path or "assets"
         )
 
         self.app.logger.handlers.clear()
@@ -183,7 +184,7 @@ class RuntimeApplication:
         )
 
         # register internal callback components
-        components_with_internal_callbacks = [JobCard]
+        components_with_internal_callbacks = [JobCard, DataTableWrapper]
         for comp_class in components_with_internal_callbacks:
             comp_class.do_registrations(self.register_callback)
 
@@ -285,7 +286,8 @@ class RuntimeApplication:
                         "padding": "20px", "margin": "0 auto",
                         "position": "relative", "float": "left",
                         "minWidth": "100vw", "maxWidth": "100vw",
-                        "minHeight": "calc(100vh - 55px)", "maxHeight": "calc(100vh - 55px)",
+                        "minHeight": "calc(100vh - 71px)",
+                        "maxHeight": "calc(100vh - 71px)",
                         "overflow": "scroll"
                     }
                 ),

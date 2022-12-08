@@ -4,7 +4,7 @@ from typing import List, Callable, Optional
 import dash_bootstrap_components as dbc
 from dash import html
 
-from base_dash_app.components.details.details import DetailTextItem
+from base_dash_app.components.details.detail_text_item import DetailTextItem
 from base_dash_app.components.historicals import historical_dots
 
 from base_dash_app.enums.task_repeat_period_enum import TaskRepeatPeriodEnum

@@ -1,8 +1,10 @@
+from typing import Type, Optional
+
 from sqlalchemy import Column, Integer, Sequence, String, orm, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 
 from base_dash_app.models.base_model import BaseModel
-
+from base_dash_app.virtual_objects.interfaces.selectable import Selectable
 
 TRUES = ["True", "true"]
 FALSES = ["False", "false"]
@@ -41,16 +43,22 @@ class JobDefinitionParameter(BaseModel):
             self.param_type = float
         elif self.param_type_name == "bool":
             self.param_type = bool
+        elif self.param_type_name == "Selectable":
+            self.param_type = Selectable
         else:
             self.param_type = None
 
     def set_param_type(self, param_type: type, is_list: bool = False):
-        if param_type not in [str, int, float, bool]:
+        if param_type not in [str, int, float, bool, Selectable]:
             raise Exception(f"Invalid param type: {str(param_type)}")
 
-        self.is_list = bool(is_list)
+        if param_type == Selectable:
+            self.is_list = False
+        else:
+            self.is_list = bool(is_list)  # todo: probably needs to change
+
         self.param_type = param_type
-        self.param_type_name = param_type.__name__
+        self.param_type_name = param_type.__name__  # todo: probably needs to change
 
     def __lt__(self, other):
         if type(other) != type(self):
@@ -97,6 +105,9 @@ class JobDefinitionParameter(BaseModel):
         return x
 
     def convert_to_correct_type(self, user_input):
+        if self.param_type == Selectable:
+            return user_input
+
         if self.is_list:
             to_return = []
             input_split = user_input.split(",")

@@ -18,6 +18,7 @@ from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.models.job_definition import JobDefinition
 from base_dash_app.models.job_definition_parameter import JobDefinitionParameter
 from base_dash_app.services.job_definition_service import JobDefinitionService
+from base_dash_app.virtual_objects.interfaces.selectable import Selectable, CachedSelectable
 
 JOB_CARD_LOG_LEVEL_SELECTOR_ID = "job-card-log-level-selector-id"
 
@@ -33,10 +34,17 @@ JOB_RUNNER_BTN_ID = "job-runner-btn-id"
 
 
 class JobCard(ComponentWithInternalCallback):
-    def __init__(self, job_definition: JobDefinition, job_def_service: JobDefinitionService, *args, **kwargs):
+    def __init__(
+            self, job_definition: JobDefinition,
+            job_def_service: JobDefinitionService,
+            footer=None,
+            *args, **kwargs
+    ):
         super().__init__()
         self.job_definition: JobDefinition = job_definition
         self.job_def_service: JobDefinitionService = job_def_service
+        self.footer = footer or []
+        self.log_level: LogLevel = LogLevelsEnum.INFO.value
 
     @classmethod
     def validate_state_on_trigger(cls, instance):
@@ -114,13 +122,17 @@ class JobCard(ComponentWithInternalCallback):
                         if 'value' in log_level_state_dict and log_level_state_dict['value'] != '':
                             log_level = LogLevelsEnum.get_by_id(int(log_level_state_dict['value']))
 
+            instance.log_level = log_level
+
             if should_run:
                 instance.progress_container = instance.job_def_service.run_job(
                     job_def=instance.job_definition, parameter_values=param_to_value_map,
                     log_level=log_level
                 )
 
-        return [instance.__render_job_card(form_messages=error_messages)]
+                instance.job_definition.rehydrate_events_from_db()
+
+        return [instance.__render_job_card(form_messages=error_messages, footer=instance.footer)]
 
     def render(self, wrapper_style_override=None):
         if wrapper_style_override is None:
@@ -128,7 +140,7 @@ class JobCard(ComponentWithInternalCallback):
 
         return html.Div(
             children=[
-                self.__render_job_card()
+                self.__render_job_card(footer=self.footer)
             ],
             style={
                 "width": "660px", "position": "relative", "float": "left", "margin": "20px",
@@ -167,15 +179,66 @@ class JobCard(ComponentWithInternalCallback):
             )
         ]
 
+    def render_log_div(self, wrapper_div_style=None):
+        if wrapper_div_style is None:
+            wrapper_div_style = {}
+
+        if not self.job_definition.is_in_progress():
+            return None
+
+        logs = self.job_definition.current_prog_container.logs
+
+        children = []
+        for log in logs:
+            style = {
+                "lineHeight": "18px", "margin": 0,
+                "flex": "none", "color": "black", "fontWeight": "normal",
+                "position": "relative", "float": "left", "overflow": "hidden"
+            }
+
+            if log.startswith("[INFO]"):
+                pass
+            elif log.startswith("[WARN]"):
+                style["color"] = StatusesEnum.WARNING.value.hex_color
+            elif log.startswith("[ERROR]"):
+                style["color"] = StatusesEnum.FAILURE.value.hex_color
+            elif log.startswith("[CRITICAL]"):
+                style["color"] = StatusesEnum.FAILURE.value.hex_color
+                style["fontWeight"] = "bold"
+
+            children.insert(
+                0, html.Pre(
+                    log,
+                    style=style
+                )
+            )
+
+        return html.Div(
+            children=children[:100],
+            style={
+                "width": "100%",
+                "height": "100%",
+                "overflow": "scroll",
+                "border": "1px solid #ccc",
+                "borderRadius": "5px",
+                "padding": "20px",
+                "display": "flex",
+                "flexDirection": "column-reverse",
+                "position": "relative",
+                "float": "left",
+                **wrapper_div_style
+            },
+        )
+
     def __render_job_card(
             self, form_messages: Dict[JobDefinitionParameter, Optional[str]] = None,
-            footer_buttons=None
+            footer=None
     ):
         if form_messages is None:
             form_messages = {}
 
-        if footer_buttons is None:
-            footer_buttons = []
+        if footer is None:
+            footer = []
 
         job = self.job_definition
         is_in_progress = job.current_prog_container is not None
@@ -204,21 +267,53 @@ class JobCard(ComponentWithInternalCallback):
         parameter_defs: List[JobDefinitionParameter] = job.parameters
         rendered_params = []
         for param in parameter_defs:
-            rendered_params.append(
-                SimpleLabelledInput(
-                    label=param.user_facing_param_name,
-                    input_id={
-                        "type": JOB_CARD_PARAM_INPUT_ID,
-                        "index": f"{self._instance_id}{INDEX_DELIMITER}{param.variable_name}"
-                    },
-                    input_type="number" if param.param_type in [int, float] else "text",
-                    placeholder=param.placeholder,
-                    initial_validity=None if param not in form_messages else False,
-                    invalid_form_feedback=form_messages[param] if param in form_messages else None,
-                    disabled=param.editable is False,
-                    starting_value=param.default_value
-                ).render()
-            )
+            if param.param_type in [int, float, str]:
+                rendered_params.append(
+                    SimpleLabelledInput(
+                        label=param.user_facing_param_name,
+                        input_id={
+                            "type": JOB_CARD_PARAM_INPUT_ID,
+                            "index": f"{self._instance_id}{INDEX_DELIMITER}{param.variable_name}"
+                        },
+                        input_type="number" if param.param_type in [int, float] else "text",
+                        placeholder=param.placeholder,
+                        initial_validity=None if param not in form_messages else False,
+                        invalid_form_feedback=form_messages[param] if param in form_messages else None,
+                        disabled=param.editable is False or is_in_progress,
+                        starting_value=param.default_value,
+                        style_override={"marginBottom": "20px"}
+                    ).render(wrapper_style_override={"marginTop": "0px"})
+                )
+            elif param.param_type in [bool, Selectable]:
+                if param.param_type == Selectable:
+                    selectables = job.get_cached_selectables_by_param_name(
+                        param.variable_name,
+                        session=self.job_def_service.dbm.get_session()
+                    )
+                else:
+                    selectables = [
+                        CachedSelectable(label="True", value=True),
+                        CachedSelectable(label="False", value=False),
+                    ]
+
+                comp_id = {
+                    "type": JOB_CARD_PARAM_INPUT_ID,
+                    "index": f"{self._instance_id}{INDEX_DELIMITER}{param.variable_name}"
+                }
+                if param.user_facing_param_name is not None:
+                    rendered_params.append(dbc.Label(param.user_facing_param_name, html_for=comp_id))
+
+                rendered_params.append(
+                    SimpleSelector(
+                        comp_id=comp_id,
+                        selectables=selectables,
+                        placeholder=param.placeholder,
+                        style={
+                            "width": "100%", "marginBottom": "20px", "padding": "10px"
+                        },
+                        disabled=param.editable is False or is_in_progress,
+                    ).render(),
+                )
 
         num_historical_dots = 15
         margin_right = 4
@@ -236,7 +331,9 @@ class JobCard(ComponentWithInternalCallback):
                                 dot_style_override={
                                     "marginRight": f"{margin_right}px",
                                     "width": f"calc((100% - {margin_right}px "
-                                             f"* {num_historical_dots}) / {num_historical_dots})"},
+                                             f"* {num_historical_dots}) / {num_historical_dots})",
+                                    "marginLeft": "0px"
+                                },
                                 use_tooltips=True
                             )
                         ]
@@ -248,8 +345,10 @@ class JobCard(ComponentWithInternalCallback):
                     html.Div(
                         children=[
                             dbc.Button(
-                                "Running..." if is_in_progress else "Run",
-                                style={"position": "relative", "float": "left", "width": "100px"},
+                                f"{job.get_current_duration()}s" if is_in_progress else "Run",
+                                style={
+                                    "position": "relative", "float": "left", "width": "100px"
+                                },
                                 id={"type": JOB_RUNNER_BTN_ID, "index": self._instance_id},
                                 disabled=is_in_progress
                             ),
@@ -268,23 +367,43 @@ class JobCard(ComponentWithInternalCallback):
                                 disabled=not is_in_progress,
                                 id={"type": JOB_CARD_INTERVAL_ID, "index": self._instance_id}
                             ),
+                            dbc.Label(
+                                "Log Level",
+                                html_for={"type": JOB_CARD_LOG_LEVEL_SELECTOR_ID, "index": self._instance_id},
+                                style={"marginTop": "20px", "position": "relative", "float": "left", "clear": "left"}
+                            ),
                             SimpleSelector(
                                 comp_id={"type": JOB_CARD_LOG_LEVEL_SELECTOR_ID, "index": self._instance_id},
                                 selectables=[level.value for level in LogLevelsEnum],
                                 placeholder="Log Level",
-                                style={"width": "100%", "position": "relative", "float": "left", "marginTop": "20px"}
+                                style={"width": "100%", "marginBottom": "10px"},
+                                disabled=is_in_progress,
+                                currently_selected_value=self.log_level.get_value()
                             ).render(),
                             last_run_error_message,
                             html.Div(
                                 children=rendered_params,
-                                style={"width": "100%", "position": "relative", "float": "left", "marginBottom": "10px"}
-                            ) if len(rendered_params) > 0 else None,
-                            dbc.CardFooter(
-                                dbc.ButtonGroup(footer_buttons),
-                            ) if len(footer_buttons) > 0 else None
+                                style={
+                                    "width": "100%", "position": "relative", "float": "left", "marginBottom": "10px"
+                                }
+                            ) if len(rendered_params) > 0 and not is_in_progress else None,
+                            html.Div(
+                                children=self.render_log_div(
+                                    wrapper_div_style={
+                                        "minHeight": "300px",
+                                        "maxHeight": "300px"
+                                    }
+                                ),
+                            ),
+                            html.Div(
+                                children=footer,
+                                style={
+                                    "width": "100%", "position": "relative", "float": "left", "marginBottom": "10px"
+                                }
+                            ) if footer is not None else None
                         ],
                         style={
-                            "position": "relative", "float": "left",
+                            "position": "relative", "clear": "left",
                             "width": "100%", "padding": "10px"
                         }
                     ),

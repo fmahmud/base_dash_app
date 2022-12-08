@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import List
 
+from base_dash_app.components.details.detail_text_item import DetailTextItem
+
 
 class Detailable(ABC):
     @abstractmethod
@@ -33,6 +35,12 @@ class Detailable(ABC):
     # @abstractmethod
     # def get_text5(self):
     #     pass
+
+    def get_progress(self):
+        return 0.0
+
+    def show_progress_bar(self):
+        return False
 
     @abstractmethod
     def show_ratio_bar(self):
