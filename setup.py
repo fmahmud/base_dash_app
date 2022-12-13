@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 setup(
     name='base_dash_app',
     packages=find_packages(),
-    version='0.6.0',
+    version='0.6.9',
     description='Base Dash Webapp',
     author='fmahmud',
     license='MIT',
