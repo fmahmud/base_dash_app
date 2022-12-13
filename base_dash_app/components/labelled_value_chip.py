@@ -1,3 +1,5 @@
+from typing import List
+
 from dash import html
 
 from base_dash_app.components.base_component import BaseComponent
@@ -41,4 +43,26 @@ class LabelledValueChip(BaseComponent):
                 "marginLeft": "10px" if not self.is_first else "none",
                 **wrapper_div_style_override,
             },
+        )
+
+
+class LabelledChipGroup(BaseComponent):
+    def __init__(self, values: List[LabelledValueChip]):
+        self.values = values
+        if len(self.values) > 0:
+            self.values[0].is_first = True
+
+    def render(self, hide_overflow=True):
+        return html.Div(
+            children=[
+                v.render({
+                    "minWidth": "75px",
+                    "width": f"calc({(100 / len(self.values)):.0f}% - 10px)",
+                    "overflow": "hidden" if hide_overflow else "visible"
+                }) for v in self.values
+            ],
+            style={
+                "width": "100%", "position": "relative", "float": "left", "overflow": "hidden",
+                "maxHeight": "40px"
+            }
         )

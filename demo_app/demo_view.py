@@ -15,6 +15,8 @@ from sqlalchemy.orm import Session
 from base_dash_app.components.alerts import Alert
 from base_dash_app.components.callback_utils.mappers import InputToState, InputMapping, StateMapping
 from base_dash_app.components.cards.special_cards.job_card import JobCard
+from base_dash_app.components.cards.tsdp_sparkline_stat_card import TsdpSparklineStatCard, TimePeriodsEnum, \
+    TsdpAggregationFuncs
 from base_dash_app.components.data_visualization import ratio_bar
 from base_dash_app.components.data_visualization.ratio_bar import StatusToCount
 from base_dash_app.components.datatable.datatable_wrapper import DataTableWrapper
@@ -354,7 +356,7 @@ class DemoView(BaseView):
                         ).render(),
                         StatSparklineCard(
                             title="Sparkline Test Stat Card",
-                            graph_height=80,
+                            graph_height=155,
                             values=[
                                 LabelledValueChip(label="Annually", value=90.4),
                                 LabelledValueChip(label="Monthly", value=96.3),
@@ -368,6 +370,23 @@ class DemoView(BaseView):
                                 )
                                 for i in range(50)
                             ]
+                        ).render(),
+                        TsdpSparklineStatCard(
+                            title="Test TSDP Sparkline Card",
+                            graph_height=155,
+                            series=[
+                                TimeSeriesDataPoint(
+                                    date=datetime.datetime(year=2022, month=11, day=1) + datetime.timedelta(days=i),
+                                    value=50 - ((random.random() / (i / 3 + 1)) * 50) + 50
+                                )
+                                for i in range(50)
+                            ],
+                            time_periods_to_show=[
+                                TimePeriodsEnum.LAST_24HRS,
+                                TimePeriodsEnum.LAST_7_DAYS,
+                                TimePeriodsEnum.LAST_30_DAYS,
+                            ],
+                            aggregation_to_use=TsdpAggregationFuncs.SUM
                         ).render()
                     ],
                     label="Stats Card Demo",

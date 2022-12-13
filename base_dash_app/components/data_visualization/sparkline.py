@@ -13,7 +13,7 @@ class Sparkline(BaseComponent):
         self.title: str = title
         self.series: List[Graphable] = series
 
-    def render(self, height=40, width=300, wrapper_style_override=None):
+    def render(self, height=40, width=300, shape="spline", smoothening=0.8, wrapper_style_override=None):
         if wrapper_style_override is None:
             wrapper_style_override = {}
 
@@ -32,7 +32,7 @@ class Sparkline(BaseComponent):
 
         graph = go.Scatter(
             x=x_data, y=y_data, text=labels,  # fill='tozeroy', fillcolor="rgba(76, 17, 48, 0.5)",
-            line=Line(color="rgba(0, 0, 0, 1)", width=2, shape="spline", smoothing=1.3),
+            line=Line(color="rgba(0, 0, 0, 1)", width=2, shape=shape, smoothing=smoothening),
             mode="lines"
         )
 
@@ -54,13 +54,14 @@ class Sparkline(BaseComponent):
 
             },
             "showlegend": False,
-            "height": height,
+            "height": height - 12,
             "hovermode": False,
         }
 
         figure = go.Figure(layout=layout, data=graph)
         if len(y_data) > 0:
-            figure.update_yaxes(range=[ymin * 0.98, ymax * 1.02])
+            figure.update_yaxes(range=[ymin - abs(ymax * 0.1), ymax + abs(ymax * 0.1)])
+
         return html.Div(
             children=[
                 dcc.Graph(
