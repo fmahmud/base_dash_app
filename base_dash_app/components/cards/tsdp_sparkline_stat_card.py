@@ -1,5 +1,6 @@
 import datetime
 from enum import Enum
+from math import floor, log
 from typing import List
 
 from dash import html
@@ -13,7 +14,7 @@ from base_dash_app.virtual_objects.time_series_data_point import TimeSeriesDataP
 
 class TsdpAggregationFuncs(Enum):
     MEAN = lambda list_of_tsdps: sum([x.value for x in list_of_tsdps]) / len(list_of_tsdps)
-    MODE = 2 # todo
+    MODE = 2  # todo
     MEDIAN = lambda list_of_tsdps: (sorted(list_of_tsdps, key=lambda t: t.value)[len(list_of_tsdps) // 2]) if len(list_of_tsdps) > 0 else None
     SUM = lambda list_of_tsdps: sum([x.value for x in list_of_tsdps])
     MIN = lambda list_of_tsdps: min([x.value for x in list_of_tsdps])
@@ -35,6 +36,27 @@ class TimePeriodsEnum(Enum):
     ALL_TIME = "All Time"
 
 
+def human_format(number):
+    units = ['', 'K', 'M', 'G', 'T', 'P']
+    k = 1000.0
+
+    magnitude = int(floor(log(abs(number), k))) if number != 0 else 0
+    return f"{number / k**magnitude:.2f}{units[magnitude]}"
+
+
+red_to_green_color_scale = {
+    -100: "rgba(180, 60, 50, 1)",
+    -50: "rgba(230, 124, 115, 1)",
+    -20: "rgba(243, 190, 185, 1)",
+    -10: "rgba(255, 230, 230, 1)",
+    0: "rgba(0, 0, 0, 1)",
+    10: "rgba(230, 255, 50, 1)",
+    20: "rgba(190, 243, 115, 1)",
+    50: "rgba(124, 230, 185, 1)",
+    100: "rgba(60, 180, 230, 1)",
+}
+
+
 class TsdpSparklineStatCard(BaseComponent):
     def __init__(
         self,
@@ -45,7 +67,9 @@ class TsdpSparklineStatCard(BaseComponent):
         shape="spline",
         smoothening=0.8,
         time_periods_to_show: List[TimePeriodsEnum] = None,
-        aggregation_to_use: TsdpAggregationFuncs = TsdpAggregationFuncs.SUM
+        aggregation_to_use: TsdpAggregationFuncs = TsdpAggregationFuncs.SUM,
+        use_human_formatting=True,
+        use_rg_color_scale=True
     ):
         self.series = sorted(series)
         self.title = title
@@ -56,6 +80,7 @@ class TsdpSparklineStatCard(BaseComponent):
         self.height = 138 + self.graph_height
         self.time_periods_to_show: List[TimePeriodsEnum] = time_periods_to_show or [TimePeriodsEnum.LAST_24HRS]
         self.aggregation_to_use: TsdpAggregationFuncs = aggregation_to_use
+        self.use_human_formatting = use_human_formatting
 
     def render(self, *args, **kwargs):
         info_card = InfoCard()
@@ -130,9 +155,14 @@ class TsdpSparklineStatCard(BaseComponent):
                     # match
                     matching_data_points.append(tsdp)
 
+            value = self.aggregation_to_use(matching_data_points)
+            if self.use_human_formatting:
+                value = human_format(value)
+            else:
+                value = f"{value:,.2f}"
             values.append(
                 LabelledValueChip(
-                    value=f"{self.aggregation_to_use(matching_data_points):,.2f}",
+                    value=value,
                     label=time_period.value
                 )
             )

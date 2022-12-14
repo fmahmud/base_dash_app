@@ -80,22 +80,3 @@ def update_elo(player_elo: float, opponent_elo: float, won: bool) -> float:
     return new_elo_for_player
 
 
-# n = 6
-# input = [1, 2, 3]
-# print(len(input) ** n)
-# result1 = get_n_sized_permutations(input, n)
-# print(len(result1))
-# print(result1)
-#
-# print("")
-# m = len(input)
-# print( math.factorial(m + n - 1) / (math.factorial(n) * math.factorial(m-1)))
-# result2 = get_n_sized_combinations(input, n)
-# print(len(result2))
-# print(result2)
-
-# [[1], [2]]
-# [[1, 1], [1, 2], [2, 2]]
-# [[1, 1, 1], [1, 1, 2], [1, 2, 2], [2, 2, 2]]
-# [[1, 1, 1, 1], [1, 1, 1, 2], [1, 1, 2, 2], [1, 2, 2, 2], [2, 2, 2, 2]]
-# [[1, 1, 1, 1, 1], [1, 1, 1, 1, 2], [1, 1, 1, 2, 2], [1, 1, 2, 2, 2], [1, 2, 2, 2, 2], [2, 2, 2, 2, 2]]
