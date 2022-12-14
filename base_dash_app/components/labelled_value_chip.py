@@ -57,7 +57,7 @@ class LabelledChipGroup(BaseComponent):
             children=[
                 v.render({
                     "minWidth": "75px",
-                    "width": f"calc({(100 / len(self.values)):.0f}% - 10px)",
+                    "width": f"calc({(100 / min(len(self.values), 5)):.0f}% - 10px)",
                     "overflow": "hidden" if hide_overflow else "visible"
                 }) for v in self.values
             ],

@@ -377,7 +377,7 @@ class DemoView(BaseView):
                             series=[
                                 TimeSeriesDataPoint(
                                     date=datetime.datetime(year=2022, month=11, day=1) + datetime.timedelta(days=i),
-                                    value=50 - ((random.random() / (i / 3 + 1)) * 50) + 50
+                                    value=50000 - ((random.random() / (i / 3 + 1)) * 50) + 50
                                 )
                                 for i in range(50)
                             ],
