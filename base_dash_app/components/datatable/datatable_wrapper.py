@@ -76,7 +76,7 @@ class DataTableWrapper(ComponentWithInternalCallback):
         self.downloadable: bool = True
 
         self.columns: List[Dict] = columns or []
-        self.last_load_time = datetime.datetime.now()
+        self.last_load_time = None
 
         self.data: List = []
         self.data_for_download = None

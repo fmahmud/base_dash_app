@@ -37,7 +37,9 @@ def construct_down_ref_btgrp(
                 style={"position": "relative", "float": "right", "clear": "right", "height": "50px", "margin": "20px 0"},
             ),
             html.H5(
-                f"Last Loaded {date_utils.readable_time_since(last_load_time)} ago",
+                f"Last Loaded {date_utils.readable_time_since(last_load_time)} ago"
+                if last_load_time is not None
+                else "Never Loaded",
                 style={
                     "position": "relative",
                     "float": "right",
@@ -46,7 +48,5 @@ def construct_down_ref_btgrp(
                     "margin-right": "20px",
                 },
             )
-            if last_load_time is not None
-            else None,
         ]
     )

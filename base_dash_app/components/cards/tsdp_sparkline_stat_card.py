@@ -1,5 +1,4 @@
 import datetime
-from enum import Enum
 from math import floor, log
 from typing import List
 
@@ -9,34 +8,14 @@ from base_dash_app.components.base_component import BaseComponent
 from base_dash_app.components.cards.info_card import InfoCard
 from base_dash_app.components.data_visualization.sparkline import Sparkline
 from base_dash_app.components.labelled_value_chip import LabelledChipGroup, LabelledValueChip
-from base_dash_app.virtual_objects.time_series_data_point import TimeSeriesDataPoint
-
-
-class TsdpAggregationFuncs(Enum):
-    MEAN = lambda list_of_tsdps: sum([x.value for x in list_of_tsdps]) / len(list_of_tsdps)
-    MODE = 2  # todo
-    MEDIAN = lambda list_of_tsdps: (sorted(list_of_tsdps, key=lambda t: t.value)[len(list_of_tsdps) // 2]) if len(list_of_tsdps) > 0 else None
-    SUM = lambda list_of_tsdps: sum([x.value for x in list_of_tsdps])
-    MIN = lambda list_of_tsdps: min([x.value for x in list_of_tsdps])
-    MAX = lambda list_of_tsdps: max([x.value for x in list_of_tsdps])
-    COUNT = lambda list_of_tsdps: len(list_of_tsdps)
-    LATEST_VALUE = lambda list_of_tsdps: sorted(list_of_tsdps)[-1].value if len(list_of_tsdps) > 0 else None
-    SEGMENT_START = lambda list_of_tsdps: sorted(list_of_tsdps)[0].value if len(list_of_tsdps) > 0 else None
-
-
-class TimePeriodsEnum(Enum):
-    LATEST = "Latest"
-    LAST_HOUR = "Last Hour"
-    LAST_24HRS = "Last 24 Hours"
-    LAST_7_DAYS = "Last 7 Days"
-    LAST_30_DAYS = "Last 30 Days"
-    LAST_90_DAYS = "Last 90 Days"
-    LAST_365_DAYS = "Last 365 Days"
-
-    ALL_TIME = "All Time"
+from base_dash_app.virtual_objects.timeseries.time_series_data_point import TimeSeriesDataPoint
+from base_dash_app.virtual_objects.timeseries.time_periods_enum import TimePeriodsEnum
+from base_dash_app.virtual_objects.timeseries.tsdp_aggregation_funcs import TsdpAggregationFuncs
 
 
 def human_format(number):
+    if number is None:
+        raise Exception("Number was none")
     units = ['', 'K', 'M', 'G', 'T', 'P']
     k = 1000.0
 
@@ -57,7 +36,37 @@ red_to_green_color_scale = {
 }
 
 
+class TsdpStatCardDescriptor:
+    # todo: make generic stat card descriptor
+    def __init__(
+            self,
+            title=None,
+            unit: str = None,
+            graph_height: int = 40,
+            shape="spline",
+            smoothening=0.8,
+            time_periods_to_show: List[TimePeriodsEnum] = None,
+            aggregation_to_use: TsdpAggregationFuncs = TsdpAggregationFuncs.SUM,
+            use_human_formatting=True,
+            use_rg_color_scale=True
+    ):
+        self.title = title
+        self.unit = unit
+        self.shape = shape
+        self.smoothening = smoothening
+        self.graph_height = graph_height
+        self.time_periods_to_show: List[TimePeriodsEnum] = time_periods_to_show or [TimePeriodsEnum.LAST_24HRS]
+        self.aggregation_to_use: TsdpAggregationFuncs = aggregation_to_use
+        self.use_human_formatting = use_human_formatting
+
+
 class TsdpSparklineStatCard(BaseComponent):
+    @staticmethod
+    def init_from_descriptor(descriptor: TsdpStatCardDescriptor, series: List[TimeSeriesDataPoint]):
+        return TsdpSparklineStatCard(
+            **{"series": series, **vars(descriptor)}
+        )
+
     def __init__(
         self,
         series: List[TimeSeriesDataPoint],
@@ -156,6 +165,9 @@ class TsdpSparklineStatCard(BaseComponent):
                     matching_data_points.append(tsdp)
 
             value = self.aggregation_to_use(matching_data_points)
+            if value is None:
+                value = 0  #todo: default value!
+
             if self.use_human_formatting:
                 value = human_format(value)
             else:

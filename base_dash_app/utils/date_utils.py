@@ -12,6 +12,9 @@ def get_num_days_in_month(month_number, year=datetime.datetime.now().year):
 
 
 def readable_time_since(moment: datetime.datetime):
+    if moment is None:
+        return "Never"
+
     difference = (datetime.datetime.now() - moment).total_seconds()
 
     if difference < SECONDS_IN_MINUTE:
@@ -33,4 +36,20 @@ def readable_time_since(moment: datetime.datetime):
         difference = difference / SECONDS_IN_WEEK
         unit = "week"
 
-    return f"{round(difference, 0):.0f} {unit}{'s' if difference != 1 else ''}"
+    return f"{round(difference, 0):.0f} {unit}{'s' if round(difference) != 1 else ''}"
+
+
+def enumerate_datetimes_between(
+    start_date: datetime.datetime,
+    end_date: datetime.datetime,
+    interval: datetime.timedelta
+):
+    if end_date < start_date:
+        raise Exception("End date cannot be before start date")
+    moments = []
+    current = start_date
+    while current < end_date:
+        moments.append(current)
+        current = current + interval
+
+    return moments

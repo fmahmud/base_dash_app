@@ -2,7 +2,7 @@ import datetime
 from typing import Dict, Optional, List, TYPE_CHECKING
 
 from base_dash_app.virtual_objects.statistics.statistic import Statistic
-from base_dash_app.virtual_objects.time_series_data_point import TimeSeriesDataPoint
+from base_dash_app.virtual_objects.timeseries.time_series_data_point import TimeSeriesDataPoint
 
 if TYPE_CHECKING:
     from base_dash_app.virtual_objects.interfaces.resultable_event import ResultableEvent
