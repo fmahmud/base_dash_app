@@ -4,11 +4,9 @@ from dash import html
 
 from base_dash_app.components.base_component import BaseComponent
 from base_dash_app.components.cards.info_card import InfoCard
-from base_dash_app.components.cards.statistic_card import StatisticCard
 from base_dash_app.components.data_visualization.sparkline import Sparkline
 from base_dash_app.components.labelled_value_chip import LabelledValueChip, LabelledChipGroup
 from base_dash_app.virtual_objects.interfaces.graphable import Graphable
-from base_dash_app.virtual_objects.time_series_data_point import TimeSeriesDataPoint
 
 
 class StatSparklineCard(BaseComponent):

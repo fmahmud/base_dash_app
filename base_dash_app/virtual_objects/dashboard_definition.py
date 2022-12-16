@@ -6,7 +6,7 @@ from typing import List
 import dash_bootstrap_components as dbc
 
 from base_dash_app.components.data_visualization.sparkline import Sparkline
-from base_dash_app.virtual_objects.time_series_data_point import TimeSeriesDataPoint
+from base_dash_app.virtual_objects.timeseries.time_series_data_point import TimeSeriesDataPoint
 from dash import html
 
 

@@ -271,7 +271,7 @@ class RuntimeApplication:
                     ),
                     id=ALERTS_WRAPPER_DIV_ID,
                     style={
-                        "zIndex": "10000", "position": "absolute", "right": "0", "top": "60px",
+                        "zIndex": "10000", "position": "absolute", "right": "0", "top": "71px",
                         "width": "580px", "bottom": "0px", "pointerEvents": "none"
                     }
                 ),
