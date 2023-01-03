@@ -1,3 +1,4 @@
+import math
 from typing import List
 
 from dash import html
@@ -52,17 +53,20 @@ class LabelledChipGroup(BaseComponent):
         if len(self.values) > 0:
             self.values[0].is_first = True
 
-    def render(self, hide_overflow=True):
+    def render(self, hide_overflow=True, wrapper_style_override=None, max_num_values=5):
+        if wrapper_style_override is None:
+            wrapper_style_override = {}
+
         return html.Div(
             children=[
                 v.render({
                     "minWidth": "75px",
-                    "width": f"calc({(100 / min(len(self.values), 5)):.0f}% - 10px)",
+                    "width": f"calc({(math.floor(100 / min(len(self.values), max_num_values))):.0f}% - 10px)",
                     "overflow": "hidden" if hide_overflow else "visible"
                 }) for v in self.values
             ],
             style={
                 "width": "100%", "position": "relative", "float": "left", "overflow": "hidden",
-                "maxHeight": "40px"
+                "maxHeight": "40px", **wrapper_style_override
             }
         )
