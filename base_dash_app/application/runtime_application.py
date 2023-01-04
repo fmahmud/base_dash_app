@@ -186,7 +186,6 @@ class RuntimeApplication:
         )
 
         # register internal callback components
-        # todo: make configurable via input of AppDescriptor
         components_with_internal_callbacks = [
             JobCard, DataTableWrapper, SimpleTimeSeriesDashboard,
             *app_descriptor.components_with_internal_callbacks
