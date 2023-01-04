@@ -1,6 +1,7 @@
 from typing import List, Type, Hashable, Any, Dict
 
 from base_dash_app.apis.api import API
+from base_dash_app.components.base_component import ComponentWithInternalCallback
 from base_dash_app.components.callback_utils.mappers import InputToState
 from base_dash_app.models.job_definition import JobDefinition
 from base_dash_app.services.base_service import BaseService
@@ -37,7 +38,8 @@ class AppDescriptor:
             valid_user_pairs: Dict[str, str] = None,
             silence_routes_logging: bool = True,
             alerts_refresh_timeout: int = 1000,
-            assets_folder_path: str = None
+            assets_folder_path: str = None,
+            components_with_internal_callbacks: List[Type['ComponentWithInternalCallback']] = None
     ):
         """
         :param global_inputs: 
@@ -81,3 +83,4 @@ class AppDescriptor:
         self.silence_routes_logging: bool = silence_routes_logging
         self.alerts_refresh_timeout: int = alerts_refresh_timeout
         self.assets_folder_path: str = assets_folder_path
+        self.components_with_internal_callbacks = components_with_internal_callbacks or []
