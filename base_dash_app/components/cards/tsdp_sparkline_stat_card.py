@@ -16,6 +16,10 @@ from base_dash_app.virtual_objects.timeseries.tsdp_aggregation_funcs import Tsdp
 def human_format(number):
     if number is None:
         raise Exception("Number was none")
+
+    if -1 < number < 1:
+        return f"{number:.2f}"
+
     units = ['', 'K', 'M', 'G', 'T', 'P']
     k = 1000.0
 
@@ -91,7 +95,10 @@ class TsdpSparklineStatCard(BaseComponent):
         self.aggregation_to_use: TsdpAggregationFuncs = aggregation_to_use
         self.use_human_formatting = use_human_formatting
 
-    def render(self, *args, **kwargs):
+    def render(self, style_override=None,  **kwargs):
+        if style_override is None:
+            style_override = {}
+
         info_card = InfoCard()
 
         sparkline = Sparkline(
@@ -130,48 +137,51 @@ class TsdpSparklineStatCard(BaseComponent):
         values = []
         for time_period in self.time_periods_to_show:
             #todo: easy memoization... too lazy to do
-            matching_data_points: List[TimeSeriesDataPoint] = []
-            if time_period == TimePeriodsEnum.LATEST:
-                time_segment_start = self.series[-1].date
-                time_segment_end = self.series[-1].date
-            elif time_period == TimePeriodsEnum.LAST_HOUR:
-                time_segment_start = current_time - datetime.timedelta(hours=1)
-                time_segment_end = current_time
-            elif time_period == TimePeriodsEnum.LAST_24HRS:
-                time_segment_start = current_time - datetime.timedelta(hours=24)
-                time_segment_end = current_time
-            elif time_period == TimePeriodsEnum.LAST_7_DAYS:
-                time_segment_start = current_time - datetime.timedelta(days=7)
-                time_segment_end = current_time
-            elif time_period == TimePeriodsEnum.LAST_30_DAYS:
-                time_segment_start = current_time - datetime.timedelta(days=30)
-                time_segment_end = current_time
-            elif time_period == TimePeriodsEnum.LAST_90_DAYS:
-                time_segment_start = current_time - datetime.timedelta(days=90)
-                time_segment_end = current_time
-            elif time_period == TimePeriodsEnum.LAST_365_DAYS:
-                time_segment_start = current_time - datetime.timedelta(days=365)
-                time_segment_end = current_time
-            elif time_period == TimePeriodsEnum.LAST_365_DAYS:
-                time_segment_start = current_time - datetime.timedelta(days=365)
-                time_segment_end = current_time
+            if len(self.series) > 0:
+                matching_data_points: List[TimeSeriesDataPoint] = []
+                if time_period == TimePeriodsEnum.LATEST:
+                    time_segment_start = self.series[-1].date
+                    time_segment_end = self.series[-1].date
+                elif time_period == TimePeriodsEnum.LAST_HOUR:
+                    time_segment_start = current_time - datetime.timedelta(hours=1)
+                    time_segment_end = current_time
+                elif time_period == TimePeriodsEnum.LAST_24HRS:
+                    time_segment_start = current_time - datetime.timedelta(hours=24)
+                    time_segment_end = current_time
+                elif time_period == TimePeriodsEnum.LAST_7_DAYS:
+                    time_segment_start = current_time - datetime.timedelta(days=7)
+                    time_segment_end = current_time
+                elif time_period == TimePeriodsEnum.LAST_30_DAYS:
+                    time_segment_start = current_time - datetime.timedelta(days=30)
+                    time_segment_end = current_time
+                elif time_period == TimePeriodsEnum.LAST_90_DAYS:
+                    time_segment_start = current_time - datetime.timedelta(days=90)
+                    time_segment_end = current_time
+                elif time_period == TimePeriodsEnum.LAST_365_DAYS:
+                    time_segment_start = current_time - datetime.timedelta(days=365)
+                    time_segment_end = current_time
+                elif time_period == TimePeriodsEnum.LAST_365_DAYS:
+                    time_segment_start = current_time - datetime.timedelta(days=365)
+                    time_segment_end = current_time
+                else:
+                    time_segment_start = self.series[0].date
+                    time_segment_end = current_time
+
+                for tsdp in self.series:
+                    if time_segment_start <= tsdp.date <= time_segment_end:
+                        # match
+                        matching_data_points.append(tsdp)
+
+                value = self.aggregation_to_use(matching_data_points)
+                if value is None:
+                    value = 0  #todo: default value!
+
+                if self.use_human_formatting:
+                    value = human_format(value)
+                else:
+                    value = f"{value:,.2f}"
             else:
-                time_segment_start = self.series[0].date
-                time_segment_end = current_time
-
-            for tsdp in self.series:
-                if time_segment_start <= tsdp.date <= time_segment_end:
-                    # match
-                    matching_data_points.append(tsdp)
-
-            value = self.aggregation_to_use(matching_data_points)
-            if value is None:
-                value = 0  #todo: default value!
-
-            if self.use_human_formatting:
-                value = human_format(value)
-            else:
-                value = f"{value:,.2f}"
+                value = "-"
             values.append(
                 LabelledValueChip(
                     value=value,
@@ -184,5 +194,7 @@ class TsdpSparklineStatCard(BaseComponent):
         )
         info_card.set_height(self.height)
 
-        return info_card.render()
+        return info_card.render(
+            style_override=style_override
+        )
 
