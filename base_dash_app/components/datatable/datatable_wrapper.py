@@ -29,16 +29,16 @@ class DataTableWrapper(ComponentWithInternalCallback):
             instance.data_for_download = dcc.send_string(
                 convert_dict_to_csv(
                     instance.data,
-                    [col["id"] for col in instance.columns]
+                    [col["id"] for col in instance.columns],
+                    headers_override={col["id"]: col["name"] for col in instance.columns}
                 ),
                 instance.download_file_name
             )
-        if triggering_id.startswith(RELOAD_DASH_BTN_ID):
+        elif triggering_id.startswith(RELOAD_DASH_BTN_ID):
             if instance.reload_data_function is None:
                 raise PreventUpdate("Reload function was null.")
 
-            instance.data = instance.reload_data_function()
-            instance.last_load_time = datetime.datetime.now()
+            instance.set_data(instance.reload_data_function())
 
         return [instance.__render_data_table()]
 
@@ -69,11 +69,19 @@ class DataTableWrapper(ComponentWithInternalCallback):
             )
         ]
 
-    def __init__(self, title: str, columns: list, reload_data_function: Callable = None, *args, **kwargs):
+    def __init__(
+            self, title: str,
+            columns: list,
+            reload_data_function: Callable = None,
+            hide_toolbar=False,
+            rows_per_page=500,
+            *args, **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self.title = title
         self.load_on_render: bool = False
         self.downloadable: bool = True
+        self.hide_toolbar = hide_toolbar
 
         self.columns: List[Dict] = columns or []
         self.last_load_time = None
@@ -85,6 +93,7 @@ class DataTableWrapper(ComponentWithInternalCallback):
         self.download_file_name = f"{datetime.datetime.now()}-{title}.csv"
 
         self.reload_data_function = reload_data_function
+        self.rows_per_page = rows_per_page
 
     def set_data(self, data):
         self.last_load_time = datetime.datetime.now()
@@ -102,7 +111,7 @@ class DataTableWrapper(ComponentWithInternalCallback):
                         "type": DATA_TABLE_WRAPPER_DOWNLOAD_ID,
                         "id": self._instance_id
                     }
-                ),
+                ) if self.hide_toolbar is False else None,
                 construct_down_ref_btgrp(
                     download_btn_id={
                         "type": DOWNLOAD_DATA_BTN_ID,
@@ -111,8 +120,8 @@ class DataTableWrapper(ComponentWithInternalCallback):
                     reload_btn_id={"type": RELOAD_DASH_BTN_ID, "index": self._instance_id},
                     last_load_time=self.last_load_time,
                     disable_reload_btn=self.reload_data_function is None,
-                    disable_download_btn=self.data is None or len(self.data) == 0
-                ),
+                    disable_download_btn=self.data is None or len(self.data) == 0,
+                ) if self.hide_toolbar is False else None,
                 dash_table.DataTable(
                     style_header={
                         "whiteSpace": "normal",
@@ -129,6 +138,7 @@ class DataTableWrapper(ComponentWithInternalCallback):
                     },
                     sort_action=self.sort_action,
                     filter_action=self.filter_action,
+                    page_size=self.rows_per_page
                 ),
             ]
         )

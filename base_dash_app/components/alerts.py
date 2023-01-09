@@ -1,3 +1,4 @@
+import datetime
 import json
 from typing import List
 
@@ -12,17 +13,21 @@ num_alerts = 0
 
 
 class Alert:
-    def __init__(self, body, icon=None, header=None, dismissable=True, duration=None, style=None, color="secondary"):
+    def __init__(
+            self, body, icon=None, header=None, dismissable=True,
+            duration=None, style=None, color="secondary"
+    ):
         self.body = body
         self.icon = icon
         self.header = header
         self.dismissable = dismissable
         self.style = style if style is not None else {}
-        self.duration = duration
+        self.duration = duration  # in seconds
         global num_alerts
         num_alerts += 1
         self.id = num_alerts
         self.color = color
+        self.created_at = datetime.datetime.now()
 
     @staticmethod
     def from_dict(dictionary):
@@ -44,6 +49,9 @@ class Alert:
     def __hash__(self):
         return hash(self.id)
 
+    def set_ttl(self, duration=10):
+        self.duration = duration
+        self.created_at = datetime.datetime.now()
 
 def render_alerts_div(alerts: List[Alert], wrapper_style=None):
     if wrapper_style is None:
@@ -64,11 +72,17 @@ def render_alerts_div(alerts: List[Alert], wrapper_style=None):
                 ),
                 html.Button(
                     className="btn-close", type="button", id={"type": DISMISS_ALERT_BTN_ID, "index": alert.id},
-                    style={"position": "absolute", "right": "14px", "top": "14px"}
+                    style={"position": "absolute", "right": "20px", "top": "20px"}
                 ),
             ],
             is_open=True,
-            style={**{"width": "550px", "position": "relative", "float": "right"}, **alert.style},
+            style={
+                "width": "550px", "position": "relative", "float": "right",
+                "filter": "drop-shadow(3px 3px 5px rgba(0,0,0,0.12))",
+                "borderRadius": "25px", "border": "none", "fontFamily": '"FS Me", sans-serif',
+                "fontWeight": "bold", "padding": "20px",
+                **alert.style
+            },
             color=alert.color
         )
         for alert in alerts
