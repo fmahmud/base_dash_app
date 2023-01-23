@@ -24,11 +24,11 @@ class Sparkline(BaseComponent):
             x_data.append(datum.get_x())
             y_data.append(datum.get_y())
             labels.append(datum.get_label())
-        xmin = min(x_data)
-        xmax = max(x_data)
+        xmin = min(x_data, default=0)
+        xmax = max(x_data, default=0)
 
-        ymin = round(min(y_data), 2)
-        ymax = round(max(y_data), 2)
+        ymin = round(min(y_data, default=0), 2)
+        ymax = round(max(y_data, default=0), 2)
 
         graph = go.Scatter(
             x=x_data, y=y_data, text=labels,  # fill='tozeroy', fillcolor="rgba(76, 17, 48, 0.5)",
@@ -77,10 +77,10 @@ class Sparkline(BaseComponent):
                     children=[
                         html.Div(
                             xmin.strftime("%Y-%m-%d"), style={"position": "relative", "float": "left"}
-                        ),
+                        ) if len(y_data) > 0 else None,
                         html.Div(
                             xmax.strftime("%Y-%m-%d"), style={"position": "relative", "float": "right"}
-                        )
+                        ) if len(y_data) > 0 else None
                     ],
                     style={
                         "width": "calc(100% - 32px)", "height": "12px", "position": "relative", "float": "left",

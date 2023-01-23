@@ -1,4 +1,7 @@
 import datetime
+from typing import Union
+
+from dateutil.relativedelta import relativedelta
 import math
 
 SECONDS_IN_MINUTE = 60
@@ -42,7 +45,7 @@ def readable_time_since(moment: datetime.datetime):
 def enumerate_datetimes_between(
     start_date: datetime.datetime,
     end_date: datetime.datetime,
-    interval: datetime.timedelta
+    interval: Union[datetime.timedelta, relativedelta]
 ):
     if end_date < start_date:
         raise Exception("End date cannot be before start date")

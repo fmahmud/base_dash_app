@@ -102,6 +102,10 @@ html, div {
     font-family: "FS Me", sans-serif;
 }
 
+.card .card {
+    filter: none;
+}
+
 .card-header, .card-footer {
     background: none;
 }

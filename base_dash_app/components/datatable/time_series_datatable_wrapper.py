@@ -1,13 +1,15 @@
 import datetime
-from typing import List, Callable
+from typing import List, Callable, Union, Dict, Any
 
 from dash.dash_table.Format import Format
 
 from base_dash_app.components.base_component import BaseComponent
 from base_dash_app.components.datatable.datatable_wrapper import DataTableWrapper
 from base_dash_app.utils import date_utils
-from base_dash_app.virtual_objects.timeseries.time_series import TimeSeries
+from base_dash_app.virtual_objects.timeseries.time_series import AbstractTimeSeries
+from base_dash_app.virtual_objects.timeseries.time_series_data_point import TimeSeriesDataPoint
 from base_dash_app.virtual_objects.timeseries.tsdp_aggregation_funcs import TsdpAggregationFuncs
+from dateutil.relativedelta import relativedelta
 
 TIMESTAMP_KEY = "timestamp"
 
@@ -22,9 +24,10 @@ class TimeSeriesDataTableWrapper(BaseComponent):
     def __init__(
         self, title,
         start_date: datetime.datetime, end_date: datetime.datetime,
-        interval_size: datetime.timedelta,
+        interval_size: Union[datetime.timedelta, relativedelta],
         aggregation_method: TsdpAggregationFuncs,
-        reload_data_function: Callable[[], List[TimeSeries]] = None
+        reload_data_function: Callable[[], List[AbstractTimeSeries]] = None,
+        hide_toolbar=False,
     ):
         self.start_date: datetime.datetime = start_date
         self.end_date: datetime.datetime = end_date
@@ -35,14 +38,15 @@ class TimeSeriesDataTableWrapper(BaseComponent):
             "type": "datetime"
         }
 
-        self.timeseries = {}
+        self.timeseries: Dict[str, AbstractTimeSeries] = {}
         self.aggregation_method: TsdpAggregationFuncs = aggregation_method
+        self.hide_toolbar = hide_toolbar
         self.reload_data_function = None
         if reload_data_function is not None:
             def wrapped_reload_data_function():
-                new_data: List[TimeSeries] = reload_data_function()
+                new_data: List[AbstractTimeSeries] = reload_data_function()
                 for series in new_data:
-                    self.overwrite_timeseries(timeseries=series)
+                    self.overwrite_timeseries_data(timeseries=series, data=series.get_tsdps())
 
                 return self.generate_data_array()
         else:
@@ -55,9 +59,10 @@ class TimeSeriesDataTableWrapper(BaseComponent):
             title=title,
             columns=[self.time_column],
             reload_data_function=self.reload_data_function,
+            hide_toolbar=self.hide_toolbar
         )
 
-    def add_timeseries(self, timeseries: TimeSeries, datatype: str = "text", format: Format = None):
+    def add_timeseries(self, timeseries: AbstractTimeSeries, datatype: str = "text", format: Format = None):
         """
 
         :param timeseries:
@@ -65,38 +70,51 @@ class TimeSeriesDataTableWrapper(BaseComponent):
         :param format:
         :return:
         """
-        if timeseries.unique_id in self.timeseries:
+        if timeseries.get_unique_id() in self.timeseries:
             raise Exception("Cannot add same time series twice.")
 
-        self.timeseries[timeseries.unique_id] = timeseries
+        self.timeseries[timeseries.get_unique_id()] = timeseries
         self.datatable.columns.append({
-            "name": timeseries.title,
-            "id": timeseries.unique_id,
+            "name": timeseries.get_title(),
+            "id": timeseries.get_unique_id(),
             "type": datatype,
             "format": format
         })
 
-    def overwrite_timeseries(self, timeseries):
-        self.timeseries[timeseries.unique_id] = timeseries
+    def overwrite_timeseries_data(self, timeseries: AbstractTimeSeries, data: List[TimeSeriesDataPoint]):
+        if timeseries.get_unique_id() not in self.timeseries:
+            raise Exception(f"Couldn't find timeseries with id: {timeseries.get_unique_id()}")
+
+        self.timeseries[timeseries.get_unique_id()].set_tsdps(data)
 
     def generate_data_array(self):
-        number_of_rows = (self.end_date - self.start_date) // self.interval_size + 1
+        interval_start = self.start_date
+        interval_end = min(self.start_date + self.interval_size, self.end_date)
+        data_dict: Dict[tuple, Any] = {}
+        while interval_start <= self.end_date:
+            data_dict[tuple([interval_start, min(interval_end, self.end_date)])] = {
+                TIMESTAMP_KEY: interval_start  # todo: missing columns
+            }
 
-        data_dict = {
-            i: {
-                TIMESTAMP_KEY: (i * self.interval_size) + self.start_date  # todo: missing columns
-            } for i in range(number_of_rows)
-        }
+            interval_start += self.interval_size
+            interval_end += self.interval_size
 
         # no aggregation yet
         for series_id, series in self.timeseries.items():
+            series.sort_tsdps()
+            interval_start = self.start_date
+            interval_end = min(self.start_date + self.interval_size, self.end_date)
             for tsdp in series.tsdps:
-                i = (tsdp.date - self.start_date) // self.interval_size
+                tsdp: TimeSeriesDataPoint
+                while tsdp.date >= interval_end:
+                    interval_start += self.interval_size
+                    interval_end += self.interval_size
 
-                if series_id not in data_dict[i]:
-                    data_dict[i][series_id] = []
+                key_tuple = tuple([interval_start, min(interval_end, self.end_date)])
+                if series_id not in data_dict[key_tuple]:
+                    data_dict[key_tuple][series_id] = []
 
-                data_dict[i][series_id].append(tsdp)
+                data_dict[key_tuple][series_id].append(tsdp)
 
         # do aggregation
         for i, data in data_dict.items():
