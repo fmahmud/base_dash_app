@@ -5,7 +5,6 @@ import time
 from typing import List, Dict
 
 import dash_bootstrap_components as dbc
-import finnhub
 from dash import html
 from dash.dash_table.Format import Format, Scheme
 from sqlalchemy import Column, Integer, Sequence, String
@@ -13,33 +12,33 @@ from sqlalchemy.orm import Session
 
 from base_dash_app.components.alerts import Alert
 from base_dash_app.components.callback_utils.mappers import InputToState, InputMapping, StateMapping
+from base_dash_app.components.cards.full_width_card import ThreeColumnCard
 from base_dash_app.components.cards.special_cards.job_card import JobCard
+from base_dash_app.components.cards.stat_sparkline_card import StatSparklineCard
+from base_dash_app.components.cards.statistic_card import StatisticCard
 from base_dash_app.components.cards.tsdp_sparkline_stat_card import TsdpSparklineStatCard, TsdpStatCardDescriptor
-from base_dash_app.components.dashboards.time_series_dashboard import SimpleTimeSeriesDashboard, \
-    DateRangeAggregatorDescriptor, TimeSeriesWrapper
-from base_dash_app.components.datatable.time_series_datatable_wrapper import TimeSeriesDataTableWrapper
-from base_dash_app.virtual_objects.timeseries.time_periods_enum import TimePeriodsEnum
-from base_dash_app.virtual_objects.timeseries.time_series import TimeSeries
-from base_dash_app.virtual_objects.timeseries.tsdp_aggregation_funcs import TsdpAggregationFuncs
+from base_dash_app.components.dashboards.simple_timeseries_dashboard import SimpleTimeSeriesDashboard
+from base_dash_app.virtual_objects.timeseries.timeseries_wrapper import TimeSeriesWrapper
+from base_dash_app.virtual_objects.timeseries.date_range_aggregation_descriptor import DateRangeAggregatorDescriptor
 from base_dash_app.components.data_visualization import ratio_bar
 from base_dash_app.components.data_visualization.ratio_bar import StatusToCount
 from base_dash_app.components.datatable.datatable_wrapper import DataTableWrapper
-from base_dash_app.components.lists.todo_list.todo_list import TodoList
+from base_dash_app.components.datatable.time_series_datatable_wrapper import TimeSeriesDataTableWrapper
+from base_dash_app.components.labelled_value_chip import LabelledValueChip
 from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.models.base_model import BaseModel
 from base_dash_app.models.job_definition import JobDefinition
 from base_dash_app.models.job_definition_parameter import JobDefinitionParameter
-from base_dash_app.models.task import Task
 from base_dash_app.services.base_service import BaseService
 from base_dash_app.services.job_definition_service import JobDefinitionService
 from base_dash_app.views.base_view import BaseView
-from base_dash_app.components.labelled_value_chip import LabelledValueChip
-from base_dash_app.components.cards.stat_sparkline_card import StatSparklineCard
-from base_dash_app.components.cards.statistic_card import StatisticCard
 from base_dash_app.virtual_objects.interfaces.selectable import Selectable, CachedSelectable
 from base_dash_app.virtual_objects.job_parameter import JobParameterDefinition
 from base_dash_app.virtual_objects.job_progress_container import VirtualJobProgressContainer
+from base_dash_app.virtual_objects.timeseries.time_periods_enum import TimePeriodsEnum
+from base_dash_app.virtual_objects.timeseries.time_series import TimeSeries
 from base_dash_app.virtual_objects.timeseries.time_series_data_point import TimeSeriesDataPoint
+from base_dash_app.virtual_objects.timeseries.tsdp_aggregation_funcs import TsdpAggregationFuncs
 
 DEMO_TABS_DIV_ID = "demo-tabs-div-id"
 
@@ -254,9 +253,9 @@ class DemoView(BaseView):
 
     def handle_any_input(self, *args, triggering_id, index):
         if triggering_id.startswith(TEST_ALERT_BTN_ID):
-            self.push_alert(Alert("Test Default Alert!"))
-            self.push_alert(Alert("Test Warning Alert!", color="warning"))
-            self.push_alert(Alert("Test DANGER Alert!", color="danger"))
+            self.push_alert(Alert("Test Default Alert!", duration=10))
+            self.push_alert(Alert("Test Warning Alert!", color="warning", duration=5))
+            self.push_alert(Alert("Test DANGER Alert!", color="danger", duration=20))
 
         job_def_service: JobDefinitionService = self.get_service(JobDefinitionService)
         job_def: TestJobDef = job_def_service.get_by_id(self.test_job_id)
@@ -363,23 +362,32 @@ class DemoView(BaseView):
                                 for i in range(50)
                             ]
                         ).render(),
-                        TsdpSparklineStatCard(
-                            title="Test TSDP Sparkline Card",
-                            graph_height=155,
-                            series=[
-                                TimeSeriesDataPoint(
-                                    date=datetime.datetime(year=2022, month=11, day=1) + datetime.timedelta(days=i),
-                                    value=50000 - ((random.random() / (i / 3 + 1)) * 50) + 50
-                                )
-                                for i in range(50)
+                        ThreeColumnCard().render(
+                            column1_content=[
+                                html.H1("Test")
                             ],
-                            time_periods_to_show=[
-                                TimePeriodsEnum.LAST_24HRS,
-                                TimePeriodsEnum.LAST_7_DAYS,
-                                TimePeriodsEnum.LAST_30_DAYS,
-                            ],
-                            aggregation_to_use=TsdpAggregationFuncs.SUM
-                        ).render()
+                            column2_content=TsdpSparklineStatCard(
+                                title="Test TSDP Sparkline Card",
+                                graph_height=155,
+                                series=[
+                                    TimeSeriesDataPoint(
+                                        date=datetime.datetime(year=2022, month=11, day=1) + datetime.timedelta(days=i),
+                                        value=50000 - ((random.random() / (i / 3 + 1)) * 50) + 50
+                                    )
+                                    for i in range(50)
+                                ],
+                                time_periods_to_show=[
+                                    TimePeriodsEnum.LAST_24HRS,
+                                    TimePeriodsEnum.LAST_7_DAYS,
+                                    TimePeriodsEnum.LAST_30_DAYS,
+                                ],
+                                aggregation_to_use=TsdpAggregationFuncs.SUM
+                            ).render(style_override={
+                                # "filter": "none"
+                            }),
+                            column3_content=[],
+                            style_override={"height": "330px"}
+                        )
                     ],
                     label="Stats Card Demo",
                     style={"padding": "20px"}
@@ -405,9 +413,14 @@ class DemoView(BaseView):
                 dbc.Tab(
                     label="Simple TSDP Dashboard Demo",
                     children=[
-                        simple_tsdp_dash.render()
+                        simple_tsdp_dash.render(
+                            wrapper_style_override={
+                                "position": "relative", "float": "left", "width": "100%",
+                                "padding": "20px"
+                            }
+                        )
                     ]
-                )
+                ),
             ],
             style={
                 "position": "relative",
@@ -485,32 +498,32 @@ class DemoView(BaseView):
         start_date = datetime.datetime(2022, 11, 1)
         end_date = datetime.datetime(2023, 1, 1)
         interval_size = datetime.timedelta(days=1)
-        if len(self.tsdp_datatables) == 0:
-            def wrapper_generate_data(num_series, interval):
-                def generate_data():
-                    all_series = []
-                    for i in range(num_series):
 
-                        timeseries: TimeSeries = TimeSeries(
-                            title=f"Series {i+1}",
-                            unique_id=f"series-{i+1}"
+        def wrapper_generate_data(num_series, interval, offset=0):
+            def generate_data():
+                all_series = []
+                for i in range(offset, num_series + offset):
+                    timeseries: TimeSeries = TimeSeries(
+                        title=f"Series {i + 1}",
+                        unique_id=f"series-{i + 1}"
+                    )
+
+                    for i in range((end_date - start_date) // interval + 1):
+                        timeseries.add_tsdp(
+                            TimeSeriesDataPoint(
+                                date=start_date + (i * interval),
+                                value=random.random() * 100
+                            )
                         )
 
-                        for i in range((end_date - start_date) // interval + 1):
-                            timeseries.add_tsdp(
-                                TimeSeriesDataPoint(
-                                    date=start_date + (i * interval),
-                                    value=random.random() * 100
-                                )
-                            )
+                    all_series.append(timeseries)
+                return all_series
 
-                        all_series.append(timeseries)
-                    return all_series
+            return generate_data
 
-                return generate_data
-
+        if len(self.tsdp_datatables) == 0:
             tsdp_dtw: TimeSeriesDataTableWrapper = TimeSeriesDataTableWrapper(
-                title="Data Table 1 ",
+                title="Data Table 1",
                 start_date=start_date,
                 end_date=end_date,
                 interval_size=interval_size,
@@ -552,36 +565,9 @@ class DemoView(BaseView):
                 aggregation_method=TsdpAggregationFuncs.SUM
             )
 
-            timeseries3 = TimeSeries(
-                title=f"Series Hourly",
-                unit="",
-                unique_id=f"series-3"
-            )
-
-            for i in range((end_date - start_date) // interval_size + 1):
-                timeseries3.add_tsdp(
-                    TimeSeriesDataPoint(
-                        date=start_date + (i * interval_size),
-                        value=random.random() * 100
-                    )
-                )
-
-            timeseries4 = TimeSeries(
-                title=f"Series Hourly 2",
-                unit="",
-                unique_id=f"series-4"
-            )
-
-            for i in range((end_date - start_date) // interval_size + 1):
-                timeseries4.add_tsdp(
-                    TimeSeriesDataPoint(
-                        date=start_date + (i * interval_size),
-                        value=random.random() * 100
-                    )
-                )
-
             tsw1 = TimeSeriesWrapper(
-                timeseries=timeseries3,
+                title=f"Series Hourly",
+                unique_id=f"series-3",
                 stat_card_descriptors=[
                     TsdpStatCardDescriptor(
                         title="TS 1 Means over Time",
@@ -597,7 +583,8 @@ class DemoView(BaseView):
             )
 
             tsw2 = TimeSeriesWrapper(
-                timeseries=timeseries4,
+                title=f"Series Hourly 2",
+                unique_id=f"series-4",
                 stat_card_descriptors=[
                     TsdpStatCardDescriptor(
                         title="TS 2 Means over Time",
@@ -614,7 +601,8 @@ class DemoView(BaseView):
 
             self.simple_tsdp_dash = SimpleTimeSeriesDashboard(
                 title="Test Simple Time Series Dashboard",
-                base_date_range=date_range
+                base_date_range=date_range,
+                reload_data_function=wrapper_generate_data(2, datetime.timedelta(days=1), offset=2)
             )
 
             self.simple_tsdp_dash.add_timeseries(tsw1)

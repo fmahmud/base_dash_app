@@ -125,4 +125,7 @@ class ComponentWithInternalCallback(BaseComponent, ABC):
 
     @classmethod
     def validate_state_on_trigger(cls, instance):
-        raise PreventUpdate()
+        if type(instance) != cls:
+            raise PreventUpdate(f"Instance was of type {type(instance)} instead of {cls}")
+
+        return

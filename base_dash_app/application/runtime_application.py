@@ -1,3 +1,4 @@
+import datetime
 import logging
 import os
 import traceback
@@ -19,6 +20,7 @@ from base_dash_app.components.callback_utils.mappers import InputToState
 from base_dash_app.components.callback_utils.utils import get_triggering_id_from_callback_context, \
     get_state_values_for_input_from_args_list, invalid_n_clicks
 from base_dash_app.components.cards.special_cards.job_card import JobCard
+from base_dash_app.components.dashboards.simple_timeseries_dashboard import SimpleTimeSeriesDashboard
 from base_dash_app.components.datatable.datatable_wrapper import DataTableWrapper
 from base_dash_app.components.navbar import NavBar, NavDefinition, NavGroup
 from base_dash_app.services.base_service import BaseService
@@ -184,7 +186,11 @@ class RuntimeApplication:
         )
 
         # register internal callback components
-        components_with_internal_callbacks = [JobCard, DataTableWrapper]
+        components_with_internal_callbacks = [
+            JobCard, DataTableWrapper, SimpleTimeSeriesDashboard,
+            *app_descriptor.components_with_internal_callbacks
+        ]
+
         for comp_class in components_with_internal_callbacks:
             comp_class.do_registrations(self.register_callback)
 
@@ -193,7 +199,7 @@ class RuntimeApplication:
         self.app.layout = self.get_layout
 
     def handle_alerts(self, n_clicks, n_interval, clear_all_nclicks, *args, **kwargs):
-        if invalid_n_clicks(n_clicks) and invalid_n_clicks(n_interval)\
+        if invalid_n_clicks(n_clicks) and invalid_n_clicks(n_interval) \
                 and invalid_n_clicks(clear_all_nclicks):
             raise PreventUpdate()
 
@@ -211,6 +217,11 @@ class RuntimeApplication:
             self.active_alerts.remove(alert_to_dismiss)
         elif trigerring_id.startswith(alerts.CLEAR_ALL_ALERTS_BTN_ID):
             self.active_alerts.clear()
+
+        for alert in self.active_alerts:
+            if alert.duration is not None and alert.created_at is not None \
+                    and alert.created_at + datetime.timedelta(seconds=alert.duration) <= datetime.datetime.now():
+                self.active_alerts.remove(alert)
 
         return [
             alerts.render_alerts_div(self.active_alerts)
@@ -295,7 +306,8 @@ class RuntimeApplication:
             style={"fontFamily": "'Roboto', sans-serif"}
         )
 
-    def register_callback(self, output: Union[Output, List[Output]], inputs: List[Input], state: List[State], function: Callable):
+    def register_callback(self, output: Union[Output, List[Output]], inputs: List[Input], state: List[State],
+                          function: Callable):
         self.app.callback(output=output, inputs=inputs, state=state)(function)
 
     def bind_to_self(self, func):
