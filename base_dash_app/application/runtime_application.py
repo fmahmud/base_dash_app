@@ -23,6 +23,7 @@ from base_dash_app.components.cards.special_cards.job_card import JobCard
 from base_dash_app.components.dashboards.simple_timeseries_dashboard import SimpleTimeSeriesDashboard
 from base_dash_app.components.datatable.datatable_wrapper import DataTableWrapper
 from base_dash_app.components.navbar import NavBar, NavDefinition, NavGroup
+from base_dash_app.services.async_handler_service import AsyncHandlerService
 from base_dash_app.services.base_service import BaseService
 from base_dash_app.services.global_state_service import GlobalStateService
 from base_dash_app.services.job_definition_service import JobDefinitionService
@@ -145,16 +146,12 @@ class RuntimeApplication:
 
         self.services[GlobalStateService] = GlobalStateService(initial_state=app_descriptor.initial_global_state)
         self.services[JobDefinitionService] = job_def_service
+        self.services[AsyncHandlerService] = AsyncHandlerService(**base_service_args)
 
         base_view_args = base_service_args
 
         for view in app_descriptor.views:
             self.views.append(view(**base_view_args))
-
-        # components_with_internal_callbacks = [
-        #     # todo: support custom components through app descriptor
-        #     TaskGroup
-        # ]
 
         wrapped_get_handler = self.bind_to_self(self.handle_get_call)
 

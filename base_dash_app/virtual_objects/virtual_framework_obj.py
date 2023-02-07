@@ -1,9 +1,15 @@
 import logging
+from typing import Optional, TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from base_dash_app.utils.db_utils import DbManager
 
 
 class VirtualFrameworkObject:
     def __init__(self, *args, **kwargs):
-        self.dbm = kwargs["dbm"] if "dbm" in kwargs else None
+
+        self.dbm: Optional['DbManager'] = kwargs["dbm"] if "dbm" in kwargs else None
         self.get_service = kwargs["service_provider"] if "service_provider" in kwargs else None
         self.get_api = kwargs["api_provider"] if "api_provider" in kwargs else None
         self.all_apis = kwargs["all_apis"] if "all_apis" in kwargs else None
@@ -26,7 +32,7 @@ class VirtualFrameworkObject:
         }
 
     def set_vars_from_kwargs(self, **kwargs):
-        self.dbm = kwargs["dbm"] if "dbm" in kwargs else None
+        self.dbm: Optional['DbManager'] = kwargs["dbm"] if "dbm" in kwargs else None
         self.get_service = kwargs["service_provider"] if "service_provider" in kwargs else None
         self.get_api = kwargs["api_provider"] if "api_provider" in kwargs else None
         self.all_apis = kwargs["all_apis"] if "all_apis" in kwargs else None

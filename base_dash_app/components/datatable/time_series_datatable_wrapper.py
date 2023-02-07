@@ -13,12 +13,6 @@ from dateutil.relativedelta import relativedelta
 
 TIMESTAMP_KEY = "timestamp"
 
-RELOAD_DASH_BTN_ID = "RELOAD_DASH_BTN_ID"
-
-DOWNLOAD_DATA_BTN_ID = "DOWNLOAD_DATA_BTN_ID"
-
-DATA_TABLE_WRAPPER_DOWNLOAD_ID = "data-table-wrapper-download-id"
-
 
 class TimeSeriesDataTableWrapper(BaseComponent):
     def __init__(
