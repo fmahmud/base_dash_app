@@ -2,6 +2,7 @@ import datetime
 import time
 from typing import Dict, List, Callable, Optional
 
+import dash_bootstrap_components as dbc
 import dash_table
 from dash import html
 from dash.exceptions import PreventUpdate
@@ -49,16 +50,11 @@ class DataTableWrapper(ComponentWithInternalCallback):
                 else:
                     async_container = AsyncWorkProgressContainer()
 
-                async_container.start_time = datetime.datetime.now()
-                async_container.execution_status = StatusesEnum.IN_PROGRESS
-                async_container.progress = 0
+                async_container.start()
                 data = instance.reload_data_function(async_container=async_container)
                 async_container.progress = 50
                 instance.set_data(data)
-                async_container.progress = 100
-                async_container.end_time = datetime.datetime.now()
-                async_container.result = 1
-                async_container.execution_status = StatusesEnum.SUCCESS
+                async_container.complete()
                 time.sleep(0.5)
 
             if instance.get_service is not None:
@@ -116,6 +112,7 @@ class DataTableWrapper(ComponentWithInternalCallback):
             hide_toolbar=False,
             rows_per_page=500,
             service_provider: Callable = None,
+            additional_buttons: List = None,
             *args, **kwargs
     ):
         super().__init__(*args, **kwargs)
@@ -138,6 +135,8 @@ class DataTableWrapper(ComponentWithInternalCallback):
 
         self.get_service: Optional[Callable] = service_provider
         self.current_async_container: Optional[AsyncWorkProgressContainer] = None
+
+        self.additional_buttons = additional_buttons or []
 
     def set_data(self, data):
         self.last_load_time = datetime.datetime.now()
@@ -172,7 +171,8 @@ class DataTableWrapper(ComponentWithInternalCallback):
                     reload_in_progress=self.current_async_container is not None,
                     reload_progress=self.current_async_container.progress
                         if self.current_async_container is not None else 0,
-                    wrapper_style={"display": "none"} if self.hide_toolbar else None
+                    wrapper_style={"display": "none"} if self.hide_toolbar else None,
+                    other_buttons=self.additional_buttons,
                 ),
                 dash_table.DataTable(
                     style_header={

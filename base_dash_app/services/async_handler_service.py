@@ -1,3 +1,4 @@
+import datetime
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
@@ -14,10 +15,20 @@ class AsyncWorkProgressContainer:
         self.end_time = None
         self.end_reason = None
         self.progress: float = 0.0
-        self.completed: bool = False
         self.extras = {}
         self.logs = []
         self.log_level: LogLevel = LogLevelsEnum.INFO.value
+
+    def start(self):
+        self.start_time = datetime.datetime.now()
+        self.execution_status = StatusesEnum.IN_PROGRESS
+        self.progress = 0
+
+    def complete(self, result=1, status=StatusesEnum.SUCCESS, progress=100):
+        self.end_time = datetime.datetime.now()
+        self.execution_status = status
+        self.result = result
+        self.progress = progress
 
 
 class AsyncHandlerService(BaseService):

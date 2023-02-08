@@ -2,6 +2,7 @@ import datetime
 import time
 from typing import List, Callable, Dict, Optional
 
+import dash_bootstrap_components
 from dash.exceptions import PreventUpdate
 from dash import html, dcc
 
@@ -78,9 +79,7 @@ class SimpleTimeSeriesDashboard(ComponentWithInternalCallback):
                 else:
                     async_container = AsyncWorkProgressContainer()
 
-                async_container.start_time = datetime.datetime.now()
-                async_container.execution_status = StatusesEnum.IN_PROGRESS
-                async_container.progress = 0
+                async_container.start()
                 all_timeseries: List[AbstractTimeSeries] = instance.reload_data_function(async_container)
                 async_container.progress = 50
                 for series in all_timeseries:
@@ -90,9 +89,7 @@ class SimpleTimeSeriesDashboard(ComponentWithInternalCallback):
                 instance.tsdp_dtw.datatable.set_data(instance.tsdp_dtw.generate_data_array())
                 async_container.progress = 100
                 instance.last_load_time = datetime.datetime.now()
-                async_container.end_time = datetime.datetime.now()
-                async_container.result = 1
-                async_container.execution_status = StatusesEnum.SUCCESS
+                async_container.complete()
                 time.sleep(0.5)
 
             if instance.get_service is not None:
@@ -111,6 +108,7 @@ class SimpleTimeSeriesDashboard(ComponentWithInternalCallback):
             self, title: str, base_date_range: DateRangeAggregatorDescriptor,
             reload_data_function: Callable[[Optional[AsyncWorkProgressContainer]], List[AbstractTimeSeries]],
             service_provider: Callable = None,
+            additional_buttons: List = None,
             *args, **kwargs
     ):
         super().__init__(*args, **kwargs)
@@ -122,6 +120,7 @@ class SimpleTimeSeriesDashboard(ComponentWithInternalCallback):
         self.reload_data_function: Callable[[Optional[AsyncWorkProgressContainer]], List[AbstractTimeSeries]] \
             = reload_data_function
         self.get_service: Optional[Callable] = service_provider
+        self.additional_buttons = additional_buttons or []
 
         self.tsdp_dtw = TimeSeriesDataTableWrapper(
             title=title,
@@ -201,6 +200,7 @@ class SimpleTimeSeriesDashboard(ComponentWithInternalCallback):
                     reload_in_progress=self.current_async_container is not None,
                     reload_progress=self.current_async_container.progress
                         if self.current_async_container is not None else 0,
+                    other_buttons=self.additional_buttons
                 ),
                 html.Div(
                     children=stat_cards,
