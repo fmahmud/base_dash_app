@@ -1,6 +1,8 @@
 import datetime
-from typing import List, Callable, Dict
+import time
+from typing import List, Callable, Dict, Optional
 
+import dash_bootstrap_components
 from dash.exceptions import PreventUpdate
 from dash import html, dcc
 
@@ -9,17 +11,21 @@ from base_dash_app.components.callback_utils.mappers import InputToState, InputM
 from base_dash_app.components.cards.tsdp_sparkline_stat_card import TsdpSparklineStatCard
 from base_dash_app.components.datatable.download_and_reload_bg import construct_down_ref_btgrp
 from base_dash_app.components.datatable.time_series_datatable_wrapper import TimeSeriesDataTableWrapper
+from base_dash_app.enums.status_colors import StatusesEnum
+from base_dash_app.services.async_handler_service import AsyncHandlerService, AsyncWorkProgressContainer
 from base_dash_app.utils.file_utils import convert_dict_to_csv
 from base_dash_app.virtual_objects.timeseries.abstract_timeseries_wrapper import AbstractTimeSeriesWrapper
 from base_dash_app.virtual_objects.timeseries.date_range_aggregation_descriptor import DateRangeAggregatorDescriptor
 from base_dash_app.virtual_objects.timeseries.time_series import AbstractTimeSeries
 from base_dash_app.virtual_objects.timeseries.time_series_data_point import TimeSeriesDataPoint
 
-TS_DASH_WRAPPER_DOWNLOAD_ID = "TS_DASH_WRAPPER_DOWNLOAD_ID"
+TSDP_DASH_RELOAD_INTERVAL_ID = "STS_DASH_RELOAD_INTERVAL_ID"
 
-TS_DASH_DOWNLOAD_BTN_ID = "TS_DASH_DOWNLOAD_BTN_ID"
+TS_DASH_WRAPPER_DOWNLOAD_ID = "STS_DASH_WRAPPER_DOWNLOAD_ID"
 
-TS_DASH_RELOAD_BTN_ID = "time-series-dash-reload-btn-id"
+TS_DASH_DOWNLOAD_BTN_ID = "STS_DASH_DOWNLOAD_BTN_ID"
+
+TS_DASH_RELOAD_BTN_ID = "simple-timeseries-dash-reload-btn-id"
 
 
 class SimpleTimeSeriesDashboard(ComponentWithInternalCallback):
@@ -37,6 +43,13 @@ class SimpleTimeSeriesDashboard(ComponentWithInternalCallback):
                 input_mapping=InputMapping(
                     input_id=TS_DASH_RELOAD_BTN_ID,
                     input_property="n_clicks",
+                ),
+                states=[]
+            ),
+            InputToState(
+                input_mapping=InputMapping(
+                    input_id=TSDP_DASH_RELOAD_INTERVAL_ID,
+                    input_property="n_intervals"
                 ),
                 states=[]
             )
@@ -60,18 +73,41 @@ class SimpleTimeSeriesDashboard(ComponentWithInternalCallback):
             if instance.reload_data_function is None:
                 raise PreventUpdate("Reload function was null.")
 
-            all_timeseries: List[AbstractTimeSeries] = instance.reload_data_function()
-            for series in all_timeseries:
-                instance.set_data_for_timeseries(series, series.get_tsdps())
+            def reload_tsdps(*args, **kwargs):
+                if "async_container" in kwargs:
+                    async_container = kwargs["async_container"]
+                else:
+                    async_container = AsyncWorkProgressContainer()
 
-            instance.tsdp_dtw.datatable.set_data(instance.tsdp_dtw.generate_data_array())
-            instance.last_load_time = datetime.datetime.now()
+                async_container.start()
+                all_timeseries: List[AbstractTimeSeries] = instance.reload_data_function(async_container)
+                async_container.progress = 50
+                for series in all_timeseries:
+                    async_container.progress = 50 + (40 / len(all_timeseries))
+                    instance.set_data_for_timeseries(series, series.get_tsdps())
+
+                instance.tsdp_dtw.datatable.set_data(instance.tsdp_dtw.generate_data_array())
+                async_container.complete()
+                instance.last_load_time = async_container.end_time
+                time.sleep(0.5)
+
+            if instance.get_service is not None:
+                async_service: AsyncHandlerService = instance.get_service(AsyncHandlerService)
+
+                def done_callback(*args, **kwargs):
+                    instance.current_async_container = None
+
+                instance.current_async_container = async_service.do_work(reload_tsdps, done_callback=done_callback)
+            else:
+                reload_tsdps()
 
         return [instance.__render_dash()]
 
     def __init__(
             self, title: str, base_date_range: DateRangeAggregatorDescriptor,
-            reload_data_function: Callable[[], List[AbstractTimeSeries]],
+            reload_data_function: Callable[[Optional[AsyncWorkProgressContainer]], List[AbstractTimeSeries]],
+            service_provider: Callable = None,
+            additional_buttons: List = None,
             *args, **kwargs
     ):
         super().__init__(*args, **kwargs)
@@ -80,7 +116,10 @@ class SimpleTimeSeriesDashboard(ComponentWithInternalCallback):
 
         self.time_series_wrappers: Dict[str, AbstractTimeSeriesWrapper] = {}
         self.last_load_time = None
-        self.reload_data_function: Callable[[], List[AbstractTimeSeries]] = reload_data_function
+        self.reload_data_function: Callable[[Optional[AsyncWorkProgressContainer]], List[AbstractTimeSeries]] \
+            = reload_data_function
+        self.get_service: Optional[Callable] = service_provider
+        self.additional_buttons = additional_buttons or []
 
         self.tsdp_dtw = TimeSeriesDataTableWrapper(
             title=title,
@@ -91,6 +130,8 @@ class SimpleTimeSeriesDashboard(ComponentWithInternalCallback):
             hide_toolbar=True
             # reload_data_function=wrapper_generate_data(2, datetime.timedelta(hours=1)) # todo!
         )
+
+        self.current_async_container: Optional[AsyncWorkProgressContainer] = None
 
         # todo: reload each time series individually?
         #   push reload function into time series wrapper?
@@ -138,10 +179,13 @@ class SimpleTimeSeriesDashboard(ComponentWithInternalCallback):
         return html.Div(
             children=[
                 html.H1(
-                    self.title, style={"position": "relative", "float": "left", "maxWidth": "calc(100% - 400px)"}),
-                dcc.Download(
-                    data=self.data_for_download,
-                    id={"type": TS_DASH_WRAPPER_DOWNLOAD_ID, "id": self._instance_id}
+                    self.title, style={"position": "relative", "float": "left", "maxWidth": "calc(100% - 400px)"}
+                ),
+                dcc.Interval(
+                    id={"type": TSDP_DASH_RELOAD_INTERVAL_ID, "index": self._instance_id},
+                    interval=1000,
+                    n_intervals=0,
+                    disabled=self.current_async_container is None or self.get_service is None
                 ),
                 construct_down_ref_btgrp(
                     reload_btn_id={"type": TS_DASH_RELOAD_BTN_ID, "index": self._instance_id},
@@ -149,7 +193,13 @@ class SimpleTimeSeriesDashboard(ComponentWithInternalCallback):
                     last_load_time=self.last_load_time,
                     disable_reload_btn=self.reload_data_function is None,
                     disable_download_btn=self.last_load_time is None,
-                    wrapper_style={"margin": "0"}
+                    wrapper_style={"margin": "0"},
+                    download_content_id={"type": TS_DASH_WRAPPER_DOWNLOAD_ID, "id": self._instance_id},
+                    download_content=self.data_for_download,
+                    reload_in_progress=self.current_async_container is not None,
+                    reload_progress=self.current_async_container.progress
+                        if self.current_async_container is not None else 0,
+                    other_buttons=self.additional_buttons
                 ),
                 html.Div(
                     children=stat_cards,

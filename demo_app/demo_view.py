@@ -2,7 +2,7 @@ import datetime
 import random
 import re
 import time
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 import dash_bootstrap_components as dbc
 from dash import html
@@ -18,6 +18,7 @@ from base_dash_app.components.cards.stat_sparkline_card import StatSparklineCard
 from base_dash_app.components.cards.statistic_card import StatisticCard
 from base_dash_app.components.cards.tsdp_sparkline_stat_card import TsdpSparklineStatCard, TsdpStatCardDescriptor
 from base_dash_app.components.dashboards.simple_timeseries_dashboard import SimpleTimeSeriesDashboard
+from base_dash_app.services.async_handler_service import AsyncWorkProgressContainer
 from base_dash_app.virtual_objects.timeseries.timeseries_wrapper import TimeSeriesWrapper
 from base_dash_app.virtual_objects.timeseries.date_range_aggregation_descriptor import DateRangeAggregatorDescriptor
 from base_dash_app.components.data_visualization import ratio_bar
@@ -478,14 +479,21 @@ class DemoView(BaseView):
                 columns=[
                     {"id": f"{i}", "type": "numeric", "format": numeric_format, "name": f"Column {i}"}
                     for i in range(10)
-                ]
+                ],
+                service_provider=self.get_service
             )
 
-            def fill_data(*args, **kwargs):
+            def fill_data(async_container: Optional[AsyncWorkProgressContainer] = None, **kwargs):
+                if async_container is None:
+                    async_container = AsyncWorkProgressContainer()
+
                 data = []
                 for row in range(100):
                     row_data = {f"{col}": random.random() * 100 for col in range(10)}
                     data.append(row_data)
+                    async_container.progress += 0.5
+                    if row % 25 == 0:
+                        time.sleep(0.5)
 
                 return data
 
@@ -499,8 +507,11 @@ class DemoView(BaseView):
         end_date = datetime.datetime(2023, 1, 1)
         interval_size = datetime.timedelta(days=1)
 
-        def wrapper_generate_data(num_series, interval, offset=0):
-            def generate_data():
+        def wrapper_generate_data(num_series, interval, offset=0, sleep_delay=0):
+            def generate_data(async_container: Optional[AsyncWorkProgressContainer] = None):
+                if async_container is None:
+                    async_container = AsyncWorkProgressContainer()
+
                 all_series = []
                 for i in range(offset, num_series + offset):
                     timeseries: TimeSeries = TimeSeries(
@@ -517,6 +528,8 @@ class DemoView(BaseView):
                         )
 
                     all_series.append(timeseries)
+                    async_container.progress += 50.0 / num_series
+                    time.sleep(max(sleep_delay, 0))
                 return all_series
 
             return generate_data
@@ -602,7 +615,8 @@ class DemoView(BaseView):
             self.simple_tsdp_dash = SimpleTimeSeriesDashboard(
                 title="Test Simple Time Series Dashboard",
                 base_date_range=date_range,
-                reload_data_function=wrapper_generate_data(2, datetime.timedelta(days=1), offset=2)
+                reload_data_function=wrapper_generate_data(2, datetime.timedelta(days=1), offset=2, sleep_delay=1),
+                service_provider=self.get_service
             )
 
             self.simple_tsdp_dash.add_timeseries(tsw1)

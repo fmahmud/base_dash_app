@@ -13,12 +13,6 @@ from dateutil.relativedelta import relativedelta
 
 TIMESTAMP_KEY = "timestamp"
 
-RELOAD_DASH_BTN_ID = "RELOAD_DASH_BTN_ID"
-
-DOWNLOAD_DATA_BTN_ID = "DOWNLOAD_DATA_BTN_ID"
-
-DATA_TABLE_WRAPPER_DOWNLOAD_ID = "data-table-wrapper-download-id"
-
 
 class TimeSeriesDataTableWrapper(BaseComponent):
     def __init__(
@@ -28,6 +22,7 @@ class TimeSeriesDataTableWrapper(BaseComponent):
         aggregation_method: TsdpAggregationFuncs,
         reload_data_function: Callable[[], List[AbstractTimeSeries]] = None,
         hide_toolbar=False,
+        additional_buttons: List = None,
     ):
         self.start_date: datetime.datetime = start_date
         self.end_date: datetime.datetime = end_date
@@ -38,6 +33,7 @@ class TimeSeriesDataTableWrapper(BaseComponent):
             "type": "datetime"
         }
 
+        self.additional_buttons = additional_buttons or []
         self.timeseries: Dict[str, AbstractTimeSeries] = {}
         self.aggregation_method: TsdpAggregationFuncs = aggregation_method
         self.hide_toolbar = hide_toolbar
@@ -59,7 +55,8 @@ class TimeSeriesDataTableWrapper(BaseComponent):
             title=title,
             columns=[self.time_column],
             reload_data_function=self.reload_data_function,
-            hide_toolbar=self.hide_toolbar
+            hide_toolbar=self.hide_toolbar,
+            additional_buttons=self.additional_buttons
         )
 
     def add_timeseries(self, timeseries: AbstractTimeSeries, datatype: str = "text", format: Format = None):
