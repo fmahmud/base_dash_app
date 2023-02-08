@@ -86,7 +86,9 @@ def construct_down_ref_btgrp(
             ),
         ],
         style={
-            "position": "relative", "float": "right", "width": "450px", "marginTop": "20px", "marginBottom": "20px",
+            "position": "relative", "float": "right",
+            "marginTop": "20px", "marginBottom": "20px",
+            "width": "fit-content",
             **wrapper_style
         }
     )

@@ -62,7 +62,10 @@ def render_summary_inner_div(
         children=[
             html.Div(
                 children=[dti.render() for dti in texts],
-                style={"position": "relative", "float": "left", "width": max_width}
+                style={
+                    "position": "relative", "float": "left", "width": max_width, "overflow": "hidden",
+                    "display": "flex", "flexDirection": "row"
+                }
             ),
             html.Div(
                 children=rendered_ratio_bar,
