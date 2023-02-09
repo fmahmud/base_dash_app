@@ -1,5 +1,5 @@
 import datetime
-from math import floor, log
+from math import floor, log, isnan
 from typing import List
 
 from dash import html
@@ -16,6 +16,9 @@ from base_dash_app.virtual_objects.timeseries.tsdp_aggregation_funcs import Tsdp
 def human_format(number):
     if number is None:
         raise Exception("Number was none")
+
+    if isnan(number):
+        number = 0
 
     if -1 < number < 1:
         return f"{number:.2f}"
