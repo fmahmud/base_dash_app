@@ -55,7 +55,8 @@ class TsdpStatCardDescriptor:
             time_periods_to_show: List[TimePeriodsEnum] = None,
             aggregation_to_use: TsdpAggregationFuncs = TsdpAggregationFuncs.SUM,
             use_human_formatting=True,
-            use_rg_color_scale=True
+            use_rg_color_scale=True,
+            description=None
     ):
         self.title = title
         self.unit = unit
@@ -65,6 +66,7 @@ class TsdpStatCardDescriptor:
         self.time_periods_to_show: List[TimePeriodsEnum] = time_periods_to_show or [TimePeriodsEnum.LAST_24HRS]
         self.aggregation_to_use: TsdpAggregationFuncs = aggregation_to_use
         self.use_human_formatting = use_human_formatting
+        self.description = description
 
 
 class TsdpSparklineStatCard(BaseComponent):
@@ -85,7 +87,9 @@ class TsdpSparklineStatCard(BaseComponent):
         time_periods_to_show: List[TimePeriodsEnum] = None,
         aggregation_to_use: TsdpAggregationFuncs = TsdpAggregationFuncs.SUM,
         use_human_formatting=True,
-        use_rg_color_scale=True
+        use_rg_color_scale=True,
+        description=None
+
     ):
         self.series = sorted(series)
         self.title = title
@@ -93,10 +97,11 @@ class TsdpSparklineStatCard(BaseComponent):
         self.shape = shape
         self.smoothening = smoothening
         self.graph_height = graph_height
-        self.height = 138 + self.graph_height
+        self.height = 138 + self.graph_height + (30 if description is not None else 0)
         self.time_periods_to_show: List[TimePeriodsEnum] = time_periods_to_show or [TimePeriodsEnum.LAST_24HRS]
         self.aggregation_to_use: TsdpAggregationFuncs = aggregation_to_use
         self.use_human_formatting = use_human_formatting
+        self.description = description
 
     def render(self, style_override=None,  **kwargs):
         if style_override is None:
@@ -131,10 +136,21 @@ class TsdpSparklineStatCard(BaseComponent):
                 self.title,
                 style={
                     "position": "relative", "float": "left", "clear": "left", "width": "100%",
-                    "marginTop": "10px", "marginBottom": "10px", "overflow": "hidden", "height": "30px"
+                    "marginTop": "10px", "overflow": "hidden", "height": "30px", "marginBottom": "0"
                 }
             ),
         )
+
+        if self.description:
+            info_card.add_content(
+                html.Pre(
+                    self.description,
+                    style={
+                        "position": "relative", "float": "left", "clear": "left", "width": "100%",
+                        "overflow": "hidden", "height": "20px", "marginBottom": "5px", "marginTop": "5px"
+                    }
+                ),
+            )
 
         current_time = datetime.datetime.now()
         values = []
