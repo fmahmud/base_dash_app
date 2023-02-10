@@ -590,6 +590,7 @@ class DemoView(BaseView):
                             TimePeriodsEnum.LAST_30_DAYS, TimePeriodsEnum.LATEST
                         ],
                         aggregation_to_use=TsdpAggregationFuncs.SEGMENT_START,
+                        description="This is a description"
                     ),
                 ],
                 column_format=numeric_format,
@@ -607,6 +608,7 @@ class DemoView(BaseView):
                             TimePeriodsEnum.LAST_30_DAYS, TimePeriodsEnum.LATEST
                         ],
                         aggregation_to_use=TsdpAggregationFuncs.SEGMENT_START,
+                        description="x = y * z"
                     ),
                 ],
                 column_format=numeric_format,
