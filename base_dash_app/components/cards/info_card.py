@@ -8,7 +8,6 @@ class InfoCard:
 
     def __init__(self):
         self.width: int = 400
-        self.height: int = 200
         self.content = []
 
     def set_content(self, content):
@@ -17,10 +16,6 @@ class InfoCard:
 
     def add_content(self, value):
         self.content.append(value)
-        return self
-
-    def set_height(self, height):
-        self.height = height
         return self
 
     def set_width(self, width):
@@ -41,7 +36,6 @@ class InfoCard:
                 "width": f"{self.width}px",
                 "marginRight": "10px",
                 "marginBottom": "10px",
-                "height": f"{self.height}px",
                 "padding": "0px",
                 **style_override,
             },

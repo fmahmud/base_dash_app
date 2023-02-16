@@ -16,6 +16,10 @@ class AbstractTimeSeries(abc.ABC):
     def get_unique_id(self):
         pass
 
+    @abc.abstractmethod
+    def get_description(self):
+        pass
+
     def add_tsdp(self, tsdp: TimeSeriesDataPoint):
         self.tsdps.append(tsdp)
         return self
@@ -52,10 +56,14 @@ class TimeSeries(AbstractTimeSeries):
     def get_unique_id(self):
         return self.unique_id
 
-    def __init__(self, title, unique_id, unit=None):
+    def get_description(self):
+        return self.description
+
+    def __init__(self, title, unique_id, unit=None, description=None):
         super().__init__()
         self.title: str = title
         self.unique_id: str = unique_id
         self.unit: Optional[str] = unit
+        self.description: Optional[str] = description
 
 

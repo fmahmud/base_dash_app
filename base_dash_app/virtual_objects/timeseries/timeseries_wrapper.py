@@ -5,6 +5,9 @@ from base_dash_app.virtual_objects.timeseries.abstract_timeseries_wrapper import
 
 
 class TimeSeriesWrapper(AbstractTimeSeriesWrapper):
+    def get_description(self):
+        return self.description
+
     def get_title(self):
         return self.title
 
@@ -26,7 +29,8 @@ class TimeSeriesWrapper(AbstractTimeSeriesWrapper):
     def __init__(
             self, title: str, unique_id: str,
             stat_card_descriptors: List[TsdpStatCardDescriptor] = None,
-            show_in_datatable=True, column_format=None, column_datatype="numeric"
+            show_in_datatable=True, column_format=None, column_datatype="numeric",
+            description=None,
     ):
         super().__init__()
         self.title = title
@@ -35,3 +39,4 @@ class TimeSeriesWrapper(AbstractTimeSeriesWrapper):
         self.show_in_datatable = show_in_datatable
         self.column_format = column_format
         self.column_datatype = column_datatype
+        self.description = description

@@ -516,7 +516,9 @@ class DemoView(BaseView):
                 for i in range(offset, num_series + offset):
                     timeseries: TimeSeries = TimeSeries(
                         title=f"Series {i + 1}",
-                        unique_id=f"series-{i + 1}"
+                        unique_id=f"series-{i + 1}",
+                        unit="$",
+                        description="This is a test series"
                     )
 
                     for i in range((end_date - start_date) // interval + 1):
@@ -546,13 +548,13 @@ class DemoView(BaseView):
 
             timeseries = TimeSeries(
                 title=f"Series Hourly",
-                unit="",
+                unit="SGD",
                 unique_id=f"series-1"
             )
 
             timeseries2 = TimeSeries(
                 title=f"Series Hourly 2",
-                unit="",
+                unit="USD",
                 unique_id=f"series-2"
             )
 
@@ -590,7 +592,6 @@ class DemoView(BaseView):
                             TimePeriodsEnum.LAST_30_DAYS, TimePeriodsEnum.LATEST
                         ],
                         aggregation_to_use=TsdpAggregationFuncs.SEGMENT_START,
-                        description="This is a description"
                     ),
                 ],
                 column_format=numeric_format,
@@ -602,13 +603,16 @@ class DemoView(BaseView):
                 stat_card_descriptors=[
                     TsdpStatCardDescriptor(
                         title="TS 2 Means over Time",
-                        graph_height=140,
+                        graph_height=210,
                         time_periods_to_show=[
                             TimePeriodsEnum.LAST_24HRS, TimePeriodsEnum.LAST_7_DAYS,
                             TimePeriodsEnum.LAST_30_DAYS, TimePeriodsEnum.LATEST
                         ],
                         aggregation_to_use=TsdpAggregationFuncs.SEGMENT_START,
-                        description="x = y * z"
+                        description="This is a very long description."
+                                    " Lorem Ipsum is simply dummy text of the printing and typesetting industry."
+                                    " Lorem Ipsum has been the industry's standard dummy text ever since the 1500s,",
+                        unit="USD"
                     ),
                 ],
                 column_format=numeric_format,

@@ -27,9 +27,11 @@ class StatSparklineCard(BaseComponent):
         self.shape = shape
         self.smoothening = smoothening
         self.graph_height = graph_height
-        self.height = 138 + self.graph_height
 
-    def render(self, *args, **kwargs):
+    def render(self, style_override=None):
+        if style_override is None:
+            style_override = {}
+
         info_card = InfoCard()
 
         sparkline = Sparkline(
@@ -69,7 +71,6 @@ class StatSparklineCard(BaseComponent):
                 values=self.values
             ).render()
         )
-        info_card.set_height(self.height)
 
-        return info_card.render()
+        return info_card.render(style_override=style_override)
 
