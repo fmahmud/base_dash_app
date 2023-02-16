@@ -199,6 +199,8 @@ class DataTableWrapper(ComponentWithInternalCallback):
         if wrapper_style_override is None:
             wrapper_style_override = {}
 
+        self.data_for_download = None
+
         return html.Div(
             children=self.__render_data_table(),
             id={"type": DataTableWrapper.get_wrapper_div_id(), "index": self._instance_id},
