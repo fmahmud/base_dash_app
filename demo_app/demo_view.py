@@ -590,7 +590,6 @@ class DemoView(BaseView):
                             TimePeriodsEnum.LAST_30_DAYS, TimePeriodsEnum.LATEST
                         ],
                         aggregation_to_use=TsdpAggregationFuncs.SEGMENT_START,
-                        description="This is a description"
                     ),
                 ],
                 column_format=numeric_format,
@@ -602,13 +601,15 @@ class DemoView(BaseView):
                 stat_card_descriptors=[
                     TsdpStatCardDescriptor(
                         title="TS 2 Means over Time",
-                        graph_height=140,
+                        graph_height=210,
                         time_periods_to_show=[
                             TimePeriodsEnum.LAST_24HRS, TimePeriodsEnum.LAST_7_DAYS,
                             TimePeriodsEnum.LAST_30_DAYS, TimePeriodsEnum.LATEST
                         ],
                         aggregation_to_use=TsdpAggregationFuncs.SEGMENT_START,
-                        description="x = y * z"
+                        description="This is a very long description."
+                                    " Lorem Ipsum is simply dummy text of the printing and typesetting industry."
+                                    " Lorem Ipsum has been the industry's standard dummy text ever since the 1500s,"
                     ),
                 ],
                 column_format=numeric_format,

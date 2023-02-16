@@ -13,7 +13,6 @@ class StatisticCard(BaseComponent):
         self.title: Optional[str] = title
         self.unit: Optional[str] = unit
         self.values: List[LabelledValueChip] = values or []
-        self.height = 120
 
         if len(values) > 0:
             values[0].is_first = True
@@ -22,7 +21,10 @@ class StatisticCard(BaseComponent):
         self.values.append(value)
         return self
 
-    def render(self, *args, **kwargs):
+    def render(self, style_override=None):
+        if style_override is None:
+            style_override = {}
+
         info_card = InfoCard()
         info_card.set_content([
             html.H4(
@@ -34,6 +36,5 @@ class StatisticCard(BaseComponent):
             ),
             LabelledChipGroup(self.values).render()
         ])
-        info_card.set_height(self.height)
 
-        return info_card.render()
+        return info_card.render(style_override=style_override)

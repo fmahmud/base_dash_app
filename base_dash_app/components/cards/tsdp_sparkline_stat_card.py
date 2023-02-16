@@ -97,7 +97,6 @@ class TsdpSparklineStatCard(BaseComponent):
         self.shape = shape
         self.smoothening = smoothening
         self.graph_height = graph_height
-        self.height = 138 + self.graph_height + (30 if description is not None else 0)
         self.time_periods_to_show: List[TimePeriodsEnum] = time_periods_to_show or [TimePeriodsEnum.LAST_24HRS]
         self.aggregation_to_use: TsdpAggregationFuncs = aggregation_to_use
         self.use_human_formatting = use_human_formatting
@@ -147,7 +146,8 @@ class TsdpSparklineStatCard(BaseComponent):
                     self.description,
                     style={
                         "position": "relative", "float": "left", "clear": "left", "width": "100%",
-                        "overflow": "hidden", "height": "20px", "marginBottom": "5px", "marginTop": "5px"
+                        "overflow": "hidden", "marginBottom": "5px",
+                        "whiteSpace": "break-spaces"
                     }
                 ),
             )
@@ -201,6 +201,7 @@ class TsdpSparklineStatCard(BaseComponent):
                     value = f"{value:,.2f}"
             else:
                 value = "-"
+
             values.append(
                 LabelledValueChip(
                     value=value,
@@ -208,10 +209,12 @@ class TsdpSparklineStatCard(BaseComponent):
                 )
             )
 
+            if self.unit is not None:
+                values[-1].value = self.unit + values[-1].value
+
         info_card.add_content(
             LabelledChipGroup(values=values).render(hide_overflow=len(values) <= 4)
         )
-        info_card.set_height(self.height)
 
         return info_card.render(
             style_override=style_override
