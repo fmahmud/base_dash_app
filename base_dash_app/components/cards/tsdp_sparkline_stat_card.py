@@ -192,15 +192,18 @@ class TsdpSparklineStatCard(BaseComponent):
                         matching_data_points.append(tsdp)
 
                 value = self.aggregation_to_use(matching_data_points)
+                is_negative = value < 0
+
                 if value is None:
                     value = 0  #todo: default value!
 
                 if self.use_human_formatting:
-                    value = human_format(value)
+                    value = human_format(abs(value))
                 else:
-                    value = f"{value:,.2f}"
+                    value = f"{abs(value):,.2f}"
             else:
                 value = "-"
+                is_negative = False
 
             values.append(
                 LabelledValueChip(
@@ -210,10 +213,10 @@ class TsdpSparklineStatCard(BaseComponent):
             )
 
             if self.unit is not None:
-                if values[-1].value >= 0:
-                    values[-1].value = self.unit + values[-1].value
-                else:
-                    values[-1].value = "-" + self.unit + abs(values[-1].value)
+                values[-1].value = self.unit + values[-1].value
+
+            if is_negative:
+                values[-1].value = "-" + values[-1].value
 
         info_card.add_content(
             LabelledChipGroup(values=values).render(hide_overflow=len(values) <= 4)
