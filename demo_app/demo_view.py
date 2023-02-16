@@ -516,7 +516,9 @@ class DemoView(BaseView):
                 for i in range(offset, num_series + offset):
                     timeseries: TimeSeries = TimeSeries(
                         title=f"Series {i + 1}",
-                        unique_id=f"series-{i + 1}"
+                        unique_id=f"series-{i + 1}",
+                        unit="$",
+                        description="This is a test series"
                     )
 
                     for i in range((end_date - start_date) // interval + 1):
@@ -546,13 +548,13 @@ class DemoView(BaseView):
 
             timeseries = TimeSeries(
                 title=f"Series Hourly",
-                unit="",
+                unit="SGD",
                 unique_id=f"series-1"
             )
 
             timeseries2 = TimeSeries(
                 title=f"Series Hourly 2",
-                unit="",
+                unit="USD",
                 unique_id=f"series-2"
             )
 
@@ -609,7 +611,8 @@ class DemoView(BaseView):
                         aggregation_to_use=TsdpAggregationFuncs.SEGMENT_START,
                         description="This is a very long description."
                                     " Lorem Ipsum is simply dummy text of the printing and typesetting industry."
-                                    " Lorem Ipsum has been the industry's standard dummy text ever since the 1500s,"
+                                    " Lorem Ipsum has been the industry's standard dummy text ever since the 1500s,",
+                        unit="USD"
                     ),
                 ],
                 column_format=numeric_format,

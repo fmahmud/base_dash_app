@@ -210,7 +210,10 @@ class TsdpSparklineStatCard(BaseComponent):
             )
 
             if self.unit is not None:
-                values[-1].value = self.unit + values[-1].value
+                if values[-1].value >= 0:
+                    values[-1].value = self.unit + values[-1].value
+                else:
+                    values[-1].value = "-" + self.unit + abs(values[-1].value)
 
         info_card.add_content(
             LabelledChipGroup(values=values).render(hide_overflow=len(values) <= 4)
