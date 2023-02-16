@@ -192,10 +192,11 @@ class TsdpSparklineStatCard(BaseComponent):
                         matching_data_points.append(tsdp)
 
                 value = self.aggregation_to_use(matching_data_points)
-                is_negative = value < 0
 
                 if value is None:
                     value = 0  #todo: default value!
+
+                is_negative = value < 0
 
                 if self.use_human_formatting:
                     value = human_format(abs(value))
