@@ -12,8 +12,12 @@ class LineGraph(BaseComponent):
         self.title: str = title
         self.series: Dict[str, List[Graphable]] = {}
 
-    def add_series(self, name, graphables: List[Graphable]):
+    def add_series(
+            self, name, graphables: List[Graphable],
+
+    ):
         self.series[name] = graphables
+        return self
 
     def render(self, style=None):
         if style is None:

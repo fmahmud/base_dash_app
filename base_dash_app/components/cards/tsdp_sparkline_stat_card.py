@@ -3,14 +3,22 @@ from math import floor, log, isnan
 from typing import List
 
 from dash import html
+from dash.exceptions import PreventUpdate
+import dash_bootstrap_components as dbc
 
-from base_dash_app.components.base_component import BaseComponent
+from base_dash_app.components.base_component import BaseComponent, ComponentWithInternalCallback
+from base_dash_app.components.callback_utils.mappers import InputToState, InputMapping
 from base_dash_app.components.cards.info_card import InfoCard
+from base_dash_app.components.data_visualization.simple_line_graph import LineGraph
 from base_dash_app.components.data_visualization.sparkline import Sparkline
 from base_dash_app.components.labelled_value_chip import LabelledChipGroup, LabelledValueChip
 from base_dash_app.virtual_objects.timeseries.time_series_data_point import TimeSeriesDataPoint
 from base_dash_app.virtual_objects.timeseries.time_periods_enum import TimePeriodsEnum
 from base_dash_app.virtual_objects.timeseries.tsdp_aggregation_funcs import TsdpAggregationFuncs
+
+STAT_CARD_EXPAND_MODAL = "tsdp-stat-card-expand-modal"
+
+STAT_CARD_EXPAND_BUTTON = "tsdp-stat-card-expand-button"
 
 
 def human_format(number):
@@ -56,7 +64,8 @@ class TsdpStatCardDescriptor:
             aggregation_to_use: TsdpAggregationFuncs = TsdpAggregationFuncs.SUM,
             use_human_formatting=True,
             use_rg_color_scale=True,
-            description=None
+            description=None,
+            show_expand_button=False,
     ):
         self.title = title
         self.unit = unit
@@ -67,9 +76,30 @@ class TsdpStatCardDescriptor:
         self.aggregation_to_use: TsdpAggregationFuncs = aggregation_to_use
         self.use_human_formatting = use_human_formatting
         self.description = description
+        self.show_expand_button = show_expand_button
 
 
-class TsdpSparklineStatCard(BaseComponent):
+class TsdpSparklineStatCard(ComponentWithInternalCallback):
+
+    @classmethod
+    def handle_any_input(cls, *args, triggering_id, instance):
+        if triggering_id.startswith(STAT_CARD_EXPAND_BUTTON):
+            instance.modal_is_open = True
+
+        return [instance.__render_tsdp_stat_card()]
+
+    @staticmethod
+    def get_input_to_states_map():
+        return [
+            InputToState(
+                input_mapping=InputMapping(
+                    input_id=STAT_CARD_EXPAND_BUTTON,
+                    input_property="n_clicks",
+                ),
+                states=[]
+            )
+        ]
+
     @staticmethod
     def init_from_descriptor(descriptor: TsdpStatCardDescriptor, series: List[TimeSeriesDataPoint]):
         return TsdpSparklineStatCard(
@@ -88,9 +118,12 @@ class TsdpSparklineStatCard(BaseComponent):
         aggregation_to_use: TsdpAggregationFuncs = TsdpAggregationFuncs.SUM,
         use_human_formatting=True,
         use_rg_color_scale=True,
-        description=None
-
+        description=None,
+        show_expand_button=False,
+        *args,
+        **kwargs,
     ):
+        super().__init__(*args, **kwargs)
         self.series = sorted(series)
         self.title = title
         self.unit = unit
@@ -101,11 +134,22 @@ class TsdpSparklineStatCard(BaseComponent):
         self.aggregation_to_use: TsdpAggregationFuncs = aggregation_to_use
         self.use_human_formatting = use_human_formatting
         self.description = description
+        self.modal_is_open = False
+        self.show_expand_button = show_expand_button
 
-    def render(self, style_override=None,  **kwargs):
+    def render(self, style_override=None, **kwargs):
         if style_override is None:
             style_override = {}
 
+        return html.Div(
+            children=[
+                self.__render_tsdp_stat_card(**kwargs),
+            ],
+            style={**style_override},
+            id={"type": TsdpSparklineStatCard.get_wrapper_div_id(), "index": self._instance_id},
+        )
+
+    def __render_tsdp_stat_card(self, **kwargs):
         info_card = InfoCard()
 
         sparkline = Sparkline(
@@ -223,7 +267,51 @@ class TsdpSparklineStatCard(BaseComponent):
             LabelledChipGroup(values=values).render(hide_overflow=len(values) <= 4)
         )
 
-        return info_card.render(
-            style_override=style_override
-        )
+        if self.show_expand_button:
+            info_card.add_content(
+                dbc.Button(
+                    html.I(
+                        className="fa-solid fa-expand",
+                        style={"fontSize": "32px", "color": "black", "lineHeight": "32px"}
+                    ),
+                    color="light",
+                    style={
+                        "position": "absolute",
+                        "right": "10px",
+                        "padding": "10px",
+                        "borderRadius": "10px",
+                        "zIndex": "1000",
+                        "top": "10px",
+                        "height": "52px",
+                    },
+                    className="display_on_parent_hover_only",
+                    id={"type": STAT_CARD_EXPAND_BUTTON, "index": self._instance_id}
+                )
+            )
+
+            info_card.add_content(
+                dbc.Modal(
+                    [
+                        dbc.ModalBody(
+                            children=[
+                                sparkline.render(
+                                    width=1100,
+                                    height=600,
+                                    shape=self.shape,
+                                    smoothening=self.smoothening,
+                                    show_x_axis=True,
+                                    show_y_axis=True,
+                                    mouse_interactions=True,
+                                    show_custom_x_axis=False
+                                )
+                            ]
+                        ),
+                    ],
+                    id={"type": STAT_CARD_EXPAND_MODAL, "index": self._instance_id},
+                    size="xl",
+                    is_open=self.modal_is_open,
+                )
+            )
+
+        return info_card.render()
 

@@ -39,4 +39,5 @@ class InfoCard:
                 "padding": "0px",
                 **style_override,
             },
+            className="display_child_on_hover_only"
         )

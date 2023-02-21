@@ -20,6 +20,7 @@ from base_dash_app.components.callback_utils.mappers import InputToState
 from base_dash_app.components.callback_utils.utils import get_triggering_id_from_callback_context, \
     get_state_values_for_input_from_args_list, invalid_n_clicks
 from base_dash_app.components.cards.special_cards.job_card import JobCard
+from base_dash_app.components.cards.tsdp_sparkline_stat_card import TsdpSparklineStatCard
 from base_dash_app.components.dashboards.simple_timeseries_dashboard import SimpleTimeSeriesDashboard
 from base_dash_app.components.datatable.datatable_wrapper import DataTableWrapper
 from base_dash_app.components.navbar import NavBar, NavDefinition, NavGroup
@@ -184,7 +185,7 @@ class RuntimeApplication:
 
         # register internal callback components
         components_with_internal_callbacks = [
-            JobCard, DataTableWrapper, SimpleTimeSeriesDashboard,
+            JobCard, DataTableWrapper, SimpleTimeSeriesDashboard, TsdpSparklineStatCard,
             *app_descriptor.components_with_internal_callbacks
         ]
 

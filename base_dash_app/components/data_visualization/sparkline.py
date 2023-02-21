@@ -13,7 +13,10 @@ class Sparkline(BaseComponent):
         self.title: str = title
         self.series: List[Graphable] = series
 
-    def render(self, height=40, width=300, shape="spline", smoothening=0.8, wrapper_style_override=None):
+    def render(
+            self, height=40, width=300, shape="spline", smoothening=0.8, wrapper_style_override=None,
+            mouse_interactions=False, show_x_axis=False, show_y_axis=False, show_custom_x_axis=True
+    ):
         if wrapper_style_override is None:
             wrapper_style_override = {}
 
@@ -43,19 +46,19 @@ class Sparkline(BaseComponent):
             'paper_bgcolor': 'rgba(0,0,0,0)',
             'plot_bgcolor': 'rgba(0,0,0,0)',
             "xaxis": {
-                "visible": False,
-                "showticklabels": False,
+                "visible": show_x_axis,
+                "showticklabels": show_x_axis,
                 "fixedrange": True,
             },
             "yaxis": {
-                "visible": False,
-                # "showticklabels": False,
+                "visible": show_y_axis,
+                "showticklabels": show_y_axis,
                 "fixedrange": True,
 
             },
             "showlegend": False,
             "height": height - 12,
-            "hovermode": False,
+            "hovermode": "x" if mouse_interactions else False,
         }
 
         figure = go.Figure(layout=layout, data=graph)
@@ -68,10 +71,9 @@ class Sparkline(BaseComponent):
                     id=self.title.replace(" ", "-"),
                     figure=figure,
                     config={
-                        'displayModeBar': False,
-                        'staticPlot': True
+                        'displayModeBar': not mouse_interactions,
+                        'staticPlot': not mouse_interactions
                     },
-                    # style={"position": "relative", "float": "left"}
                 ),
                 html.Div(
                     children=[
@@ -86,7 +88,7 @@ class Sparkline(BaseComponent):
                         "width": "calc(100% - 32px)", "height": "12px", "position": "relative", "float": "left",
                         "fontSize": "12px", "marginTop": "2px", "marginLeft": "16px"
                     }
-                )
+                ) if show_custom_x_axis else None
             ],
             style={"position": "relative", "float": "left", "marginTop": "8px", **wrapper_style_override}
         )
