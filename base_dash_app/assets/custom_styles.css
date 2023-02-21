@@ -192,3 +192,15 @@ label, .form-label {
         transform:rotate(360deg);
     }
 }
+
+.display-on-hover {
+    visibility: hidden;
+}
+
+.display-on-hover:hover {
+    visibility: visible;
+}
+
+.pointer {
+    cursor: pointer;
+}

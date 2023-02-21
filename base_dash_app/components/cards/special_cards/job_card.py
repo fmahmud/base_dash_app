@@ -47,13 +47,6 @@ class JobCard(ComponentWithInternalCallback):
         self.log_level: LogLevel = LogLevelsEnum.INFO.value
 
     @classmethod
-    def validate_state_on_trigger(cls, instance):
-        if type(instance) != cls:
-            raise PreventUpdate(f"Instance was of type {type(instance)} instead of {cls}")
-
-        return
-
-    @classmethod
     def handle_any_input(cls, *args, triggering_id, instance):
         # todo: parameters for job execution - look at DeployedContractView in ContractsDashboard
 

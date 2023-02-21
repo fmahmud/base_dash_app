@@ -612,7 +612,8 @@ class DemoView(BaseView):
                         description="This is a very long description."
                                     " Lorem Ipsum is simply dummy text of the printing and typesetting industry."
                                     " Lorem Ipsum has been the industry's standard dummy text ever since the 1500s,",
-                        unit="USD"
+                        unit="USD",
+                        show_expand_button=True
                     ),
                 ],
                 column_format=numeric_format,
