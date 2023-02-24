@@ -18,6 +18,7 @@ class AsyncWorkProgressContainer:
         self.extras = {}
         self.logs = []
         self.log_level: LogLevel = LogLevelsEnum.INFO.value
+        self.future = None
 
     def start(self):
         self.start_time = datetime.datetime.now()
@@ -32,10 +33,10 @@ class AsyncWorkProgressContainer:
 
 
 class AsyncHandlerService(BaseService):
-    def __init__(self, **kwargs):
+    def __init__(self, max_workers=10, **kwargs):
         super().__init__(**kwargs)
 
-        self.threadpool_executor = ThreadPoolExecutor(max_workers=10)
+        self.threadpool_executor = ThreadPoolExecutor(max_workers=max_workers)
 
     def do_work(self, func, done_callback=None, *args, **kwargs):
 
@@ -43,8 +44,12 @@ class AsyncHandlerService(BaseService):
         kwargs['async_container'] = async_container
 
         if done_callback is None:
-            self.threadpool_executor.submit(func, *args, **kwargs)
+            async_container.future = self.threadpool_executor.submit(func, *args, **kwargs)
         else:
-            self.threadpool_executor.submit(func, *args, **kwargs).add_done_callback(done_callback)
+            async_container.future = (
+                self.threadpool_executor
+                .submit(func, *args, **kwargs)
+                .add_done_callback(done_callback)
+            )
 
         return async_container
