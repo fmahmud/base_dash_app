@@ -283,9 +283,11 @@ class TsdpSparklineStatCard(ComponentWithInternalCallback):
                         "zIndex": "1000",
                         "top": "10px",
                         "height": "52px",
+                        "display": "none" if len(self.series) == 0 else "inherit"
                     },
                     className="display_on_parent_hover_only",
-                    id={"type": STAT_CARD_EXPAND_BUTTON, "index": self._instance_id}
+                    id={"type": STAT_CARD_EXPAND_BUTTON, "index": self._instance_id},
+
                 )
             )
 
