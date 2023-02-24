@@ -18,6 +18,7 @@ from base_dash_app.components.cards.stat_sparkline_card import StatSparklineCard
 from base_dash_app.components.cards.statistic_card import StatisticCard
 from base_dash_app.components.cards.tsdp_sparkline_stat_card import TsdpSparklineStatCard, TsdpStatCardDescriptor
 from base_dash_app.components.dashboards.simple_timeseries_dashboard import SimpleTimeSeriesDashboard
+from base_dash_app.components.data_visualization.simple_line_graph import LineGraph
 from base_dash_app.services.async_handler_service import AsyncWorkProgressContainer
 from base_dash_app.virtual_objects.timeseries.timeseries_wrapper import TimeSeriesWrapper
 from base_dash_app.virtual_objects.timeseries.date_range_aggregation_descriptor import DateRangeAggregatorDescriptor
@@ -114,7 +115,7 @@ class TestJobDef(JobDefinition):
         for param in instance.parameters:
             param.job_definition = instance
 
-        instance.description = "A test job that showcases the capabilities of a job definition, and how to extend it."\
+        instance.description = "A test job that showcases the capabilities of a job definition, and how to extend it." \
                                " This job doesn't actually do anything. It has a ~50% chance of failure."
         return instance
 
@@ -156,7 +157,8 @@ class TestJobDef(JobDefinition):
     def check_completion_criteria(self, *args, prog_container: VirtualJobProgressContainer, **kwargs) -> StatusesEnum:
         return prog_container.execution_status
 
-    def check_prerequisites(self, *args, prog_container: VirtualJobProgressContainer, parameter_values: Dict, **kwargs) -> StatusesEnum:
+    def check_prerequisites(self, *args, prog_container: VirtualJobProgressContainer, parameter_values: Dict,
+                            **kwargs) -> StatusesEnum:
         self.info_log("starting prereq. check")
         self.info_log("Example info log")
         self.debug_log("Example debug log")
@@ -167,7 +169,8 @@ class TestJobDef(JobDefinition):
         prog_container.result = 1
         return StatusesEnum.SUCCESS
 
-    def start(self, *args, prog_container: VirtualJobProgressContainer, parameter_values: Dict, **kwargs) -> StatusesEnum:
+    def start(self, *args, prog_container: VirtualJobProgressContainer, parameter_values: Dict,
+              **kwargs) -> StatusesEnum:
         if "session" not in kwargs:
             prog_container.end_reason = "Didn't receive session!"
             self.critical_log("Didn't receive session.")
@@ -189,10 +192,9 @@ class TestJobDef(JobDefinition):
         self.info_log("4 seconds passed")
 
         if "param_4" in parameter_values:
-            my_selectable: MySelectableModel = session.query(MySelectableModel)\
+            my_selectable: MySelectableModel = session.query(MySelectableModel) \
                 .filter_by(id=int(parameter_values["param_4"])).first()
             self.info_log(my_selectable.get_label())
-
 
         time.sleep(1)
 
@@ -274,7 +276,8 @@ class DemoView(BaseView):
 
     @staticmethod
     def render_watchlist(watchlist):
-        base_style = {"position": "relative", "float": "left", "minWidth": "100px", "maxWidth": "300px", "marginRight": "10px"}
+        base_style = {"position": "relative", "float": "left", "minWidth": "100px", "maxWidth": "300px",
+                      "marginRight": "10px"}
         return [
             dbc.Card(
                 children=[
@@ -333,6 +336,47 @@ class DemoView(BaseView):
                     ],
                     label="Job Card Demo",
                     style={"padding": "20px"}
+                ),
+                dbc.Tab(
+                    label="Simple Line Graph Demo",
+                    children=[
+                        LineGraph(title="Line Graph Demo")
+                        .add_series(
+                            name="Series 1",
+                            graphables=[
+                                TimeSeriesDataPoint(
+                                    date=datetime.datetime(year=2023, day=1, month=1) + datetime.timedelta(days=i),
+                                    value=random.randint(0, 100)
+                                )
+                                for i in range(100)
+                            ]
+                        )
+                        .add_series(
+                            name="Series 2",
+                            graphables=[
+                                TimeSeriesDataPoint(
+                                    date=datetime.datetime(year=2023, day=1, month=1) + datetime.timedelta(days=i),
+                                    value=random.randint(0, 100) * 1.5
+                                )
+                                for i in range(100)
+                            ]
+                        )
+                        .add_series(
+                            name="Series 3",
+                            graphables=[
+                                TimeSeriesDataPoint(
+                                    date=datetime.datetime(year=2023, day=1, month=1) + datetime.timedelta(days=i),
+                                    value=random.randint(0, 100) * 2
+                                )
+                                for i in range(100)
+                            ]
+                        )
+                        .render(
+                            smoothening=0.7,
+                            height=800,
+                            style={"width": "100%", "height": "100%", "padding": "20px"}
+                        )
+                    ],
                 ),
                 dbc.Tab(
                     children=[

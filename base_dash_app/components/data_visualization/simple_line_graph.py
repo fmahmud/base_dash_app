@@ -19,7 +19,14 @@ class LineGraph(BaseComponent):
         self.series[name] = graphables
         return self
 
-    def render(self, style=None):
+    def render(
+        self,
+        shape="spline",
+        smoothening=0.8,
+        height=500,
+        show_legend=False,
+        style=None
+    ):
         if style is None:
             style = {}
 
@@ -31,7 +38,12 @@ class LineGraph(BaseComponent):
                 X.append(g.get_x())
                 Y.append(g.get_y())
 
-            scatters.append(go.Scatter(x=X, y=Y, name=k, line=Line(shape="hv")))
+            scatters.append(
+                go.Scatter(
+                    x=X, y=Y, name=k, line=Line(shape=shape, smoothing=smoothening, width=2),
+                    mode="lines"
+                )
+            )
 
         figure = go.Figure(
             data=scatters,
@@ -42,6 +54,8 @@ class LineGraph(BaseComponent):
                 'paper_bgcolor': 'rgba(0,0,0,0)',
                 'plot_bgcolor': 'rgba(0,0,0,0)',
                 "hovermode": "x",
+                "showlegend": show_legend,
+                "height": height,
             }
         )
 
