@@ -5,9 +5,7 @@ from typing import Dict, Tuple, Callable, Any, List, Union
 from base_dash_app.apis.endpoint import Endpoint
 from base_dash_app.apis.utils import api_utils
 from base_dash_app.apis.utils.request import Request
-from base_dash_app.enums.http_methods import HttpMethod, HttpMethods
-
-
+from base_dash_app.enums.http_methods import HttpMethod
 # TODO
 from base_dash_app.virtual_objects.virtual_framework_obj import VirtualFrameworkObject
 

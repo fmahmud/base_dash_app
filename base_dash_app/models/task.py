@@ -1,11 +1,14 @@
 import datetime
-from typing import List, Callable, Optional
+from typing import List, Callable, Optional, TYPE_CHECKING
 
 import dash_bootstrap_components as dbc
 from dash import html
 
 from base_dash_app.components.details.detail_text_item import DetailTextItem
 from base_dash_app.components.historicals import historical_dots
+
+if TYPE_CHECKING:
+    from base_dash_app.components.lists.todo_list.todo_list_item import TaskGroup
 
 from base_dash_app.enums.task_repeat_period_enum import TaskRepeatPeriodEnum
 from base_dash_app.enums.todo_status_enum import TodoStatusEnum

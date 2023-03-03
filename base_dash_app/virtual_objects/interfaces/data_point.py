@@ -1,5 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from base_dash_app.virtual_objects.interfaces.dimension import Dimension
 
 
 class DataPoint(ABC):
