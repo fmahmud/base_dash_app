@@ -9,16 +9,20 @@ SECONDS_IN_HOUR = SECONDS_IN_MINUTE * 60
 SECONDS_IN_DAY = SECONDS_IN_HOUR * 24
 SECONDS_IN_WEEK = SECONDS_IN_DAY * 7
 
+
 def get_num_days_in_month(month_number, year=datetime.datetime.now().year):
     from calendar import monthrange
     return monthrange(year, month_number)[1]
 
 
-def readable_time_since(moment: datetime.datetime):
-    if moment is None:
+def readable_time_since(start_time: datetime.datetime, end_time: datetime.datetime = None):
+    if start_time is None:
         return "Never"
 
-    difference = (datetime.datetime.now() - moment).total_seconds()
+    if end_time is None:
+        end_time = datetime.datetime.now()
+
+    difference = (end_time - start_time).total_seconds()
 
     if difference < SECONDS_IN_MINUTE:
         # use seconds
@@ -56,3 +60,8 @@ def enumerate_datetimes_between(
         current = current + interval
 
     return moments
+
+
+def daterange(start_date, end_date):
+    for n in range(int((end_date - start_date).days)):
+        yield start_date + datetime.timedelta(n)

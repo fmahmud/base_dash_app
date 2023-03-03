@@ -65,6 +65,7 @@ werkzeug = "==1.0.1"
 zipp = "==3.6.0"
 psycopg2-binary = "*"
 dash-auth = "*"
+pytest = "*"
 
 [dev-packages]
 pre-commit = "*"
@@ -72,4 +73,4 @@ black = "*"
 pylint = "*"
 
 [requires]
-python_version = "3.8"
+python_version = "3.9"
