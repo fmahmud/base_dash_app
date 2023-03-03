@@ -9,10 +9,10 @@ from dash import html, dcc
 
 from base_dash_app.components.callback_utils.mappers import InputToState, InputMapping
 from base_dash_app.components.data_visualization.simple_area_graph import AreaGraph
-from base_dash_app.components.multi_prog_bar_group import MultiProgBarGroup, DetailedProgressBar
 from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.services.async_handler_service import AsyncOrderedTaskGroup, AsyncTask, AsyncWorkProgressContainer, \
     AsyncHandlerService, AsyncUnorderedTaskGroup
+from base_dash_app.utils.tsdp_utils import get_max_for_each_moment
 from base_dash_app.views.base_view import BaseView
 from base_dash_app.virtual_objects.timeseries.time_series_data_point import TimeSeriesDataPoint
 
@@ -20,17 +20,6 @@ ASYNC_VIEW_INTERVAL_ID = "async-view-interval-id"
 
 START_ASYNC_GROUP_TASKS = "start-async-group-tasks-btn-id"
 
-
-def get_max_for_each_date(array: List[List[TimeSeriesDataPoint]]):
-    max_for_each_date = {}
-    for series in array:
-        for dp in series:
-            if dp.date in max_for_each_date:
-                max_for_each_date[dp.date] = dp if dp.value > max_for_each_date[dp.date].value else max_for_each_date[dp.date]
-            else:
-                max_for_each_date[dp.date] = dp
-
-    return list(max_for_each_date.values())
 
 class AsyncDemoView(BaseView):
     def __init__(self, **kwargs):
@@ -133,7 +122,7 @@ class AsyncDemoView(BaseView):
                                 ),
                             ],
                             async_service=async_service,
-                            reducer_func=get_max_for_each_date
+                            reducer_func=get_max_for_each_moment
                         )
                     ]
                 )

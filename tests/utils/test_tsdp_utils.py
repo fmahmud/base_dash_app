@@ -1,4 +1,5 @@
 import datetime
+import random
 
 from dateutil.relativedelta import relativedelta
 
@@ -107,3 +108,30 @@ def test_interpolate_tsdp_array_2_3():
     assert first_val == result[second_index - 1].value
     assert second_val == result[second_index].value
     assert second_val == result[-1].value
+
+
+def test_get_max_for_each_moment_1_1():
+    # create 2 lists of 10 TimeSeriesDataPoint objects
+    # each list has the same moments,
+    # but list 1 has lower values than list 2 for each moment.
+
+    # list 1
+    list_1 = [TimeSeriesDataPoint(
+        date=datetime.datetime(2021, 1, 1 + i),
+        value=random.randint(1, 100)
+    ) for i in range(10)]
+
+    list_2 = [TimeSeriesDataPoint(
+        date=datetime.datetime(2021, 1, 1 + i),
+        value=random.randint(100, 200)
+    ) for i in range(10)]
+
+    max_values = tsdp_utils.get_max_for_each_moment([list_1, list_2])
+
+    assert max_values is not None
+    assert len(max_values) == 10
+    assert all([max_values[i].value == max(list_1[i].value, list_2[i].value) for i in range(10)])
+
+
+
+

@@ -1,5 +1,5 @@
 import datetime
-from concurrent.futures import ThreadPoolExecutor, Future
+from concurrent.futures import ThreadPoolExecutor, Future, wait
 from typing import Optional, List, Callable, Any, Dict
 
 from dash import html
@@ -46,7 +46,7 @@ class WorkContainer(BaseWorkContainer, BaseComponent):
         self.result = result
         self.progress = progress
         self.status_message = f"""Done in {
-            date_utils.readable_time_since(start_time=self.start_time, end_time=self.end_time)
+        date_utils.readable_time_since(start_time=self.start_time, end_time=self.end_time)
         }"""
 
     def get_start_time(self):
@@ -72,12 +72,12 @@ class WorkContainer(BaseWorkContainer, BaseComponent):
             children=[
                 html.H4(self.get_name(), style={"float": "left"}),
                 html.Pre(self.get_status_message(),
-                    style={
-                        "position": "relative",
-                        "float": "right",
-                        "marginBottom": "0px",
-                    },
-                ) if self.get_status_message() else None,
+                         style={
+                             "position": "relative",
+                             "float": "right",
+                             "marginBottom": "0px",
+                         },
+                         ) if self.get_status_message() else None,
                 dbc.Progress(
                     value=self.get_progress(),
                     label=self.get_progress_label(),
@@ -114,7 +114,7 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent):
         # return message saying how many successfully done
         num_success = f"""{self.get_num_success()} / {len(self.work_containers)} """
         if self.get_num_in_progress() > 0 or self.get_num_pending() > 0:
-            return num_success
+            return f"{num_success} - {self.get_latest_status_message() or ''}"
 
         return f"Done in " \
                f"{date_utils.readable_time_since(start_time=self.get_start_time(), end_time=self.get_end_time())}"
@@ -252,7 +252,10 @@ class AsyncTask(AsyncWorkProgressContainer):
 
     def start(self, task_input=None):
         super().start()
-        self.work_func(self, task_input, self.func_kwargs)
+        try:
+            self.work_func(self, task_input, self.func_kwargs)
+        except Exception as e:
+            print(e)
 
 
 class AsyncOrderedTaskGroup(AsyncGroupProgressContainer, AsyncTask):
@@ -278,7 +281,7 @@ class AsyncOrderedTaskGroup(AsyncGroupProgressContainer, AsyncTask):
             prev_result = task_input
             for task in self.work_containers:
                 task.start(task_input=prev_result)
-                prev_result = task.result
+                prev_result = task.get_result()
         else:
             prev_result = task_input
             for task in self.work_containers:
@@ -318,6 +321,9 @@ class AsyncUnorderedTaskGroup(WorkContainerGroup, AsyncTask):
         for async_task in self.work_containers:
             self.async_service.submit_async_task(async_task, task_input=task_input)
 
+        futures = [task.future for task in self.work_containers]
+        wait(futures)
+
     def get_result(self) -> Any:
         if len(self.work_containers) == 0:
             return None
@@ -350,8 +356,3 @@ class AsyncHandlerService(BaseService):
     def submit_async_task(self, async_task: AsyncTask, task_input=None):
         async_task.future = self.threadpool_executor.submit(async_task.start, task_input=task_input)
         return async_task
-
-
-
-
-

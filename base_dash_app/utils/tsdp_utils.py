@@ -38,3 +38,16 @@ def interpolate_tsdp_array(
 
     return result_array
 
+
+def get_max_for_each_moment(array: List[List[TimeSeriesDataPoint]]):
+    max_for_each_moment = {}
+    for series in array:
+        for dp in series:
+            if dp.date in max_for_each_moment:
+                max_for_each_moment[dp.date] = (
+                    dp if dp.value > max_for_each_moment[dp.date].value else max_for_each_moment[dp.date]
+                )
+            else:
+                max_for_each_moment[dp.date] = dp
+
+    return list(max_for_each_moment.values())
