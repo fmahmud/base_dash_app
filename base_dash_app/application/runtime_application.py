@@ -71,7 +71,7 @@ class RuntimeApplication:
         self.active_alerts: List[Alert] = []
         self.services: Dict[Type, BaseService] = {}
         self.apis: Dict[Type, API] = {}
-        self.views: List[BaseView] = []
+        self.views: Dict[Type, BaseView] = {}
         self.env_vars: Dict[str, EnvVarDefinition] = {}
         self.jobs: Dict[Type, JobDefinition] = {}
         for e in self.app_descriptor.env_vars:
@@ -102,6 +102,9 @@ class RuntimeApplication:
         def get_job_by_class(clazz):
             return self.jobs[clazz]
 
+        def get_view_by_type(view_class: Type) -> BaseView:
+            return self.views.get(view_class)
+
         if app_descriptor.db_descriptor is not None:
             self.dbm = DbManager(app_descriptor.db_descriptor)
 
@@ -117,7 +120,8 @@ class RuntimeApplication:
             "push_alert": push_new_alert,
             "remove_alert": remove_alert,
             "env_vars": self.env_vars,
-            "job_provider": get_job_by_class
+            "job_provider": get_job_by_class,
+            "view_provider": get_view_by_type,
         }
 
         for api_type in app_descriptor.apis:
@@ -152,7 +156,7 @@ class RuntimeApplication:
         base_view_args = base_service_args
 
         for view in app_descriptor.views:
-            self.views.append(view(**base_view_args))
+            self.views[view] = view(**base_view_args)
 
         wrapped_get_handler = self.bind_to_self(self.handle_get_call)
 
@@ -251,7 +255,7 @@ class RuntimeApplication:
             for page in v:
                 page_to_nav_group[page] = nav_group  # add to mapping to go the other way
 
-        for page in self.views:
+        for page in self.views.values():
             if page.show_in_navbar:
                 if type(page) in page_to_nav_group:
                     nav_group: NavGroup = page_to_nav_group[type(page)]
@@ -331,7 +335,7 @@ class RuntimeApplication:
 
         decoded_url = unquote(url)
         decoded_params = unquote(query_params)
-        for page in self.views:
+        for page in self.views.values():
             if page.matches(decoded_url):
                 try:
                     return page.render(decoded_params, states_for_input)

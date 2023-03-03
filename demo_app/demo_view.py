@@ -241,8 +241,9 @@ class DemoView(BaseView):
                         )
                     ]
                 )
-            ]
+            ],
         )
+        self.sub_views = None
         self.simple_tsdp_dash = None
         self.tsdp_datatables = []
 
@@ -251,9 +252,6 @@ class DemoView(BaseView):
         self.test_job_id = 1
         self.data_tables = []
         self.current_tab_id = 'tab-0'
-
-    def validate_state_on_trigger(self):
-        return
 
     def handle_any_input(self, *args, triggering_id, index):
         if triggering_id.startswith(TEST_ALERT_BTN_ID):
@@ -271,7 +269,8 @@ class DemoView(BaseView):
                 job_def_service,
                 data_tables=self.data_tables,
                 tsdp_data_tables=self.tsdp_datatables,
-                simple_tsdp_dash=self.simple_tsdp_dash
+                simple_tsdp_dash=self.simple_tsdp_dash,
+                sub_views=self.sub_views
             )
         ]
 
@@ -301,6 +300,7 @@ class DemoView(BaseView):
             data_tables: List[DataTableWrapper] = None,
             tsdp_data_tables: List[TimeSeriesDataTableWrapper] = None,
             simple_tsdp_dash: SimpleTimeSeriesDashboard = None,
+            sub_views: Dict[str, BaseView] = None,
             current_tab_id: str = 'tab-0'
     ):
         # return todo_list_component.render()
@@ -326,6 +326,17 @@ class DemoView(BaseView):
         )
 
         test_button_style = {"position": "relative", "float": "left", "margin": "10px"}
+
+        extra_views = []
+        for name, view in sub_views.items():
+            extra_views.append(
+                dbc.Tab(
+                    label=name,
+                    children=[
+                        view.render()
+                    ],
+                ),
+            )
 
         tabs_div = dbc.Tabs(
             id=DEMO_TABS_DIV_ID,
@@ -379,47 +390,7 @@ class DemoView(BaseView):
                         )
                     ],
                 ),
-                dbc.Tab(
-                    label="Simple Area Graph Demo",
-                    children=[
-                        AreaGraph(title="Area Graph Demo")
-                        .add_series(
-                            name="Series 1",
-                            graphables=[
-                                TimeSeriesDataPoint(
-                                    date=datetime.datetime(year=2023, day=1, month=1) + datetime.timedelta(days=i),
-                                    value=random.randint(0, 100)
-                                )
-                                for i in range(100)
-                            ]
-                        )
-                        .add_series(
-                            name="Series 2",
-                            graphables=[
-                                TimeSeriesDataPoint(
-                                    date=datetime.datetime(year=2023, day=1, month=1) + datetime.timedelta(days=i),
-                                    value=random.randint(0, 100) * 1.5
-                                )
-                                for i in range(100)
-                            ]
-                        )
-                        .add_series(
-                            name="Series 3",
-                            graphables=[
-                                TimeSeriesDataPoint(
-                                    date=datetime.datetime(year=2023, day=1, month=1) + datetime.timedelta(days=i),
-                                    value=random.randint(0, 100) * 2
-                                )
-                                for i in range(100)
-                            ]
-                        )
-                        .render(
-                            smoothening=0,
-                            height=800,
-                            style={"width": "100%", "height": "100%", "padding": "20px"}
-                        )
-                    ],
-                ),
+
                 dbc.Tab(
                     children=[
                         StatisticCard(
@@ -508,6 +479,7 @@ class DemoView(BaseView):
                         )
                     ]
                 ),
+                *extra_views
             ],
             style={
                 "position": "relative",
@@ -715,6 +687,14 @@ class DemoView(BaseView):
             self.simple_tsdp_dash.add_timeseries(tsw1)
             self.simple_tsdp_dash.add_timeseries(tsw2)
 
+        if not self.sub_views:
+            from demo_app.area_graph_view import AreaGraphView
+            from demo_app.async_demo_view import AsyncDemoView
+            self.sub_views = {
+                "Area Graph Demo": self.get_view(AreaGraphView),
+                "Async Graph Demo": self.get_view(AsyncDemoView),
+            }
+
         return html.Div(
             children=DemoView.raw_render(
                 self.watchlist,
@@ -722,7 +702,8 @@ class DemoView(BaseView):
                 job_def_service,
                 data_tables=self.data_tables,
                 tsdp_data_tables=self.tsdp_datatables,
-                simple_tsdp_dash=self.simple_tsdp_dash
+                simple_tsdp_dash=self.simple_tsdp_dash,
+                sub_views=self.sub_views
             ),
             id=self.wrapper_div_id
         )

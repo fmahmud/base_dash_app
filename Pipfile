@@ -65,6 +65,7 @@ werkzeug = "==1.0.1"
 zipp = "==3.6.0"
 psycopg2-binary = "*"
 dash-auth = "*"
+pytest = "*"
 
 [dev-packages]
 pre-commit = "*"

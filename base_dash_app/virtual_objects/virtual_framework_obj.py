@@ -8,7 +8,6 @@ if TYPE_CHECKING:
 
 class VirtualFrameworkObject:
     def __init__(self, *args, **kwargs):
-
         self.dbm: Optional['DbManager'] = kwargs["dbm"] if "dbm" in kwargs else None
         self.get_service = kwargs["service_provider"] if "service_provider" in kwargs else None
         self.get_api = kwargs["api_provider"] if "api_provider" in kwargs else None
@@ -18,6 +17,7 @@ class VirtualFrameworkObject:
         self.remove_alert = kwargs["remove_alert"] if "remove_alert" in kwargs else None
         self.env_vars = kwargs["env_vars"] if "env_vars" in kwargs else None
         self.logger = logging.getLogger(kwargs["logger_name"] if "logger_name" in kwargs else self.__class__.__name__)
+        self.get_view = kwargs["view_provider"] if "view_provider" in kwargs else None
 
     def produce_kwargs(self):
         return {
@@ -29,6 +29,7 @@ class VirtualFrameworkObject:
             "push_alert": self.push_alert,
             "remove_alert": self.remove_alert,
             "env_vars": self.env_vars,
+            "view_provider": self.get_view,
         }
 
     def set_vars_from_kwargs(self, **kwargs):
@@ -40,3 +41,4 @@ class VirtualFrameworkObject:
         self.push_alert = kwargs["push_alert"] if "push_alert" in kwargs else None
         self.remove_alert = kwargs["remove_alert"] if "remove_alert" in kwargs else None
         self.env_vars = kwargs["env_vars"] if "env_vars" in kwargs else None
+        self.get_view = kwargs["view_provider"] if "view_provider" in kwargs else None

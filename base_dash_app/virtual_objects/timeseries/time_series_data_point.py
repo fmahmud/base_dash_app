@@ -24,3 +24,17 @@ class TimeSeriesDataPoint(Graphable):
 
     def __lt__(self, other):
         return self.date < other.date
+
+    def __repr__(self):
+        return f"{self.date}: {self.value}"
+
+    def __str__(self):
+        return f"{self.date}: {self.value}"
+
+    def __hash__(self):
+        return hash((self.date, self.value))
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
+
+

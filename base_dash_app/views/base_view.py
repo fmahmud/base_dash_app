@@ -12,37 +12,24 @@ from base_dash_app.components.callback_utils.utils import invalid_n_clicks, get_
     get_state_values_for_input_from_args_list
 from base_dash_app.components.callback_utils.mappers import InputToState
 from base_dash_app.utils.db_utils import DbManager
+from base_dash_app.virtual_objects.virtual_framework_obj import VirtualFrameworkObject
 
 
-class BaseView(BaseComponent, ABC):
+class BaseView(VirtualFrameworkObject, BaseComponent, ABC):
     VIEWS = []
 
     def __init__(
-            self, title: str, url_regex: Pattern[str], register_callback_func: Callable,
-            dbm: Optional[DbManager] = None, nav_url: str = "", show_in_navbar: bool = True,
-            service_provider: Callable = None, input_to_states_map: List[InputToState] = None,
-            api_provider: Callable = None, job_provider: Callable = None,
-            push_alert: Callable = None, remove_alert: Callable = None,
-            all_jobs=None, all_apis=None,
+            self, title: str, url_regex: Pattern[str],
+            nav_url: str = "", show_in_navbar: bool = True,
+            input_to_states_map: List[InputToState] = None,
             **kwargs
     ):
+        super().__init__(**kwargs)
         self.title: str = title
         self.url_regex = url_regex
         self.path_params = {}
         self.nav_url = nav_url
         self.show_in_navbar = show_in_navbar
-
-        self.register_callback_func = register_callback_func
-
-        self.get_service = service_provider
-        self.get_api = api_provider
-        self.get_job = job_provider
-        self.all_jobs = all_jobs
-        self.all_apis = all_apis
-        self.dbm: Optional[DbManager] = dbm
-
-        self.push_alert = push_alert
-        self.remove_alert = remove_alert
 
         self.input_to_states_map: List[InputToState] = input_to_states_map if input_to_states_map else []
         self.input_string_ids_map = {its.get_input_string_id(): its for its in self.input_to_states_map}
@@ -52,7 +39,7 @@ class BaseView(BaseComponent, ABC):
         self.logger = logging.getLogger(self.__name)
 
         if len(self.input_to_states_map) > 0:
-            register_callback_func(
+            self.register_callback_func(
                 output=[Output(self.wrapper_div_id, "children")],
                 inputs=[its.input.get_as_input() for its in self.input_to_states_map],
                 state=[state.get_as_state() for its in self.input_to_states_map for state in its.states],
@@ -90,7 +77,7 @@ class BaseView(BaseComponent, ABC):
         raise PreventUpdate()
 
     def validate_state_on_trigger(self):
-        raise PreventUpdate()
+        return
 
     # todo: move path params out of here. make it a return variable and have it sent to render function
     def matches(self, target_url: str):
