@@ -24,6 +24,9 @@ class Sparkline(BaseComponent):
         y_data = []
         labels = []
         for datum in self.series:
+            if datum is None or datum.get_x() is None or datum.get_y() is None or datum.get_label() is None:
+                continue
+
             x_data.append(datum.get_x())
             y_data.append(datum.get_y())
             labels.append(datum.get_label())

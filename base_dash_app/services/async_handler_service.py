@@ -1,4 +1,5 @@
 import datetime
+import traceback
 from concurrent.futures import ThreadPoolExecutor, Future, wait
 from typing import Optional, List, Callable, Any, Dict
 
@@ -136,7 +137,7 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent):
             return StatusesEnum.IN_PROGRESS
 
         if self.get_num_failed() > 0:
-            return StatusesEnum.FAILED
+            return StatusesEnum.FAILURE
 
         return StatusesEnum.SUCCESS
 
@@ -255,7 +256,8 @@ class AsyncTask(AsyncWorkProgressContainer):
         try:
             self.work_func(self, task_input, self.func_kwargs)
         except Exception as e:
-            print(e)
+            traceback.print_exc()
+            self.complete(status=StatusesEnum.FAILURE, status_message=str(e))
 
 
 class AsyncOrderedTaskGroup(AsyncGroupProgressContainer, AsyncTask):
