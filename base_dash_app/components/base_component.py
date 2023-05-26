@@ -8,6 +8,7 @@ from dash.exceptions import PreventUpdate
 from base_dash_app.components.callback_utils.mappers import InputToState
 from base_dash_app.components.callback_utils.utils import get_state_values_for_input_from_args_list, invalid_n_clicks, \
     get_triggering_id_from_callback_context
+from base_dash_app.virtual_objects.virtual_framework_obj import VirtualFrameworkObject
 
 
 class BaseComponent(ABC):
@@ -16,10 +17,12 @@ class BaseComponent(ABC):
         pass
 
 
-class ComponentWithInternalCallback(BaseComponent, ABC):
+class ComponentWithInternalCallback(BaseComponent, VirtualFrameworkObject, ABC):
     type_to_instances_map = {}
 
     def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        VirtualFrameworkObject.__init__(self, *args, **kwargs)
         if type(self) not in ComponentWithInternalCallback.type_to_instances_map:
             ComponentWithInternalCallback.type_to_instances_map[type(self)] = {}
 

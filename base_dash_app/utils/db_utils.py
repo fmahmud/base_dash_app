@@ -1,7 +1,7 @@
 from enum import Enum
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker, Session, scoped_session
 
 from base_dash_app.utils.base_definition import get_base_class
 
@@ -31,8 +31,9 @@ class DbDescriptor:
 
 
 class DbManager:
-    def __init__(self, db_descriptor: DbDescriptor):
+    def __init__(self, db_descriptor: DbDescriptor, use_scoped_sessions: bool = False):
         self.db_descriptor: DbDescriptor = db_descriptor
+        self.use_scoped_sessions = use_scoped_sessions
 
         check_thread_string = ""
         if self.db_descriptor.engine_type == DbEngineTypes.SQLITE:
@@ -58,8 +59,11 @@ class DbManager:
             connect_args=self.connection_args
         )
         self.__connection = self.__engine.connect()
-        self.__Session = sessionmaker(bind=self.__engine)
-        self.session = self.__Session()
+        self.__Session = sessionmaker(bind=self.__engine, expire_on_commit=False)
+        if self.use_scoped_sessions:
+            self.__Session = scoped_session(self.__Session)
+
+        self.session = self.new_session()
 
     def upgrade_db(self, drop_first: bool = False):
         if drop_first:

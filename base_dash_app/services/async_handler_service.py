@@ -14,7 +14,7 @@ import dash_bootstrap_components as dbc
 
 
 class WorkContainer(BaseWorkContainer, BaseComponent):
-    def __init__(self, name: str = None, color: str = "primary"):
+    def __init__(self, name: str = None, color: str = "primary", is_hidden: bool = False, *args, **kwargs):
         super().__init__()
 
         self.execution_status: Optional[StatusesEnum] = StatusesEnum.PENDING
@@ -26,6 +26,16 @@ class WorkContainer(BaseWorkContainer, BaseComponent):
         self.status_message = ""
         self.name = name
         self.color = color
+        self.is_hidden = is_hidden
+
+    def reset(self):
+        self.execution_status = StatusesEnum.PENDING
+        self.result = None
+        self.start_time = None
+        self.end_time = None
+        self.end_reason = None
+        self.progress = 0.0
+        self.status_message = ""
 
     def get_name(self):
         return self.name
@@ -47,8 +57,8 @@ class WorkContainer(BaseWorkContainer, BaseComponent):
         self.result = result
         self.progress = progress
         self.status_message = f"""Done in {
-        date_utils.readable_time_since(start_time=self.start_time, end_time=self.end_time)
-        }"""
+            date_utils.readable_time_since(start_time=self.start_time, end_time=self.end_time)
+        }""" if status_message is None else status_message
 
     def get_start_time(self):
         return self.start_time
@@ -65,24 +75,31 @@ class WorkContainer(BaseWorkContainer, BaseComponent):
     def get_status(self) -> StatusesEnum:
         return self.execution_status
 
-    def get_result(self) -> Any:
-        return self.result
+    def get_result(self, clear_result=False) -> Any:
+        to_return = self.result
+        if clear_result:
+            self.result = None
+        return to_return
 
     def render(self):
+        if self.is_hidden:
+            return None
+
         return html.Div(
             children=[
-                html.H4(self.get_name(), style={"float": "left"}),
-                html.Pre(self.get_status_message(),
-                         style={
-                             "position": "relative",
-                             "float": "right",
-                             "marginBottom": "0px",
-                         },
-                         ) if self.get_status_message() else None,
+                html.Div(self.get_name(), style={"float": "left", "fontSize": "18px"}),
+                html.Pre(
+                    self.get_status_message(),
+                    style={
+                         "position": "relative",
+                         "float": "right",
+                         "marginBottom": "0px",
+                     },
+                ) if self.get_status_message() else None,
                 dbc.Progress(
                     value=self.get_progress(),
                     label=self.get_progress_label(),
-                    color=self.color,
+                    color=self.get_status().value.hex_color,
                     animated=self.get_status() == StatusesEnum.IN_PROGRESS,
                     striped=self.get_status() == StatusesEnum.IN_PROGRESS,
                     style={
@@ -97,7 +114,7 @@ class WorkContainer(BaseWorkContainer, BaseComponent):
                 "float": "left",
                 "width": "100%",
                 "height": "50px",
-                "marginBottom": "20px",
+                "marginBottom": "10px",
             },
         )
 
@@ -108,13 +125,19 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent):
         self.name = name
         self.color = color
 
+    def reset(self):
+        [container.reset() for container in self.work_containers]
+
     def get_name(self):
         return self.name
 
     def get_status_message(self) -> str:
         # return message saying how many successfully done
+        if self.get_num_pending() == len(self.work_containers):
+            return ""
+
         num_success = f"""{self.get_num_success()} / {len(self.work_containers)} """
-        if self.get_num_in_progress() > 0 or self.get_num_pending() > 0:
+        if self.get_num_in_progress() > 0:
             return f"{num_success} - {self.get_latest_status_message() or ''}"
 
         return f"Done in " \
@@ -143,12 +166,22 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent):
 
     def get_status_messages(self):
         return [
-            container.get_status_message() for container in self.work_containers
+            container.get_status_message() for container in self.work_containers if not container.is_hidden
         ]
 
     def get_start_time(self):
-        return None if len(self.work_containers) == self.get_num_pending() else \
-            min([container.get_start_time() for container in self.work_containers])
+        if len(self.work_containers) == self.get_num_pending():
+            return None
+        else:
+            start_times = [
+                container.get_start_time() for container in self.work_containers
+                if container.get_start_time() is not None
+            ]
+
+            if len(start_times) == 0:
+                return None
+
+            return min(start_times)
 
     def get_end_time(self):
         return None if self.get_num_in_progress() > 0 else \
@@ -203,6 +236,12 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent):
         if len(messages) == 0:
             return "Initializing..."
 
+        if self.get_num_success() == len(self.work_containers)\
+                or self.get_num_failed() == len(self.work_containers):
+            # all done
+            return f"Done in " \
+                   f"{date_utils.readable_time_since(start_time=self.get_start_time(), end_time=self.get_end_time())}"
+
         return messages[-1]
 
     def render(self):
@@ -219,8 +258,8 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent):
 
 
 class AsyncWorkProgressContainer(WorkContainer):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.future = None
 
 
@@ -243,9 +282,9 @@ class AsyncGroupProgressContainer(WorkContainerGroup):
 class AsyncTask(AsyncWorkProgressContainer):
     def __init__(
             self, work_func: Callable[[AsyncWorkProgressContainer, Any, Optional[Dict]], Any] = None,
-            func_kwargs: Dict[str, Any] = None, task_name: str = None
+            func_kwargs: Dict[str, Any] = None, task_name: str = None, is_hidden: bool = False
     ):
-        super().__init__()
+        super().__init__(is_hidden=is_hidden)
         self.work_func = work_func
         self.func_kwargs = func_kwargs or {}
         self.name = task_name
@@ -264,6 +303,7 @@ class AsyncOrderedTaskGroup(AsyncGroupProgressContainer, AsyncTask):
     def __init__(
             self, async_tasks: List[AsyncTask] = None,
             chain_results: bool = True,
+            clear_intermediate_results: bool = True,
             task_group_title: str = None
     ):
         super().__init__(async_tasks)
@@ -271,6 +311,7 @@ class AsyncOrderedTaskGroup(AsyncGroupProgressContainer, AsyncTask):
         self.chain_results = chain_results
         self.work_containers: List[AsyncTask] = async_tasks or []
         self.task_group_title = task_group_title
+        self.clear_intermediate_results = clear_intermediate_results
 
     def add_task(self, task: AsyncTask):
         if task is None:
@@ -279,21 +320,27 @@ class AsyncOrderedTaskGroup(AsyncGroupProgressContainer, AsyncTask):
         self.add_container(task)
 
     def start(self, task_input=None):
+        self.reset()
         if self.chain_results:
             prev_result = task_input
             for task in self.work_containers:
                 task.start(task_input=prev_result)
-                prev_result = task.get_result()
+                prev_result = task.get_result(clear_result=self.clear_intermediate_results)
         else:
             prev_result = task_input
             for task in self.work_containers:
                 task.start(prev_result)
                 prev_result = None
 
-    def get_result(self) -> Any:
+    def get_result(self, clear_result=False) -> Any:
         if len(self.work_containers) == 0:
             return None
-        return self.work_containers[-1].result
+        to_return = self.work_containers[-1].result
+
+        if clear_result:
+            self.work_containers[-1].result = None
+
+        return to_return
 
 
 class AsyncUnorderedTaskGroup(WorkContainerGroup, AsyncTask):
@@ -320,17 +367,18 @@ class AsyncUnorderedTaskGroup(WorkContainerGroup, AsyncTask):
         self.add_container(task)
 
     def start(self, task_input=None):
+        self.reset()
         for async_task in self.work_containers:
             self.async_service.submit_async_task(async_task, task_input=task_input)
 
         futures = [task.future for task in self.work_containers]
         wait(futures)
 
-    def get_result(self) -> Any:
+    def get_result(self, clear_result=False) -> Any:
         if len(self.work_containers) == 0:
             return None
 
-        return self.reducer_func([task.get_result() for task in self.work_containers])
+        return self.reducer_func([task.get_result(clear_result) for task in self.work_containers])
 
 
 class AsyncHandlerService(BaseService):

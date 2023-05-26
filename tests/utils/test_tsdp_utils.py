@@ -133,5 +133,3 @@ def test_get_max_for_each_moment_1_1():
     assert all([max_values[i].value == max(list_1[i].value, list_2[i].value) for i in range(10)])
 
 
-
-

@@ -39,7 +39,8 @@ class AppDescriptor:
             silence_routes_logging: bool = True,
             alerts_refresh_timeout: int = 1000,
             assets_folder_path: str = None,
-            components_with_internal_callbacks: List[Type['ComponentWithInternalCallback']] = None
+            components_with_internal_callbacks: List[Type['ComponentWithInternalCallback']] = None,
+            use_scoped_session: bool = False,
     ):
         """
         :param global_inputs: 
@@ -59,6 +60,14 @@ class AppDescriptor:
             the app
         :param initial_global_state: Sets the initial global state in the global state service
         :param extra_nav_bar_components: Appends any provided rendered components to the right side of the nav bar
+        :param drop_tables: If True, drops all tables in the db before creating them
+        :param use_auth: If True, uses basic auth to protect the app
+        :param valid_user_pairs: If use_auth is True, this is a dict of valid username:password pairs
+        :param silence_routes_logging: If True, silences the logging of every call to routes
+        :param alerts_refresh_timeout: How often the alerts refresh in milliseconds
+        :param assets_folder_path: Path to the assets folder
+        :param components_with_internal_callbacks: List of components that have internal callbacks
+        :param use_scoped_session: If True, uses a scoped session for the db
         """
 
         self.db_descriptor: DbDescriptor = db_descriptor
@@ -84,3 +93,4 @@ class AppDescriptor:
         self.alerts_refresh_timeout: int = alerts_refresh_timeout
         self.assets_folder_path: str = assets_folder_path
         self.components_with_internal_callbacks = components_with_internal_callbacks or []
+        self.use_scoped_session: bool = use_scoped_session
