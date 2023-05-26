@@ -291,6 +291,8 @@ class TsdpSparklineStatCard(ComponentWithInternalCallback):
                 )
             )
 
+            show_modal = self.modal_is_open
+            self.modal_is_open = False
             info_card.add_content(
                 dbc.Modal(
                     [
@@ -311,7 +313,7 @@ class TsdpSparklineStatCard(ComponentWithInternalCallback):
                     ],
                     id={"type": STAT_CARD_EXPAND_MODAL, "index": self._instance_id},
                     size="xl",
-                    is_open=self.modal_is_open,
+                    is_open=show_modal,
                 )
             )
 
