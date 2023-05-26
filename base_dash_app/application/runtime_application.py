@@ -16,6 +16,7 @@ from base_dash_app.apis.api import API
 from base_dash_app.application.app_descriptor import AppDescriptor
 from base_dash_app.components import alerts
 from base_dash_app.components.alerts import Alert
+from base_dash_app.components.async_task_controls import AsyncTaskControls
 from base_dash_app.components.callback_utils.mappers import InputToState
 from base_dash_app.components.callback_utils.utils import get_triggering_id_from_callback_context, \
     get_state_values_for_input_from_args_list, invalid_n_clicks
@@ -106,7 +107,10 @@ class RuntimeApplication:
             return self.views.get(view_class)
 
         if app_descriptor.db_descriptor is not None:
-            self.dbm = DbManager(app_descriptor.db_descriptor)
+            self.dbm = DbManager(
+                app_descriptor.db_descriptor,
+                use_scoped_sessions=app_descriptor.use_scoped_session
+            )
 
         if self.dbm is not None and app_descriptor.upgrade_db:
             self.dbm.upgrade_db(drop_first=app_descriptor.drop_tables)
@@ -190,6 +194,7 @@ class RuntimeApplication:
         # register internal callback components
         components_with_internal_callbacks = [
             JobCard, DataTableWrapper, SimpleTimeSeriesDashboard, TsdpSparklineStatCard,
+            AsyncTaskControls,
             *app_descriptor.components_with_internal_callbacks
         ]
 
@@ -340,7 +345,7 @@ class RuntimeApplication:
                 try:
                     return page.render(decoded_params, states_for_input)
                 except Exception as e:
-                    traceback.print_exc()
-                    return html.Div("Page under construction")
+                    exception_trace = traceback.format_exc()
+                    return html.Pre(exception_trace, style={"whiteSpace": "pre-wrap", "wordBreak": "break-all"})
 
         return html.Div("404 Not Found.")
