@@ -19,7 +19,7 @@ from base_dash_app.components.cards.statistic_card import StatisticCard
 from base_dash_app.components.cards.tsdp_sparkline_stat_card import TsdpSparklineStatCard, TsdpStatCardDescriptor
 from base_dash_app.components.dashboards.simple_timeseries_dashboard import SimpleTimeSeriesDashboard
 from base_dash_app.components.data_visualization.simple_area_graph import AreaGraph
-from base_dash_app.components.data_visualization.simple_line_graph import LineGraph
+from base_dash_app.components.data_visualization.simple_line_graph import LineGraph, GraphTypes
 from base_dash_app.services.async_handler_service import AsyncWorkProgressContainer
 from base_dash_app.virtual_objects.timeseries.timeseries_wrapper import TimeSeriesWrapper
 from base_dash_app.virtual_objects.timeseries.date_range_aggregation_descriptor import DateRangeAggregatorDescriptor
@@ -361,27 +361,32 @@ class DemoView(BaseView):
                                     value=random.randint(0, 100)
                                 )
                                 for i in range(100)
-                            ]
+                            ],
+                            graph_type=GraphTypes.BAR,
+                            color="tan"
                         )
                         .add_series(
                             name="Series 2",
                             graphables=[
                                 TimeSeriesDataPoint(
                                     date=datetime.datetime(year=2023, day=1, month=1) + datetime.timedelta(days=i),
-                                    value=random.randint(0, 100) * 1.5
+                                    value=random.randint(0, 100) * -1.5
                                 )
                                 for i in range(100)
-                            ]
+                            ],
+                            graph_type=GraphTypes.BAR,
+                            color="red"
                         )
                         .add_series(
                             name="Series 3",
                             graphables=[
                                 TimeSeriesDataPoint(
                                     date=datetime.datetime(year=2023, day=1, month=1) + datetime.timedelta(days=i),
-                                    value=random.randint(0, 100) * 2
+                                    value=random.randint(0, 100000) * 2
                                 )
                                 for i in range(100)
-                            ]
+                            ],
+                            secondary_y=True
                         )
                         .render(
                             smoothening=0.7,

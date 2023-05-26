@@ -37,4 +37,9 @@ class TimeSeriesDataPoint(Graphable):
     def __eq__(self, other):
         return hash(self) == hash(other)
 
+    def to_dict(self):
+        return {
+            "date": datetime.datetime.strftime(self.date, "%Y-%m-%d %H:%M:%S"),
+            "value": self.value
+        }
 

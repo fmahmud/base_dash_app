@@ -1,8 +1,10 @@
 import datetime
+import json
 from typing import List, Union
 
 from dateutil.relativedelta import relativedelta
 
+from base_dash_app.utils import file_utils
 from base_dash_app.utils.date_utils import enumerate_datetimes_between
 from base_dash_app.virtual_objects.timeseries.time_series_data_point import TimeSeriesDataPoint
 
@@ -51,3 +53,22 @@ def get_max_for_each_moment(array: List[List[TimeSeriesDataPoint]]):
                 max_for_each_moment[dp.date] = dp
 
     return list(max_for_each_moment.values())
+
+
+def serialize_tsdp(tsdp: TimeSeriesDataPoint):
+    return tsdp.to_dict()
+
+
+def serialize_tsdp_array(tsdp_array: List[TimeSeriesDataPoint]):
+    return [serialize_tsdp(tsdp) for tsdp in tsdp_array]
+
+
+def tsdp_array_to_json(tsdp_array: List[TimeSeriesDataPoint]):
+    return json.dumps(serialize_tsdp_array(tsdp_array))
+
+
+def tsdp_array_to_csv(tsdp_array: List[TimeSeriesDataPoint]):
+    return file_utils.convert_dict_to_csv(
+        data_to_write=serialize_tsdp_array(tsdp_array),
+        keys=["date", "value"],
+    )

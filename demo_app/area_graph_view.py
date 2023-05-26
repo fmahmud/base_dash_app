@@ -7,6 +7,7 @@ from dash import html
 
 from base_dash_app.components.callback_utils.mappers import InputToState, InputMapping
 from base_dash_app.components.data_visualization.simple_area_graph import AreaGraph
+from base_dash_app.components.data_visualization.simple_line_graph import LineGraph, GraphableSeries, GraphTypes
 from base_dash_app.views.base_view import BaseView
 from base_dash_app.virtual_objects.timeseries.time_series_data_point import TimeSeriesDataPoint
 
@@ -31,7 +32,7 @@ class AreaGraphView(BaseView):
             **kwargs
         )
 
-        self.area_graph = AreaGraph(title="Area Graph Demo")
+        self.area_graph = LineGraph(title="Area Graph")
 
     def validate_state_on_trigger(self):
         return
@@ -44,39 +45,45 @@ class AreaGraphView(BaseView):
 
     def generate_graph_data(self):
         self.area_graph.series = {}
-        self.area_graph.add_series(
+        self.area_graph.add_graphable_series(
+            GraphableSeries(
                 name="Series 1",
-                graphables=[
+                data=[
                     TimeSeriesDataPoint(
                         date=datetime.datetime(year=2023, day=1, month=1) + datetime.timedelta(days=i),
                         value=random.randint(0, 100)
                     )
                     for i in range(100)
-                ]
-            ).add_series(
-                name="Series 2",
-                graphables=[
-                    TimeSeriesDataPoint(
-                        date=datetime.datetime(year=2023, day=1, month=1) + datetime.timedelta(days=i),
-                        value=random.randint(0, 100) * 1.5
-                    )
-                    for i in range(100)
-                ]
-            ).add_series(
-                name="Series 3",
-                graphables=[
-                    TimeSeriesDataPoint(
-                        date=datetime.datetime(year=2023, day=1, month=1) + datetime.timedelta(days=i),
-                        value=random.randint(0, 100) * 2
-                    )
-                    for i in range(100)
-                ]
+                ],
+                graph_type=GraphTypes.AREA,
+                color="IndianRed"
             )
+        ).add_series(
+            name="Series 2",
+            graphables=[
+                TimeSeriesDataPoint(
+                    date=datetime.datetime(year=2023, day=1, month=1) + datetime.timedelta(days=i),
+                    value=random.randint(0, 100) * 1.5
+                )
+                for i in range(100)
+            ],
+            graph_type=GraphTypes.AREA,
+        ).add_series(
+            name="Series 3",
+            graphables=[
+                TimeSeriesDataPoint(
+                    date=datetime.datetime(year=2023, day=1, month=1) + datetime.timedelta(days=i),
+                    value=random.randint(0, 100) * 2
+                )
+                for i in range(100)
+            ],
+            graph_type=GraphTypes.AREA,
+        )
 
     @staticmethod
-    def raw_render(area_graph: AreaGraph):
+    def raw_render(area_graph: LineGraph):
         return html.Div(
-            children= [
+            children=[
                 dbc.Button("Reload Graph", id=RELOAD_GRAPH_BTN_ID),
                 area_graph.render(
                     smoothening=0,

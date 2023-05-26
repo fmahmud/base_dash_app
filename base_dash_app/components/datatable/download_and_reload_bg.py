@@ -11,13 +11,16 @@ def construct_down_ref_btgrp(
     download_btn_id, reload_btn_id,
     last_load_time: datetime.datetime = None,
     date_format="%Y-%m-%d", time_format="%H:%M:%S",
-    disable_download_btn=False, disable_reload_btn=False,
+    disable_download_btn=False,
+    disable_reload_btn=False,
     other_buttons=None,
     wrapper_style=None,
     download_content=None,
     download_content_id=None,
     reload_in_progress=False,
     reload_progress=0,
+    hide_download_button=False,
+    right_align=True,
 ):
     if other_buttons is None:
         other_buttons = []
@@ -32,6 +35,8 @@ def construct_down_ref_btgrp(
             "WebkitAnimation": "spin 1s linear infinite",
         }
 
+    float_direction = "right" if right_align else "left"
+
     return html.Div(
         children=[
             dcc.Download(data=download_content, id=download_content_id) if download_content_id is not None else None,
@@ -42,6 +47,7 @@ def construct_down_ref_btgrp(
                         id=download_btn_id,
                         style={
                             "fontSize": "25px", "width": "65px",
+                            "display": "none" if hide_download_button else None
                         },
                         disabled=disable_download_btn or reload_in_progress
                     ) if download_btn_id is not None else None,
@@ -56,7 +62,7 @@ def construct_down_ref_btgrp(
                     ),
                     *other_buttons
                 ],
-                style={"position": "relative", "float": "right", "clear": "right", "height": "50px"},
+                style={"position": "relative", "float": float_direction, "clear": float_direction, "height": "50px"},
             ),
             html.H5(
                 f"Last Loaded {date_utils.readable_time_since(last_load_time)} ago"
@@ -64,10 +70,10 @@ def construct_down_ref_btgrp(
                 else "Never Loaded",
                 style={
                     "position": "relative",
-                    "float": "right",
+                    "float": float_direction,
                     "height": "100%",
                     "marginTop": "15px",
-                    "margin-right": "20px",
+                    f"margin{float_direction.title()}": "20px",
                 },
             ) if not reload_in_progress else
             dbc.Progress(
@@ -77,16 +83,17 @@ def construct_down_ref_btgrp(
                 animated=True,
                 striped=True,
                 style={
-                    "position": "relative", "float": "right",
+                    "position": "relative",
+                    "float": float_direction,
                     "marginTop": "15px",
-                    "margin-right": "20px",
+                    f"margin{float_direction.title()}": "20px",
                     "width": "300px",
                     "height": "20px"
                 }
             ),
         ],
         style={
-            "position": "relative", "float": "right",
+            "position": "relative", "float": float_direction,
             "marginTop": "20px", "marginBottom": "20px",
             "width": "fit-content",
             **wrapper_style

@@ -1,12 +1,16 @@
 import abc
 from typing import List, Optional
 
+from base_dash_app.components.data_visualization.simple_line_graph import GraphableSeries
 from base_dash_app.virtual_objects.timeseries.time_series_data_point import TimeSeriesDataPoint
 
 
-class AbstractTimeSeries(abc.ABC):
+class AbstractTimeSeries(GraphableSeries, abc.ABC):
     def __init__(self):
-        self.tsdps: List[TimeSeriesDataPoint] = []
+        super().__init__()
+
+    def get_name(self):
+        return self.get_title()
 
     @abc.abstractmethod
     def get_title(self):
@@ -21,32 +25,32 @@ class AbstractTimeSeries(abc.ABC):
         pass
 
     def add_tsdp(self, tsdp: TimeSeriesDataPoint):
-        self.tsdps.append(tsdp)
+        self.data.append(tsdp)
         return self
 
     def set_tsdps(self, tsdps: List[TimeSeriesDataPoint]):
-        self.tsdps = [*tsdps]
+        self.data = [*tsdps]
         return self
 
     def get_tsdps(self):
-        return self.tsdps
+        return self.data
 
     def sort_tsdps(self):
-        self.tsdps = sorted(self.tsdps)
+        self.data = sorted(self.data)
 
     def get_first_date(self):
-        if len(self.tsdps) == 0:
+        if len(self.data) == 0:
             return None
 
         self.sort_tsdps()
-        return self.tsdps[0].date
+        return self.data[0].date
 
     def get_last_date(self):
-        if len(self.tsdps) == 0:
+        if len(self.data) == 0:
             return None
 
         self.sort_tsdps()
-        return self.tsdps[-1].date
+        return self.data[-1].date
 
 
 class TimeSeries(AbstractTimeSeries):
