@@ -65,14 +65,19 @@ class AsyncTaskControls(ComponentWithInternalCallback):
             self.download_formatter_func = download_formatter_func
 
             def final_task_func(wpc: AsyncWorkProgressContainer, task_input, kwargs):
-                self.download_content = dcc.send_string(
-                    self.download_formatter_func(task_input),
-                    filename=f"{self.async_task.get_start_time()}"
-                             f"_{self.async_task.get_name()}"
-                             f".{self.download_file_format}",
-                )
-                self.in_progress = False
-                wpc.complete()
+                try:
+                    self.download_content = dcc.send_string(
+                        self.download_formatter_func(task_input),
+                        filename=f"{self.async_task.get_start_time()}"
+                                 f"_{self.async_task.get_name()}"
+                                 f".{self.download_file_format}",
+                    )
+                    wpc.complete()
+                except Exception as e:
+                    wpc.complete(status=StatusesEnum.FAILED, status_message=str(e))
+                    raise e
+                finally:
+                    self.in_progress = False
 
             final_task = AsyncTask(
                 work_func=final_task_func,

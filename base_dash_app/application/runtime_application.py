@@ -7,6 +7,7 @@ from urllib.parse import unquote
 
 import dash
 import dash_auth
+import sqlalchemy.exc
 from dash import dcc, html
 from dash.dependencies import Output, Input, State, ALL
 from dash.exceptions import PreventUpdate
@@ -344,8 +345,14 @@ class RuntimeApplication:
             if page.matches(decoded_url):
                 try:
                     return page.render(decoded_params, states_for_input)
-                except Exception as e:
+                except sqlalchemy.exc.PendingRollbackError:
                     exception_trace = traceback.format_exc()
+                    self.app.logger.error(exception_trace)
+                    self.dbm.session.rollback()
+                    return self.handle_get_call(url, query_params, *args)
+                except Exception:
+                    exception_trace = traceback.format_exc()
+                    self.app.logger.error(exception_trace)
                     return html.Pre(exception_trace, style={"whiteSpace": "pre-wrap", "wordBreak": "break-all"})
 
         return html.Div("404 Not Found.")

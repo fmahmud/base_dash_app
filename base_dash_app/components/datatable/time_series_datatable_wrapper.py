@@ -101,7 +101,7 @@ class TimeSeriesDataTableWrapper(BaseComponent):
             series.sort_tsdps()
             interval_start = self.start_date
             interval_end = min(self.start_date + self.interval_size, self.end_date)
-            for tsdp in series.tsdps:
+            for tsdp in series.get_tsdps():
                 tsdp: TimeSeriesDataPoint
                 while tsdp.date >= interval_end:
                     interval_start += self.interval_size
