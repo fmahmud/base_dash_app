@@ -404,5 +404,6 @@ class AsyncHandlerService(BaseService):
         return async_container
 
     def submit_async_task(self, async_task: AsyncTask, task_input=None):
+        async_task.reset()
         async_task.future = self.threadpool_executor.submit(async_task.start, task_input=task_input)
         return async_task
