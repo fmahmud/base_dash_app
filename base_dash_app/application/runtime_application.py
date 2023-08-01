@@ -156,7 +156,10 @@ class RuntimeApplication:
 
         self.services[GlobalStateService] = GlobalStateService(initial_state=app_descriptor.initial_global_state)
         self.services[JobDefinitionService] = job_def_service
-        self.services[AsyncHandlerService] = AsyncHandlerService(**base_service_args)
+        self.services[AsyncHandlerService] = AsyncHandlerService(
+            **base_service_args,
+            max_workers=app_descriptor.max_num_threads
+        )
 
         base_view_args = base_service_args
 
@@ -345,7 +348,7 @@ class RuntimeApplication:
             if page.matches(decoded_url):
                 try:
                     return page.render(decoded_params, states_for_input)
-                except sqlalchemy.exc.PendingRollbackError:
+                except sqlalchemy.exc.SQLAlchemyError:
                     exception_trace = traceback.format_exc()
                     self.app.logger.error(exception_trace)
                     self.dbm.session.rollback()
