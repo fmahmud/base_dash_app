@@ -72,7 +72,8 @@ class GraphableSeries(Nameable):
 
 
 class LineGraph(BaseComponent):
-    def __init__(self, title: str = ""):
+    def __init__(self, title: str = "", *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.title: str = title
         self.graphable_series: List[GraphableSeries] = []
         self.barmode = "group"

@@ -32,6 +32,7 @@ from base_dash_app.services.global_state_service import GlobalStateService
 from base_dash_app.services.job_definition_service import JobDefinitionService
 from base_dash_app.utils.db_utils import DbManager
 from base_dash_app.utils.env_vars.env_var_def import EnvVarDefinition
+from base_dash_app.views.admin_statistics_dash import AdminStatisticsDash
 from base_dash_app.views.base_view import BaseView
 from base_dash_app.virtual_objects.interfaces.startable import Startable, ExternalTriggerEvent
 from base_dash_app.models.job_definition import JobDefinition
@@ -165,6 +166,8 @@ class RuntimeApplication:
 
         for view in app_descriptor.views:
             self.views[view] = view(**base_view_args)
+
+        self.views[AdminStatisticsDash] = AdminStatisticsDash(**base_view_args)
 
         wrapped_get_handler = self.bind_to_self(self.handle_get_call)
 
