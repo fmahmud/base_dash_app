@@ -1,6 +1,6 @@
 import datetime
 from math import floor, log, isnan
-from typing import List
+from typing import List, Dict
 
 from dash import html
 from dash.exceptions import PreventUpdate
@@ -113,7 +113,7 @@ class TsdpSparklineStatCard(ComponentWithInternalCallback):
         unit: str = None,
         graph_height: int = 40,
         shape="spline",
-        smoothening=0.8,
+        smoothening=0.4,
         time_periods_to_show: List[TimePeriodsEnum] = None,
         aggregation_to_use: TsdpAggregationFuncs = TsdpAggregationFuncs.SUM,
         use_human_formatting=True,
@@ -130,12 +130,20 @@ class TsdpSparklineStatCard(ComponentWithInternalCallback):
         self.shape = shape
         self.smoothening = smoothening
         self.graph_height = graph_height
-        self.time_periods_to_show: List[TimePeriodsEnum] = time_periods_to_show or [TimePeriodsEnum.LAST_24HRS]
+        self.time_periods_to_show: List[TimePeriodsEnum] = (
+                sorted(time_periods_to_show, reverse=True) or [TimePeriodsEnum.LAST_24HRS]
+        )
         self.aggregation_to_use: TsdpAggregationFuncs = aggregation_to_use
         self.use_human_formatting = use_human_formatting
         self.description = description
         self.modal_is_open = False
         self.show_expand_button = show_expand_button
+
+        self.values: Dict[TimePeriodsEnum, LabelledValueChip] = {
+            time_period: None for time_period in self.time_periods_to_show
+        }
+
+        self.generate_data()
 
     def render(self, style_override=None, **kwargs):
         if style_override is None:
@@ -149,11 +157,98 @@ class TsdpSparklineStatCard(ComponentWithInternalCallback):
             id={"type": TsdpSparklineStatCard.get_wrapper_div_id(), "index": self._instance_id},
         )
 
-    def __render_tsdp_stat_card(self, **kwargs):
+    def generate_data(self):
+        current_time = datetime.datetime.now()
+        for time_period in self.time_periods_to_show:
+            if time_period not in self.values or self.values[time_period] is None:
+                self.values[time_period] = (
+                    LabelledValueChip(
+                        value=" -",
+                        label=time_period.get_label(),
+                    )
+                )
+
+            # todo: easy memoization... too lazy to do
+            if len(self.series) > 0:
+                matching_data_points: List[TimeSeriesDataPoint] = []
+                # if time_period == TimePeriodsEnum.LATEST:
+                #     time_segment_start = self.series[-1].date
+                #     time_segment_end = self.series[-1].date
+                # elif time_period == TimePeriodsEnum.LAST_HOUR:
+                #     time_segment_start = current_time - datetime.timedelta(hours=1)
+                #     time_segment_end = current_time
+                # elif time_period == TimePeriodsEnum.LAST_24HRS:
+                #     time_segment_start = current_time - datetime.timedelta(hours=24)
+                #     time_segment_end = current_time
+                # elif time_period == TimePeriodsEnum.LAST_7_DAYS:
+                #     time_segment_start = current_time - datetime.timedelta(days=7)
+                #     time_segment_end = current_time
+                # elif time_period == TimePeriodsEnum.LAST_30_DAYS:
+                #     time_segment_start = current_time - datetime.timedelta(days=30)
+                #     time_segment_end = current_time
+                # elif time_period == TimePeriodsEnum.LAST_90_DAYS:
+                #     time_segment_start = current_time - datetime.timedelta(days=90)
+                #     time_segment_end = current_time
+                # elif time_period == TimePeriodsEnum.LAST_YEAR:
+                #     time_segment_start = current_time - datetime.timedelta(days=365)
+                #     time_segment_end = current_time
+                # elif time_period == TimePeriodsEnum.LAST_YEAR:
+                #     time_segment_start = current_time - datetime.timedelta(days=365)
+                #     time_segment_end = current_time
+                # else:
+                #     time_segment_start = self.series[0].date
+                #     time_segment_end = current_time
+
+                time_segment_start, time_segment_end = time_period.get_start_end_dates(current_time, self.series)
+                previous_time_segment_start = time_segment_start - time_period.value.delta
+                previous_time_segment_end = current_time
+                previous_matching_data_points: List[TimeSeriesDataPoint] = []
+
+                for tsdp in self.series:
+                    if time_segment_start <= tsdp.date <= time_segment_end:
+                        # match
+                        matching_data_points.append(tsdp)
+
+                    if previous_time_segment_start <= tsdp.date <= previous_time_segment_end:
+                        previous_matching_data_points.append(tsdp)
+
+                numeric_value = value = self.aggregation_to_use(matching_data_points)
+                previous_value = self.aggregation_to_use(previous_matching_data_points)
+
+                if value is None:
+                    value = 0  # todo: default value!
+
+                if previous_value is None:
+                    previous_value = 0
+
+                is_negative = value < 0
+
+                if self.use_human_formatting:
+                    value = human_format(abs(value))
+                else:
+                    value = f"{abs(value):,.2f}"
+            else:
+                value = "-"
+                numeric_value = None
+                is_negative = False
+                previous_value = None
+
+            value = (
+                f"{'-' if is_negative else ''}"
+                f"{self.unit if self.unit is not None else ''}"
+                f"{' ' if is_negative or self.unit is not None else ''}"
+                f"{value}"
+            )
+
+            self.values[time_period].value = value
+            self.values[time_period].set_previous_value(numeric_value, previous_value)
+
+    def __render_tsdp_stat_card(self, card_width=550, **kwargs):
         info_card = InfoCard()
+        info_card.width = card_width
 
         sparkline = Sparkline(
-            title=self.title, series=self.series
+            title=self.title, series=self.series,
         )
 
         info_card.add_content(
@@ -170,7 +265,8 @@ class TsdpSparklineStatCard(ComponentWithInternalCallback):
                     "marginLeft": "-1rem"
                 },
                 shape=self.shape,
-                smoothening=self.smoothening
+                smoothening=self.smoothening,
+                mouse_interactions=True
             )
         )
 
@@ -196,75 +292,15 @@ class TsdpSparklineStatCard(ComponentWithInternalCallback):
                 ),
             )
 
-        current_time = datetime.datetime.now()
-        values = []
-        for time_period in self.time_periods_to_show:
-            #todo: easy memoization... too lazy to do
-            if len(self.series) > 0:
-                matching_data_points: List[TimeSeriesDataPoint] = []
-                if time_period == TimePeriodsEnum.LATEST:
-                    time_segment_start = self.series[-1].date
-                    time_segment_end = self.series[-1].date
-                elif time_period == TimePeriodsEnum.LAST_HOUR:
-                    time_segment_start = current_time - datetime.timedelta(hours=1)
-                    time_segment_end = current_time
-                elif time_period == TimePeriodsEnum.LAST_24HRS:
-                    time_segment_start = current_time - datetime.timedelta(hours=24)
-                    time_segment_end = current_time
-                elif time_period == TimePeriodsEnum.LAST_7_DAYS:
-                    time_segment_start = current_time - datetime.timedelta(days=7)
-                    time_segment_end = current_time
-                elif time_period == TimePeriodsEnum.LAST_30_DAYS:
-                    time_segment_start = current_time - datetime.timedelta(days=30)
-                    time_segment_end = current_time
-                elif time_period == TimePeriodsEnum.LAST_90_DAYS:
-                    time_segment_start = current_time - datetime.timedelta(days=90)
-                    time_segment_end = current_time
-                elif time_period == TimePeriodsEnum.LAST_365_DAYS:
-                    time_segment_start = current_time - datetime.timedelta(days=365)
-                    time_segment_end = current_time
-                elif time_period == TimePeriodsEnum.LAST_365_DAYS:
-                    time_segment_start = current_time - datetime.timedelta(days=365)
-                    time_segment_end = current_time
-                else:
-                    time_segment_start = self.series[0].date
-                    time_segment_end = current_time
-
-                for tsdp in self.series:
-                    if time_segment_start <= tsdp.date <= time_segment_end:
-                        # match
-                        matching_data_points.append(tsdp)
-
-                value = self.aggregation_to_use(matching_data_points)
-
-                if value is None:
-                    value = 0  #todo: default value!
-
-                is_negative = value < 0
-
-                if self.use_human_formatting:
-                    value = human_format(abs(value))
-                else:
-                    value = f"{abs(value):,.2f}"
-            else:
-                value = "-"
-                is_negative = False
-
-            values.append(
-                LabelledValueChip(
-                    value=value,
-                    label=time_period.value
-                )
-            )
-
-            if self.unit is not None:
-                values[-1].value = self.unit + values[-1].value
-
-            if is_negative:
-                values[-1].value = "-" + values[-1].value
-
+        chips_list = list(self.values.values())
         info_card.add_content(
-            LabelledChipGroup(values=values).render(hide_overflow=len(values) <= 4)
+            LabelledChipGroup(
+                values=chips_list
+            ).render(
+                hide_overflow=len(chips_list) <= 4,
+                show_percentages=True
+            )
+            # todo: make number of chips to show configurable
         )
 
         if self.show_expand_button:
@@ -306,7 +342,8 @@ class TsdpSparklineStatCard(ComponentWithInternalCallback):
                                     show_x_axis=True,
                                     show_y_axis=True,
                                     mouse_interactions=True,
-                                    show_custom_x_axis=False
+                                    show_custom_x_axis=False,
+                                    fixed_range=False
                                 )
                             ]
                         ),

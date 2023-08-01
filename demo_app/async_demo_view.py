@@ -57,12 +57,12 @@ class AsyncDemoView(BaseView):
     def gen_work_func(self):
         def gen_graph_data(prog_container: AsyncWorkProgressContainer, prev_result=None, *args, **kwargs):
             self.logger.info("Starting work func")
-            time.sleep(random.randint(1, 5))
+            time.sleep(random.randint(1, 2))
             prog_container.set_progress(25)
             prog_container.set_status_message("Generating Data...")
             time.sleep(1)
             prog_container.set_progress(50)
-            time.sleep(random.randint(1, 5))
+            time.sleep(random.randint(1, 2))
             prog_container.set_progress(75)
             if prev_result:
                 data = prev_result
@@ -77,7 +77,8 @@ class AsyncDemoView(BaseView):
                     for i in range(100)
                 ]
             prog_container.complete(
-                result=data
+                result=data,
+                status_message="Finished generating data"
             )
             self.logger.info("Finished work func")
 
@@ -97,12 +98,12 @@ class AsyncDemoView(BaseView):
         area_graph = AreaGraph()
 
         for ag in async_groups:
-            for at in ag.work_containers:
-                if at.get_status() == StatusesEnum.SUCCESS:
-                    area_graph.add_series(
-                        graphables=sorted(at.get_result()),
-                        name=at.get_name()
-                    )
+            # for at in ag.work_containers:
+            if ag.get_status() == StatusesEnum.SUCCESS:
+                area_graph.add_series(
+                    graphables=sorted(ag.get_result()),
+                    name=ag.get_name()
+                )
 
         disabled = (all(ag is None or ag.get_status() != StatusesEnum.IN_PROGRESS for ag in async_groups))
 
@@ -125,6 +126,13 @@ class AsyncDemoView(BaseView):
         )
 
     def render(self, *args, **kwargs):
+        def throw_exception_func(x, y, z):
+            raise Exception("This is a test exception")
+
+        def long_sleep_task(x, y, z):
+            time.sleep(20)
+            x.complete(result=y, status_message="Finished sleeping")
+
         async_service: AsyncHandlerService = self.get_service(AsyncHandlerService)
         if len(self.async_groups) == 0:
             self.async_groups = [
@@ -161,8 +169,12 @@ class AsyncDemoView(BaseView):
                                     work_func=self.gen_work_func()
                                 ),
                                 AsyncTask(
-                                    task_name="Task 6",
-                                    work_func=self.gen_work_func()
+                                    task_name="Long Sleep Task",
+                                    work_func=long_sleep_task
+                                ),
+                                AsyncTask(
+                                    task_name="Failure Task",
+                                    work_func=throw_exception_func
                                 ),
                             ],
                             async_service=async_service,

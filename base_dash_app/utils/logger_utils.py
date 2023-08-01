@@ -20,7 +20,7 @@ class BColors(Enum):
 
 
 LOGGING_FORMAT = f'{BColors.WHITE}[%(asctime)s]{BColors.ENDC}' \
-                 f'{BColors.OKCYAN}[%(name)30s]{BColors.ENDC}:' \
+                 f'{BColors.OKCYAN}[%(name)30s]{BColors.ENDC}' \
                  f'{BColors.WARNING}[%(levelname)10s]{BColors.ENDC}:' \
                  f'%(message)s'
 

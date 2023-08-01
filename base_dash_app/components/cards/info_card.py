@@ -22,13 +22,17 @@ class InfoCard:
         self.width = width
         return self
 
-    def render(self, style_override=None):
+    def render(self, style_override=None, card_body_style_override=None):
         if style_override is None:
             style_override = {}
 
+        if card_body_style_override is None:
+            card_body_style_override = {}
+
         return dbc.Card(
             children=dbc.CardBody(
-                children=self.content
+                children=self.content,
+                style={**card_body_style_override}
             ),
             style={
                 "position": "relative",

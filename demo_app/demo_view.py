@@ -566,8 +566,8 @@ class DemoView(BaseView):
             self.data_tables.append(dtw)
 
         numeric_format = Format(precision=2, scheme=Scheme.fixed).group(True)
-        start_date = datetime.datetime(2022, 11, 1)
-        end_date = datetime.datetime(2023, 1, 1)
+        end_date = datetime.datetime.now()
+        start_date = end_date - datetime.timedelta(days=120)
         interval_size = datetime.timedelta(days=1)
 
         def wrapper_generate_data(num_series, interval, offset=0, sleep_delay=0):
