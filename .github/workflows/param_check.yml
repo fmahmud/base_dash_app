@@ -3,11 +3,11 @@ name: Parameter Check
 on:
   push:
     paths:
-      - 'application/app_descriptor.py'
+      - 'base_dash_app/application/app_descriptor.py'
       - 'README.md'
   pull_request:
     paths:
-      - 'application/app_descriptor.py'
+      - 'base_dash_app/application/app_descriptor.py'
       - 'README.md'
 
 jobs:
