@@ -1,6 +1,8 @@
+import concurrent
 import datetime
 import traceback
-from concurrent.futures import ThreadPoolExecutor, Future, wait
+import uuid
+from concurrent.futures import ThreadPoolExecutor, Future, wait, FIRST_EXCEPTION
 from typing import Optional, List, Callable, Any, Dict
 
 from dash import html
@@ -16,14 +18,15 @@ import dash_bootstrap_components as dbc
 class WorkContainer(BaseWorkContainer, BaseComponent):
     def __init__(self, name: str = None, color: str = "primary", is_hidden: bool = False, *args, **kwargs):
         super().__init__()
+        BaseComponent.__init__(self, *args, **kwargs)
 
         self.execution_status: Optional[StatusesEnum] = StatusesEnum.PENDING
         self.result = None
         self.start_time = None
         self.end_time = None
-        self.end_reason = None
+        self.stacktrace = None
         self.progress: float = 0.0
-        self.status_message = ""
+        self.status_message = None
         self.name = name
         self.color = color
         self.is_hidden = is_hidden
@@ -33,9 +36,9 @@ class WorkContainer(BaseWorkContainer, BaseComponent):
         self.result = None
         self.start_time = None
         self.end_time = None
-        self.end_reason = None
+        self.stacktrace = None
         self.progress = 0.0
-        self.status_message = ""
+        self.status_message = None
 
     def get_name(self):
         return self.name
@@ -44,21 +47,27 @@ class WorkContainer(BaseWorkContainer, BaseComponent):
         self.progress = progress
 
     def set_status_message(self, status_message: str):
-        self.status_message = status_message
+        if status_message:
+            self.status_message = status_message
 
     def start(self):
         self.start_time = datetime.datetime.now()
         self.execution_status = StatusesEnum.IN_PROGRESS
         self.progress = 0
+        self.result = None
 
-    def complete(self, result=None, status=StatusesEnum.SUCCESS, progress=100, status_message=None):
+    def complete(self, result=None, status=StatusesEnum.SUCCESS, progress=100, status_message=None, stacktrace=None):
         self.end_time = datetime.datetime.now()
         self.execution_status = status
-        self.result = result
-        self.progress = progress
-        self.status_message = f"""Done in {
-            date_utils.readable_time_since(start_time=self.start_time, end_time=self.end_time)
-        }""" if status_message is None else status_message
+        self.stacktrace = stacktrace
+
+        if result is not None:
+            self.result = result
+
+        self.set_progress(progress=progress)
+        self.set_status_message(
+            status_message=status_message or self.get_time_taken_message()
+        )
 
     def get_start_time(self):
         return self.start_time
@@ -72,6 +81,11 @@ class WorkContainer(BaseWorkContainer, BaseComponent):
     def get_status_message(self):
         return self.status_message
 
+    def get_time_taken_message(self):
+        return f"""Done in {
+            date_utils.readable_time_since(start_time=self.get_start_time(), end_time=self.get_end_time())
+        }"""
+
     def get_status(self) -> StatusesEnum:
         return self.execution_status
 
@@ -81,21 +95,40 @@ class WorkContainer(BaseWorkContainer, BaseComponent):
             self.result = None
         return to_return
 
+    def __repr__(self):
+        return f"[{self.__class__.__name__}]-{self.name}-{self.id}"
+
     def render(self):
         if self.is_hidden:
             return None
 
+        status_message_id = f"{self.id}-status-message"
+
         return html.Div(
             children=[
-                html.Div(self.get_name(), style={"float": "left", "fontSize": "18px"}),
+                html.Div(
+                    self.get_name(),
+                    style={
+                        "float": "left", "fontSize": "18px",
+                        "maxWidth": "50%", "textOverflow": "ellipsis",
+                    }),
                 html.Pre(
                     self.get_status_message(),
                     style={
-                         "position": "relative",
-                         "float": "right",
-                         "marginBottom": "0px",
+                        "position": "relative",
+                        "float": "right",
+                        "marginBottom": "0px",
+                        "maxWidth": "50%",
+                        "textOverflow": "ellipsis",
                      },
+                    id=status_message_id,
                 ) if self.get_status_message() else None,
+                dbc.Tooltip(
+                    self.get_status_message(),
+                    target=status_message_id,
+                    placement="right",
+                    id=f"{self.id}-status-message-tooltip",
+                ),
                 dbc.Progress(
                     value=self.get_progress(),
                     label=self.get_progress_label(),
@@ -120,10 +153,18 @@ class WorkContainer(BaseWorkContainer, BaseComponent):
 
 
 class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent):
+    def complete(self, result=None, status=StatusesEnum.SUCCESS, progress=100, status_message=None):
+        pass
+
     def __init__(self, containers: List[WorkContainer] = None, name: str = None, color: str = "primary"):
+        super().__init__()
+        BaseComponent.__init__(self)
         self.work_containers: List[WorkContainer] = containers or []
         self.name = name
         self.color = color
+
+    def __repr__(self):
+        return f"[{self.__class__.__name__}]-{self.name}-{self.id}"
 
     def reset(self):
         [container.reset() for container in self.work_containers]
@@ -131,22 +172,34 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent):
     def get_name(self):
         return self.name
 
+    def get_num_success_message(self):
+        return f"{self.get_num_success()} / {len(self.work_containers)}"
+
     def get_status_message(self) -> str:
         # return message saying how many successfully done
-        if self.get_num_pending() == len(self.work_containers):
-            return ""
+        num_success = self.get_num_success_message()
+        message = f"{num_success}"
+        status = self.get_status()
 
-        num_success = f"""{self.get_num_success()} / {len(self.work_containers)} """
-        if self.get_num_in_progress() > 0:
-            return f"{num_success} - {self.get_latest_status_message() or ''}"
+        if status == StatusesEnum.PENDING:
+            message += " - Not Started"
+        elif status == StatusesEnum.IN_PROGRESS:
+            message += f" - {self.get_latest_status_message() or ''}"
+        elif status == StatusesEnum.SUCCESS:
+            message = f"{self.get_num_success()} Done in" \
+               f" {date_utils.readable_time_since(start_time=self.get_start_time(), end_time=self.get_end_time())}"
+        elif status == StatusesEnum.FAILURE:
+            failure_containers = [
+                container for container in self.work_containers
+                if container.get_status() == StatusesEnum.FAILURE
+            ]
+            message = f"{len(failure_containers)} / {len(self.work_containers)} - Failed"
+        else:
+            raise ValueError(f"Unknown status: {status}")
 
-        return f"Done in " \
-               f"{date_utils.readable_time_since(start_time=self.get_start_time(), end_time=self.get_end_time())}"
+        return message
 
     def set_progress(self, progress: float):
-        pass
-
-    def complete(self, *args, **kwargs):
         pass
 
     def get_status(self):
@@ -156,11 +209,11 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent):
         if len(self.work_containers) == self.get_num_pending():
             return StatusesEnum.PENDING
 
-        if self.get_num_in_progress() > 0:
-            return StatusesEnum.IN_PROGRESS
-
         if self.get_num_failed() > 0:
             return StatusesEnum.FAILURE
+
+        if self.get_num_in_progress() > 0:
+            return StatusesEnum.IN_PROGRESS
 
         return StatusesEnum.SUCCESS
 
@@ -236,12 +289,6 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent):
         if len(messages) == 0:
             return "Initializing..."
 
-        if self.get_num_success() == len(self.work_containers)\
-                or self.get_num_failed() == len(self.work_containers):
-            # all done
-            return f"Done in " \
-                   f"{date_utils.readable_time_since(start_time=self.get_start_time(), end_time=self.get_end_time())}"
-
         return messages[-1]
 
     def render(self):
@@ -260,7 +307,7 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent):
 class AsyncWorkProgressContainer(WorkContainer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.future = None
+        self.future: Optional[Future] = None
 
 
 class AsyncGroupProgressContainer(WorkContainerGroup):
@@ -290,13 +337,21 @@ class AsyncTask(AsyncWorkProgressContainer):
         self.name = task_name
         # todo: think about done callbacks
 
+    def __repr__(self):
+        return f"[{self.__class__.__name__}]-{self.name}-{self.id}"
+
     def start(self, task_input=None):
         super().start()
         try:
             self.work_func(self, task_input, self.func_kwargs)
         except Exception as e:
-            traceback.print_exc()
-            self.complete(status=StatusesEnum.FAILURE, status_message=str(e))
+            stacktrace = traceback.format_exc()
+            self.complete(
+                status=StatusesEnum.FAILURE,
+                status_message=str(e),
+                stacktrace=stacktrace,
+            )
+            raise e
 
 
 class AsyncOrderedTaskGroup(AsyncGroupProgressContainer, AsyncTask):
@@ -304,7 +359,8 @@ class AsyncOrderedTaskGroup(AsyncGroupProgressContainer, AsyncTask):
             self, async_tasks: List[AsyncTask] = None,
             chain_results: bool = True,
             clear_intermediate_results: bool = True,
-            task_group_title: str = None
+            task_group_title: str = None,
+            require_all_success: bool = True,
     ):
         super().__init__(async_tasks)
         AsyncTask.__init__(self, work_func=self.start, task_name=task_group_title)
@@ -312,6 +368,10 @@ class AsyncOrderedTaskGroup(AsyncGroupProgressContainer, AsyncTask):
         self.work_containers: List[AsyncTask] = async_tasks or []
         self.task_group_title = task_group_title
         self.clear_intermediate_results = clear_intermediate_results
+        self.require_all_success = require_all_success
+
+    def __repr__(self):
+        return f"[{self.__class__.__name__}]-{self.name}-{self.id}"
 
     def add_task(self, task: AsyncTask):
         if task is None:
@@ -319,28 +379,81 @@ class AsyncOrderedTaskGroup(AsyncGroupProgressContainer, AsyncTask):
 
         self.add_container(task)
 
+    def complete(self, result=None, status=StatusesEnum.SUCCESS, progress=100, status_message=None, stacktrace=None):
+        for task in self.work_containers:
+            if task.get_status() == StatusesEnum.PENDING or task.get_status() == StatusesEnum.IN_PROGRESS:
+                task.complete(
+                    result=result, status=status, progress=progress, status_message=status_message
+                )
+
+        WorkContainer.complete(
+            self=self,
+            result=result,
+            status=status,
+            progress=progress,
+            status_message=status_message,
+            stacktrace=stacktrace
+        )
+
+    def get_status_message(self):
+        return self.status_message or WorkContainerGroup.get_status_message(self)
+
     def start(self, task_input=None):
         self.reset()
+        in_failure_state = False
+        first_failed_task = None
+
         if self.chain_results:
             prev_result = task_input
             for task in self.work_containers:
-                task.start(task_input=prev_result)
-                prev_result = task.get_result(clear_result=self.clear_intermediate_results)
+                if in_failure_state:
+                    task.complete(status=StatusesEnum.FAILURE, status_message="Previous task failed")
+                    continue
+
+                try:
+                    task.start(task_input=prev_result)
+                    self.result = prev_result = task.get_result(clear_result=self.clear_intermediate_results)
+                except Exception as e:
+                    stacktrace = traceback.format_exc()
+                    task.complete(status=StatusesEnum.FAILURE, status_message=str(e), stacktrace=stacktrace)
+                    first_failed_task = task
+
+                if task.get_status() == StatusesEnum.FAILURE and self.require_all_success:
+                    in_failure_state = True
+                    continue
         else:
-            prev_result = task_input
+
             for task in self.work_containers:
-                task.start(prev_result)
-                prev_result = None
+                if in_failure_state:
+                    task.complete(status=StatusesEnum.FAILURE, status_message="Previous task failed")
+                    continue
+
+                try:
+                    task.start(task_input=task_input)
+                    self.result = task.get_result(clear_result=self.clear_intermediate_results)
+                except Exception as e:
+                    stacktrace = traceback.format_exc()
+                    task.complete(status=StatusesEnum.FAILURE, status_message=str(e), stacktrace=stacktrace)
+                    first_failed_task = task
+
+                if task.get_status() == StatusesEnum.FAILURE and self.require_all_success:
+                    in_failure_state = True
+                    continue
+
+        num_success_message = f"{self.get_num_success()} / {len(self.work_containers)}"
+        if in_failure_state:
+            self.complete(
+                status=StatusesEnum.FAILURE,
+                status_message=f"{num_success_message} - {first_failed_task.name} failed"
+            )
+        else:
+            self.complete(
+                status=StatusesEnum.SUCCESS,
+                status_message=f"{num_success_message} - {self.get_time_taken_message()}"
+            )
 
     def get_result(self, clear_result=False) -> Any:
-        if len(self.work_containers) == 0:
-            return None
-        to_return = self.work_containers[-1].result
-
-        if clear_result:
-            self.work_containers[-1].result = None
-
-        return to_return
+        return self.result
 
 
 class AsyncUnorderedTaskGroup(WorkContainerGroup, AsyncTask):
@@ -348,7 +461,8 @@ class AsyncUnorderedTaskGroup(WorkContainerGroup, AsyncTask):
             self, async_service: 'AsyncHandlerService',
             async_tasks: List[AsyncTask] = None,
             task_group_title: str = None,
-            reducer_func: Callable[[List[Any]], Any] = None
+            reducer_func: Callable[[List[Any]], Any] = None,
+            clear_intermediate_results: bool = True,
     ):
         super().__init__(async_tasks)
         AsyncTask.__init__(self, work_func=self.start, task_name=task_group_title)
@@ -360,6 +474,14 @@ class AsyncUnorderedTaskGroup(WorkContainerGroup, AsyncTask):
         else:
             self.reducer_func = reducer_func
 
+        self.clear_intermediate_results = clear_intermediate_results
+
+    def __repr__(self):
+        return f"[{self.__class__.__name__}]-{self.name}-{self.id}"
+
+    def get_status_message(self):
+        return f"{self.status_message or WorkContainerGroup.get_status_message(self)}"
+
     def add_task(self, task: AsyncTask):
         if task is None:
             return
@@ -368,21 +490,58 @@ class AsyncUnorderedTaskGroup(WorkContainerGroup, AsyncTask):
 
     def start(self, task_input=None):
         self.reset()
+
         for async_task in self.work_containers:
             self.async_service.submit_async_task(async_task, task_input=task_input)
 
-        futures = [task.future for task in self.work_containers]
-        wait(futures)
+        task_to_futures_map: Dict[AsyncTask, Future] = {task: task.future for task in self.work_containers}
+        try:
+            for future in concurrent.futures.as_completed(list(task_to_futures_map.values())):
+                _ = future.result()
+
+            self.complete(
+                status=StatusesEnum.SUCCESS,
+                status_message=WorkContainerGroup.get_status_message(self),
+                result=self.reducer_func([
+                    task.get_result(clear_result=self.clear_intermediate_results)
+                    for task in self.work_containers
+                ])
+            )
+        except Exception as e:
+            # Cancel all the unstarted futures
+            for task, future in task_to_futures_map.items():
+                if not future.done():
+                    future.cancel()
+                    task.complete(
+                        status=StatusesEnum.FAILURE, status_message="Aborted due to other task failure"
+                    )
+
+            self.complete(
+                status=StatusesEnum.FAILURE,
+                status_message=f"{self.get_num_success_message()} - {str(e)}",
+                stacktrace=traceback.format_exc()
+            )
 
     def get_result(self, clear_result=False) -> Any:
-        if len(self.work_containers) == 0:
-            return None
+        return self.result
 
-        return self.reducer_func([task.get_result(clear_result) for task in self.work_containers])
+    def complete(self, result=None, status=StatusesEnum.SUCCESS, progress=100, status_message=None, stacktrace=None):
+        for task in self.work_containers:
+            if task.get_status() == StatusesEnum.PENDING or task.get_status() == StatusesEnum.IN_PROGRESS:
+                task.complete(result=result, status=status, progress=progress, status_message=status_message)
+
+        AsyncTask.complete(
+            self=self,
+            result=result,
+            status=status,
+            progress=progress,
+            status_message=status_message,
+            stacktrace=stacktrace
+        )
 
 
 class AsyncHandlerService(BaseService):
-    def __init__(self, max_workers=10, **kwargs):
+    def __init__(self, max_workers=5, **kwargs):
         super().__init__(**kwargs)
 
         self.threadpool_executor = ThreadPoolExecutor(max_workers=max_workers)

@@ -2,7 +2,7 @@
 
 ![example](https://github.com/fmahmud/base_dash_app/actions/workflows/python-package.yml/badge.svg)
 
-Current version: 0.8.0
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/fmahmud/base_dash_app?include_prereleases&&color=green)
 
 ## Demo App Usage
 If you are checking out this repository, you can use the Demo App as an example of 
@@ -13,53 +13,62 @@ The [`AppDescriptor`](https://github.com/fmahmud/base_dash_app/blob/master/base_
 class exposes a number of properties that can be used to configure the Dash App.
 The `RuntimeApplication` uses the information you have provided in the 
 `AppDescriptor` to configure and run your Dash App.
+Sure, I'll create a markdown documentation for the `AppDescriptor` class:
 
-This is the snippet from the Demo App that shows how to create an `AppDescriptor`.
+---
+
+# AppDescriptor Class
+
+`AppDescriptor` is utilized for defining a service with customizable granularity. The class offers various parameters to cater to different needs of a service.
+
+## Initialization Parameters
+
+### Main Parameters
+
+- **`db_descriptor`** (`DbDescriptor`): Descriptor of the database to use.
+- **`title`** (`str`): The title of the application. Default is an empty string.
+- **`service_classes`** (`List[Type[BaseService]]`): List of all uninitialized service classes that extend `BaseService`. Default is an empty list.
+- **`external_stylesheets`** (`List[str]`): External stylesheets to be used. Default is an empty list.
+- **`views`** (`List[Type[BaseView]]`): List of uninitialized view classes extending `BaseView` that could be rendered in the app. Default is an empty list.
+
+### Optional Parameters
+
+- **`initial_global_state`** (`Dict`): Sets the initial global state in the global state service. Default is an empty dictionary.
+- **`extra_nav_bar_components`** (`List`): Appends any provided rendered components to the right side of the nav bar. Default is an empty list.
+- **`global_inputs`** (`List[InputToState]`): List of global inputs.
+- **`view_groups`** (`Dict[str, List[Type[BaseView]]]`): Group of views to be used.
+- **`apis`** (`List[Type[API]]`): List of APIs to be used in the app. Default is an empty list.
+- **`logging_format`** (`str`): Logging format to be used.
+- **`log_level`** (`str`): Logging level to be set.
+- **`jobs`** (`List[Type[JobDefinition]]`): List of jobs for the application. Default is an empty list.
+- **`upgrade_db`** (`bool`): Flag to indicate if the database should be upgraded.
+- **`env_vars`** (`List[EnvVarDefinition]`): List of environment variables for the application. Default is an empty list.
+- **`env_file_location`** (`str`): Location of the environment file.
+- **`drop_tables`** (`bool`): If set to True, drops all tables in the database before creating them.
+- **`use_auth`** (`bool`): If set to True, uses basic authentication to protect the app.
+- **`valid_user_pairs`** (`Dict[str, str]`): If `use_auth` is True, this is a dictionary of valid `username:password` pairs. Default is an empty dictionary.
+- **`silence_routes_logging`** (`bool`): If set to True, silences the logging of every call to routes.
+- **`alerts_refresh_timeout`** (`int`): How often the alerts refresh in milliseconds.
+- **`assets_folder_path`** (`str`): Path to the assets folder.
+- **`components_with_internal_callbacks`** (`List[Type[ComponentWithInternalCallback]]`): List of components that have internal callbacks.
+- **`use_scoped_session`** (`bool`): If set to True, uses a scoped session for the database.
+- **`max_num_threads`** (`int`): Maximum number of threads to use for the app.
+
+## Usage
+
+To utilize the `AppDescriptor` class, simply instantiate it with desired parameters:
+
 ```python
-my_app_descriptor = AppDescriptor(
-    db_descriptor=db_descriptor,
-    title="Test App", external_stylesheets=external_stylesheets,
-    views=[DemoView, AreaGraphView, AsyncDemoView], view_groups={"Test": [DemoView]},
-    jobs=[TestJobDef], service_classes=[MySelectablesService],
-    upgrade_db=True,
-    drop_tables=True,
-    use_auth=True,
-    valid_user_pairs={"test": "test"},
-    log_level=logging.WARN,
-    alerts_refresh_timeout=2000,
-    assets_folder_path="../base_dash_app/assets"
+app_descriptor = AppDescriptor(
+    title="My App",
+    service_classes=[MyService],
+    views=[MyView],
+    ...
 )
 ```
 
-Breakdown of the `AppDescriptor` properties:
-1) `db_descriptor`: The `DBDescriptor` class is used to configure the database connection.
-2) `title`: The title of the Dash App.
-3) `external_stylesheets`: A list of string URLs that point to CSS files you want to include.
-4) `views`: The views to register with the Dash App. 
-These should all be instances of the [`BaseView`](https://github.com/fmahmud/base_dash_app/blob/master/base_dash_app/views/base_view.py) class.
-5) `view_groups`: The view groups to configure the navbar for your Dash App.
-6) `jobs`: The jobs to register with the Dash App. 
-These should all be instances of the [`JobDefinition`](https://github.com/fmahmud/base_dash_app/blob/master/base_dash_app/models/job_definition.py) class. 
-7) `service_classes`: The service classes to register with the Dash App. 
-These should all be instances of the [`BaseService`](https://github.com/fmahmud/base_dash_app/blob/master/base_dash_app/services/base_service.py) class.
-8) `upgrade_db`: Whether or not to upgrade the database schema on startup.
-9) `drop_tables`: Whether or not to drop the database tables on startup before upgrading the schema.
-10) `use_auth`: Whether or not to use authentication for the Dash App.
-11) `valid_user_pairs`: A dictionary of valid username/password pairs.
-12) `log_level`: The log level to use for the Dash App.
-13) `alerts_refresh_timeout`: The size of the interval in seconds between each refresh of the alerts section.
-14) `assets_folder_path`: The path to the assets folder.
+---
 
-The following are more properties of the `AppDescriptor` class that aren't used in the demo:
-1) `initial_global_state`: The initial global state to use for the Dash App.
-2) `extra_nav_bar_components`: A list of Dash components to add to the navbar.
-3) `global_inputs`: Deprecated
-4) `logging_format`: The logging format to use for the Dash App.
-5) `env_vars`: A dictionary of environment variables to use for the Dash App.
-6) `env_file_location`: The location of the environment file to use for the Dash App.
-7) `silence_routes_logging`: Whether or not to silence the logging of every http call to your Dash App.
-8) `components_with_internal_callbacks`: A list of classes that extend the [`ComponentWithInternalCallback`](https://github.com/fmahmud/base_dash_app/blob/master/base_dash_app/components/base_component.py#L19)
-class. These components will be registered with the Dash App and will be able to use the internal callback mechanism.
 
 ## Package Usage
 1) Download the latest wheel from the [releases](https://github.com/fmahmud/base_dash_app/releases) page.

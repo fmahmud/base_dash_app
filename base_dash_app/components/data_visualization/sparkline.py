@@ -15,7 +15,8 @@ class Sparkline(BaseComponent):
 
     def render(
             self, height=40, width=300, shape="spline", smoothening=0.8, wrapper_style_override=None,
-            mouse_interactions=False, show_x_axis=False, show_y_axis=False, show_custom_x_axis=True
+            mouse_interactions=False, show_x_axis=False, show_y_axis=False, show_custom_x_axis=True,
+            fixed_range=True, show_markers=False
     ):
         if wrapper_style_override is None:
             wrapper_style_override = {}
@@ -39,7 +40,7 @@ class Sparkline(BaseComponent):
         graph = go.Scatter(
             x=x_data, y=y_data, text=labels,  # fill='tozeroy', fillcolor="rgba(76, 17, 48, 0.5)",
             line=Line(color="rgba(0, 0, 0, 1)", width=2, shape=shape, smoothing=smoothening),
-            mode="lines"
+            mode=f"lines{'+markers' if show_markers else ''}"
         )
 
         layout = {
@@ -51,12 +52,12 @@ class Sparkline(BaseComponent):
             "xaxis": {
                 "visible": show_x_axis,
                 "showticklabels": show_x_axis,
-                "fixedrange": True,
+                "fixedrange": fixed_range,
             },
             "yaxis": {
                 "visible": show_y_axis,
                 "showticklabels": show_y_axis,
-                "fixedrange": True,
+                "fixedrange": fixed_range,
 
             },
             "showlegend": False,

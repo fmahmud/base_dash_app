@@ -10,7 +10,7 @@ class Event(ABC):
         return self.date
 
     def get_string_date(self):
-        return self.date.strftime("%d/%m/%Y %H:%M")
+        return self.date.strftime("%Y-%m-%d %H:%M")
 
     def __lt__(self, other):
         if type(other) != type(self):

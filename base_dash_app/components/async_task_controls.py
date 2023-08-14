@@ -74,7 +74,7 @@ class AsyncTaskControls(ComponentWithInternalCallback):
                     )
                     wpc.complete()
                 except Exception as e:
-                    wpc.complete(status=StatusesEnum.FAILED, status_message=str(e))
+                    wpc.complete(status=StatusesEnum.FAILURE, status_message=str(e))
                     raise e
                 finally:
                     self.in_progress = False
@@ -100,6 +100,9 @@ class AsyncTaskControls(ComponentWithInternalCallback):
             instance.collapsed = not instance.collapsed
         elif triggering_id.startswith(ASYNC_TASK_DOWNLOAD_BTN_ID):
             instance.download_string = instance.download_content
+
+        if instance.aotg.get_status() != StatusesEnum.IN_PROGRESS and instance.in_progress:
+            instance.in_progress = False
 
         return [instance.__render_controls()]
 

@@ -5,6 +5,7 @@ from typing import Dict, List, Callable, Optional
 import dash_bootstrap_components as dbc
 import dash_table
 from dash import html
+from dash.dash_table.Format import Format, Scheme
 from dash.exceptions import PreventUpdate
 
 from base_dash_app.components.base_component import ComponentWithInternalCallback
@@ -23,6 +24,9 @@ RELOAD_DASH_BTN_ID = "RELOAD_DASH_BTN_ID"
 DOWNLOAD_DATA_BTN_ID = "DOWNLOAD_DATATABLE_BTN_ID"
 
 DATA_TABLE_WRAPPER_DOWNLOAD_ID = "data-table-wrapper-download-id"
+
+float_format = Format(precision=2, scheme=Scheme.fixed).group(True)
+integer_format = Format(precision=0, scheme=Scheme.fixed).group(True)
 
 
 class DataTableWrapper(ComponentWithInternalCallback):

@@ -1,3 +1,4 @@
+import uuid
 from abc import ABC, abstractmethod
 from typing import Callable, List
 
@@ -12,6 +13,9 @@ from base_dash_app.virtual_objects.virtual_framework_obj import VirtualFramework
 
 
 class BaseComponent(ABC):
+    def __init__(self, *args, **kwargs):
+        self.id = uuid.uuid4().hex
+
     @abstractmethod
     def render(self, *args, **kwargs):
         pass

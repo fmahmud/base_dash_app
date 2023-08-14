@@ -66,6 +66,7 @@ zipp = "==3.6.0"
 psycopg2-binary = "*"
 dash-auth = "*"
 pytest = "*"
+pympler = "*"
 
 [dev-packages]
 pre-commit = "*"

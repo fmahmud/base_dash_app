@@ -32,6 +32,7 @@ from base_dash_app.services.global_state_service import GlobalStateService
 from base_dash_app.services.job_definition_service import JobDefinitionService
 from base_dash_app.utils.db_utils import DbManager
 from base_dash_app.utils.env_vars.env_var_def import EnvVarDefinition
+from base_dash_app.views.admin_statistics_dash import AdminStatisticsDash
 from base_dash_app.views.base_view import BaseView
 from base_dash_app.virtual_objects.interfaces.startable import Startable, ExternalTriggerEvent
 from base_dash_app.models.job_definition import JobDefinition
@@ -156,12 +157,17 @@ class RuntimeApplication:
 
         self.services[GlobalStateService] = GlobalStateService(initial_state=app_descriptor.initial_global_state)
         self.services[JobDefinitionService] = job_def_service
-        self.services[AsyncHandlerService] = AsyncHandlerService(**base_service_args)
+        self.services[AsyncHandlerService] = AsyncHandlerService(
+            **base_service_args,
+            max_workers=app_descriptor.max_num_threads
+        )
 
         base_view_args = base_service_args
 
         for view in app_descriptor.views:
             self.views[view] = view(**base_view_args)
+
+        self.views[AdminStatisticsDash] = AdminStatisticsDash(**base_view_args)
 
         wrapped_get_handler = self.bind_to_self(self.handle_get_call)
 
@@ -345,7 +351,7 @@ class RuntimeApplication:
             if page.matches(decoded_url):
                 try:
                     return page.render(decoded_params, states_for_input)
-                except sqlalchemy.exc.PendingRollbackError:
+                except sqlalchemy.exc.SQLAlchemyError:
                     exception_trace = traceback.format_exc()
                     self.app.logger.error(exception_trace)
                     self.dbm.session.rollback()

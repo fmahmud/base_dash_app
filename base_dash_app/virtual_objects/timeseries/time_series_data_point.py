@@ -1,13 +1,16 @@
 import datetime
 from typing import Callable
 
+from base_dash_app.virtual_objects.interfaces.event import Event
 from base_dash_app.virtual_objects.interfaces.graphable import Graphable
 
 
-class TimeSeriesDataPoint(Graphable):
-    def __init__(self, date: datetime.datetime, value: float,
-                 label_func: Callable[[datetime.datetime, float], str] = None):
-        self.date: datetime.datetime = date
+class TimeSeriesDataPoint(Graphable, Event):
+    def __init__(
+            self, date: datetime.datetime, value: float,
+            label_func: Callable[[datetime.datetime, float], str] = None
+    ):
+        super().__init__(date=date)
         self.value: float = value
         self.label_func = label_func
 
@@ -26,10 +29,10 @@ class TimeSeriesDataPoint(Graphable):
         return self.date < other.date
 
     def __repr__(self):
-        return f"{self.date}: {self.value}"
+        return f"{self.get_string_date()}: {self.value}"
 
     def __str__(self):
-        return f"{self.date}: {self.value}"
+        return f"{self.get_string_date()}: {self.value}"
 
     def __hash__(self):
         return hash((self.date, self.value))
@@ -39,7 +42,7 @@ class TimeSeriesDataPoint(Graphable):
 
     def to_dict(self):
         return {
-            "date": datetime.datetime.strftime(self.date, "%Y-%m-%d %H:%M:%S"),
+            "date": self.get_string_date(),
             "value": self.value
         }
 

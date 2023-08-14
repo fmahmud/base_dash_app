@@ -39,14 +39,14 @@ class TimeSeriesDataTableWrapper(BaseComponent):
         self.hide_toolbar = hide_toolbar
         self.reload_data_function = None
         if reload_data_function is not None:
-            def wrapped_reload_data_function():
+            def wrapped_reload_data_function(*args, **kwargs):
                 new_data: List[AbstractTimeSeries] = reload_data_function()
                 for series in new_data:
                     self.overwrite_timeseries_data(timeseries=series, data=series.get_tsdps())
 
                 return self.generate_data_array()
         else:
-            def wrapped_reload_data_function():
+            def wrapped_reload_data_function(*args, **kwargs):
                 return self.generate_data_array()
 
         self.reload_data_function = wrapped_reload_data_function
