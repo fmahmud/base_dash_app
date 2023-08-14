@@ -1,12 +1,12 @@
 import re
 
 # Extract parameters from the Python class docstring
-with open("application/app_descriptor.py", "r") as file:
+with open("../../base_dash_app/application/app_descriptor.py", "r") as file:
     content = file.read()
     params_py = re.findall(r":param (\w+):", content)
 
 # Extract parameters from README.md
-with open("README.md", "r") as file:
+with open("../../README.md", "r") as file:
     content = file.read()
     params_md = re.findall(r"- \*\*`(\w+)`\*\* \(", content)
 
