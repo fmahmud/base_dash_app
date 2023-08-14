@@ -36,9 +36,13 @@ class GraphableSeries(Nameable):
         self.secondary_y: bool = secondary_y
 
     def max_y(self):
+        if len(self.data) == 0:
+            return 0
         return max([datum.get_y() for datum in self.data])
 
     def min_y(self):
+        if len(self.data) == 0:
+            return 0
         return min([datum.get_y() for datum in self.data])
 
     def get_xs_and_ys(self):
@@ -149,7 +153,7 @@ class LineGraph(BaseComponent):
             )
         )
 
-        if include_secondary_y and align_y_axes:
+        if include_secondary_y and align_y_axes and len(self.graphable_series) > 1:
             primary_y_max = max([x.max_y() for x in self.graphable_series if not x.secondary_y])
             secondary_y_max = max([x.max_y() for x in self.graphable_series if x.secondary_y])
             primary_y_min = min([x.min_y() for x in self.graphable_series if not x.secondary_y])
@@ -157,11 +161,17 @@ class LineGraph(BaseComponent):
 
             # primary side
             primary_range = primary_y_max - primary_y_min
-            primary_range_ratio = primary_range / max(abs(primary_y_max), abs(primary_y_min))
+            if primary_y_max == 0 == primary_y_min:
+                primary_range_ratio = 1
+            else:
+                primary_range_ratio = primary_range / max(abs(primary_y_max), abs(primary_y_min))
 
             # secondary side
             secondary_range = secondary_y_max - secondary_y_min
-            secondary_range_ratio = secondary_range / max(abs(secondary_y_max), abs(secondary_y_min))
+            if secondary_y_max == 0 == secondary_y_min:
+                secondary_range_ratio = 1
+            else:
+                secondary_range_ratio = secondary_range / max(abs(secondary_y_max), abs(secondary_y_min))
 
             if primary_range_ratio > secondary_range_ratio:
                 # use primary range to determine secondary range
