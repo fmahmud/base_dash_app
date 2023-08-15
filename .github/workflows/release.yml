@@ -3,7 +3,7 @@ name: Build and Release
 on:
   push:
     branches:
-      - master  # change to 'master' if you're using 'master' as the primary branch
+      - master
 
 jobs:
   release:
@@ -16,7 +16,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
-          python-version: 3.11  # Use the version required
+          python-version: 3.11
 
       - name: Install dependencies
         run: |
@@ -31,7 +31,18 @@ jobs:
         run: |
           echo "::set-output name=VERSION::$(python setup.py --version)"
 
+      - name: Fetch latest release version from GitHub
+        id: fetch_latest_release
+        run: |
+          LATEST_RELEASE=$(curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                            -s "https://api.github.com/repos/${{ github.repository }}/releases/latest" | \
+                            jq -r .tag_name)
+          echo "::set-output name=LATEST_RELEASE_VERSION::${LATEST_RELEASE}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create Release and Upload Wheel
+        if: steps.get_version.outputs.VERSION != steps.fetch_latest_release.outputs.LATEST_RELEASE_VERSION
         run: |
           gh release create ${{ steps.get_version.outputs.VERSION }} dist/* --title "Release ${{ steps.get_version.outputs.VERSION }}"
         env:

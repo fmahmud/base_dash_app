@@ -1,8 +1,8 @@
 ﻿# base_dash_app
 
-![example](https://github.com/fmahmud/base_dash_app/actions/workflows/python-package.yml/badge.svg)
+![example](https://img.shields.io/github/actions/workflow/status/fmahmud/base_dash_app/python-package.yml?branch=master&style=for-the-badge)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/fmahmud/base_dash_app?color=green&style=for-the-badge)
 
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/fmahmud/base_dash_app?include_prereleases&&color=green)
 
 ## Demo App Usage
 If you are checking out this repository, you can use the Demo App as an example of 
