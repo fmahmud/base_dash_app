@@ -33,7 +33,6 @@ jobs:
 
       - name: Create Release and Upload Wheel
         run: |
-          gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
           gh release create ${{ steps.get_version.outputs.VERSION }} dist/* --title "Release ${{ steps.get_version.outputs.VERSION }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

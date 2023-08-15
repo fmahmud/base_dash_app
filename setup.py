@@ -7,5 +7,3 @@ setup(
     author='fmahmud',
     license='MIT',
 )
-
-
