@@ -16,7 +16,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
-          python-version: 3.11  # Use the version required
+          python-version: 3.x  # Use the version required
 
       - name: Install dependencies
         run: |
@@ -26,20 +26,21 @@ jobs:
       - name: Build wheel
         run: python setup.py sdist bdist_wheel
 
-      - name: Create Release and Upload Wheel
-        id: create_release
-        uses: gh-actions/gh-release@v1
-        with:
-          name: Release ${{ steps.get_version.outputs.VERSION }}
-          tag_name: ${{ steps.get_version.outputs.VERSION }}
-          draft: false
-          prerelease: false
-          files: dist/*
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Get the version from setup.py
         id: get_version
         run: |
           echo "::set-output name=VERSION::$(python setup.py --version)"
 
+      - name: Set up GitHub CLI
+        run: |
+          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
+          sudo apt-add-repository https://cli.github.com/packages
+          sudo apt update
+          sudo apt install gh=<version>
+
+      - name: Create Release and Upload Wheel
+        run: |
+          gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
+          gh release create ${{ steps.get_version.outputs.VERSION }} dist/* --title "Release ${{ steps.get_version.outputs.VERSION }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
