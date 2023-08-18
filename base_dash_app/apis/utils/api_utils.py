@@ -109,7 +109,7 @@ def __make_call(
             logger.error(f"Error: {type(error).__name__} - {str(error)}")
             exception = error
             # If it's not a connection error, no need to retry
-            if not isinstance(e, requests.exceptions.ConnectionError):
+            if not isinstance(error, requests.exceptions.ConnectionError):
                 break
 
     raise exception

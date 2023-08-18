@@ -13,14 +13,11 @@ EXPECTED_HEADERS = {
 }
 
 
-@pytest.fixture
-def mock_response():
-    def _make_mock_response(status_code=200, json_data=None):
-        mock_response = Mock()
-        mock_response.status_code = status_code
-        mock_response.json.return_value = json_data or {}
-        return mock_response
-    return _make_mock_response
+def make_mock_response(status_code=200, json_data=None):
+    mock_response = Mock()
+    mock_response.status_code = status_code
+    mock_response.json.return_value = json_data or {}
+    return mock_response
 
 
 def test_successful_request():
