@@ -32,17 +32,8 @@ class LabelledValueChip(BaseComponent):
         if wrapper_div_style_override is None:
             wrapper_div_style_override = {}
 
-        color = "black"
-        if self.lower_is_better:
-            if self.percent_change > 0:
-                color = "red"
-            elif self.percent_change < 0:
-                color = "green"
-        else:
-            if self.percent_change > 0:
-                color = "green"
-            elif self.percent_change < 0:
-                color = "red"
+        color_mapping = {(True, True): 'red', (True, False): 'green', (False, True): 'green', (False, False): 'red'}
+        color = color_mapping[(self.lower_is_better, self.percent_change > 0)] if self.percent_change != 0 else 'black'
 
         return html.Div(
             children=[
