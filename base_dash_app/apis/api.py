@@ -54,6 +54,7 @@ class API(VirtualFrameworkObject, ABC):
         self.functions: Dict[str, Callable] = {}
 
     def add_endpoint(self, path: str, http_method: HttpMethod, name: str):
+
         if (path, http_method) in self.__endpoints:
             raise Exception("This endpoint already exists")
 
@@ -82,7 +83,7 @@ class API(VirtualFrameworkObject, ABC):
         return make_request
 
     @staticmethod
-    def endpoint_def(path: str, http_method: HttpMethod, timeout: int = 200):
+    def endpoint_def(path: str, http_method: HttpMethod, timeout: int = 200, parse_json: bool = True):
 
         def inner_func(result_handler: Callable[[Union[Dict, List], int], Any]):
 
@@ -116,7 +117,8 @@ class API(VirtualFrameworkObject, ABC):
                         additional_headers=additional_headers,
                         query_params=query_params,
                         timeout=timeout
-                    )
+                    ),
+                    parse_json=parse_json
                 )
 
                 return result_handler(response, status)
