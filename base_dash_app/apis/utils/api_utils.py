@@ -103,11 +103,11 @@ def __make_call(
                 response_json = response.text
             return response_json, status_code
 
-        except (TypeError, HTTPError, requests.exceptions.ConnectionError, JSONDecodeError, Exception) as e:
+        except (TypeError, HTTPError, requests.exceptions.ConnectionError, JSONDecodeError, Exception) as error:
             if logger.level == logging.DEBUG:
                 traceback.print_exc()
-            logger.error(f"Error: {type(e).__name__} - {str(e)}")
-            exception = e
+            logger.error(f"Error: {type(error).__name__} - {str(error)}")
+            exception = error
             # If it's not a connection error, no need to retry
             if not isinstance(e, requests.exceptions.ConnectionError):
                 break
