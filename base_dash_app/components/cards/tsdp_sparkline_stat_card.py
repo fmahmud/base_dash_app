@@ -171,36 +171,15 @@ class TsdpSparklineStatCard(ComponentWithInternalCallback):
             # todo: easy memoization... too lazy to do
             if len(self.series) > 0:
                 matching_data_points: List[TimeSeriesDataPoint] = []
-                # if time_period == TimePeriodsEnum.LATEST:
-                #     time_segment_start = self.series[-1].date
-                #     time_segment_end = self.series[-1].date
-                # elif time_period == TimePeriodsEnum.LAST_HOUR:
-                #     time_segment_start = current_time - datetime.timedelta(hours=1)
-                #     time_segment_end = current_time
-                # elif time_period == TimePeriodsEnum.LAST_24HRS:
-                #     time_segment_start = current_time - datetime.timedelta(hours=24)
-                #     time_segment_end = current_time
-                # elif time_period == TimePeriodsEnum.LAST_7_DAYS:
-                #     time_segment_start = current_time - datetime.timedelta(days=7)
-                #     time_segment_end = current_time
-                # elif time_period == TimePeriodsEnum.LAST_30_DAYS:
-                #     time_segment_start = current_time - datetime.timedelta(days=30)
-                #     time_segment_end = current_time
-                # elif time_period == TimePeriodsEnum.LAST_90_DAYS:
-                #     time_segment_start = current_time - datetime.timedelta(days=90)
-                #     time_segment_end = current_time
-                # elif time_period == TimePeriodsEnum.LAST_YEAR:
-                #     time_segment_start = current_time - datetime.timedelta(days=365)
-                #     time_segment_end = current_time
-                # elif time_period == TimePeriodsEnum.LAST_YEAR:
-                #     time_segment_start = current_time - datetime.timedelta(days=365)
-                #     time_segment_end = current_time
-                # else:
-                #     time_segment_start = self.series[0].date
-                #     time_segment_end = current_time
 
                 time_segment_start, time_segment_end = time_period.get_start_end_dates(current_time, self.series)
-                previous_time_segment_start = time_segment_start - time_period.value.delta
+                # if is latest - use different delta:
+                if time_period == TimePeriodsEnum.LATEST:
+                    previous_time_segment_start = self.series[-2].date if len(self.series) > 1 else self.series[0].date
+                else:
+                    previous_time_segment_start = time_segment_start - time_period.value.delta
+
+
                 previous_time_segment_end = current_time
                 previous_matching_data_points: List[TimeSeriesDataPoint] = []
 

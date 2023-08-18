@@ -7,11 +7,8 @@ from base_dash_app.components.base_component import BaseComponent
 
 
 class LabelledValueChip(BaseComponent):
-    def __init__(
-            self, label, value,
-            percent_change=0.0,
-            lower_is_better=False,
-    ):
+    def __init__(self, label, value, percent_change=0.0, lower_is_better=False, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.label = label
         self.value = value
         self.is_first = False
@@ -26,12 +23,17 @@ class LabelledValueChip(BaseComponent):
             self.percent_change = (current_value - self.previous_value) / self.previous_value
             # if self.lower_is_better:
             #     self.percent_change *= -1
+            if round(self.percent_change, 1) == 0.0:
+                self.percent_change = 0.0
         else:
             self.percent_change = 0.0
 
     def render(self, show_previous_value=False, show_percent_change=False, wrapper_div_style_override=None):
         if wrapper_div_style_override is None:
             wrapper_div_style_override = {}
+
+        color_mapping = {(True, True): 'red', (True, False): 'green', (False, True): 'green', (False, False): 'red'}
+        color = color_mapping[(self.lower_is_better, self.percent_change > 0)] if self.percent_change != 0 else 'black'
 
         return html.Div(
             children=[
@@ -41,7 +43,7 @@ class LabelledValueChip(BaseComponent):
                     f"{self.percent_change:.1%}",
                     style={
                         "position": "relative", "float": "left", "clear": "left",
-                        "color": "red" if self.percent_change < 0 else "green"
+                        "color": color
                     }
                 ) if show_percent_change else None,
                 html.Div(

@@ -8,7 +8,10 @@ from base_dash_app.virtual_objects.interfaces.event import Event
 
 
 class TimePeriods:
-    def __init__(self, name, delta: relativedelta, get_start_date_override: Callable = None):
+    def __init__(
+            self, name, delta: relativedelta,
+            get_start_date_override: Callable = None
+    ):
         self.name = name
         self.delta = delta
         if get_start_date_override:
@@ -23,9 +26,10 @@ class TimePeriods:
 
         return False
 
+
 class TimePeriodsEnum(Enum):
     LATEST = TimePeriods(
-        "Latest", relativedelta(minutes=1), lambda current_time, events: (events[-1].date, events[-1].date)
+        "Latest", relativedelta(hours=1), lambda current_time, events: (events[-1].date, events[-1].date)
     )
     EARLIEST = TimePeriods(
         "Earliest", relativedelta(days=1), lambda current_time, events: (events[0].date, events[0].date)
