@@ -56,7 +56,7 @@ class API(VirtualFrameworkObject, ABC):
     def add_endpoint(self, path: str, http_method: HttpMethod, name: str):
 
         if (path, http_method) in self.__endpoints:
-            raise Exception("This endpoint already exists")
+            raise ValueError("This endpoint already exists")
 
         endpoint: Endpoint = Endpoint(self, path, http_method)
         self.__endpoints[(path, http_method)] = endpoint
