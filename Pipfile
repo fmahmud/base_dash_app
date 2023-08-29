@@ -66,7 +66,9 @@ dash-auth = "*"
 pytest = "*"
 pympler = "*"
 certifi = "*"
-dash = "*"
+dash = "==2.12.1"
+apscheduler = "==3.10"
+psutil = "*"
 
 [dev-packages]
 pre-commit = "*"

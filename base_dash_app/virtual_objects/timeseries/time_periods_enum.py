@@ -15,7 +15,7 @@ class TimePeriods:
         self.name = name
         self.delta = delta
         if get_start_date_override:
-            self.get_start_date = get_start_date_override
+            self.get_start_end_dates = get_start_date_override
 
     def get_start_end_dates(self, current_time, events: List[Event] = None):
         return current_time - self.delta, current_time

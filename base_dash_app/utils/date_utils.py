@@ -15,7 +15,7 @@ def get_num_days_in_month(month_number, year=datetime.datetime.now().year):
     return monthrange(year, month_number)[1]
 
 
-def readable_time_since(start_time: datetime.datetime, end_time: datetime.datetime = None):
+def readable_time_since(start_time: datetime.datetime, end_time: datetime.datetime = None, no_negatives=True):
     if start_time is None:
         return "Never"
 
@@ -23,6 +23,8 @@ def readable_time_since(start_time: datetime.datetime, end_time: datetime.dateti
         end_time = datetime.datetime.now()
 
     difference = (end_time - start_time).total_seconds()
+    if no_negatives:
+        difference = abs(difference)
 
     if difference < SECONDS_IN_MINUTE:
         # use seconds
