@@ -66,9 +66,11 @@ class TsdpStatCardDescriptor:
             use_rg_color_scale=True,
             description=None,
             show_expand_button=False,
+            unit_is_suffix=False,
     ):
         self.title = title
         self.unit = unit
+        self.unit_is_suffix = unit_is_suffix
         self.shape = shape
         self.smoothening = smoothening
         self.graph_height = graph_height
@@ -120,6 +122,7 @@ class TsdpSparklineStatCard(ComponentWithInternalCallback):
         use_rg_color_scale=True,
         description=None,
         show_expand_button=False,
+        unit_is_suffix=False,
         *args,
         **kwargs,
     ):
@@ -127,6 +130,7 @@ class TsdpSparklineStatCard(ComponentWithInternalCallback):
         self.series = sorted(series)
         self.title = title
         self.unit = unit
+        self.unit_is_suffix = unit_is_suffix
         self.shape = shape
         self.smoothening = smoothening
         self.graph_height = graph_height
@@ -179,7 +183,6 @@ class TsdpSparklineStatCard(ComponentWithInternalCallback):
                 else:
                     previous_time_segment_start = time_segment_start - time_period.value.delta
 
-
                 previous_time_segment_end = current_time
                 previous_matching_data_points: List[TimeSeriesDataPoint] = []
 
@@ -214,9 +217,10 @@ class TsdpSparklineStatCard(ComponentWithInternalCallback):
 
             value = (
                 f"{'-' if is_negative else ''}"
-                f"{self.unit if self.unit is not None else ''}"
+                f"{self.unit if self.unit is not None and not self.unit_is_suffix else ''}"
                 f"{' ' if is_negative or self.unit is not None else ''}"
                 f"{value}"
+                f"{self.unit if self.unit is not None and self.unit_is_suffix else ''}"
             )
 
             self.values[time_period].value = value

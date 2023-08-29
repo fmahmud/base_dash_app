@@ -1,9 +1,9 @@
 import datetime
-from typing import List, Type, Dict, Optional
+from typing import List, Type, Dict, Optional, FrozenSet, Tuple, Any, Union
 
 import dash
 import dash_bootstrap_components as dbc
-from dash import html, dcc, ALL
+from dash import html, dcc, ALL, MATCH
 from dash.exceptions import PreventUpdate
 from sqlalchemy.orm import Session
 
@@ -18,7 +18,15 @@ from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.models.job_definition import JobDefinition
 from base_dash_app.models.job_definition_parameter import JobDefinitionParameter
 from base_dash_app.services.job_definition_service import JobDefinitionService
+from base_dash_app.utils import date_utils
 from base_dash_app.virtual_objects.interfaces.selectable import Selectable, CachedSelectable
+from base_dash_app.virtual_objects.job_progress_container import VirtualJobProgressContainer
+
+SELECTABLE_ADDITIONAL_ID = "selectable_additional_id"
+
+JOB_SELECTABLE_RUNNER_BTN_ID = "JOB_COMBO_RUNNER_BTN_ID"
+
+JOB_CARD_TABS_ID = "JOB_CARD_TABS_ID"
 
 JOB_CARD_LOG_LEVEL_SELECTOR_ID = "job-card-log-level-selector-id"
 
@@ -27,6 +35,8 @@ INDEX_DELIMITER = "||||"
 JOB_CARD_PARAM_INPUT_ID = "job-card-param-input-id"
 
 JOB_CARD_INTERVAL_ID = "job-card-interval-id"
+
+JOB_CARD_LONG_INTERVAL_ID = "job-card-long-interval-id"
 
 JOB_CARD_DIV_ID = "job-card-div-id"
 
@@ -38,6 +48,8 @@ class JobCard(ComponentWithInternalCallback):
             self, job_definition: JobDefinition,
             job_def_service: JobDefinitionService,
             footer=None,
+            selectables_as_tabs=False,
+            hide_log_div=False,
             *args, **kwargs
     ):
         super().__init__()
@@ -45,6 +57,42 @@ class JobCard(ComponentWithInternalCallback):
         self.job_def_service: JobDefinitionService = job_def_service
         self.footer = footer or []
         self.log_level: LogLevel = LogLevelsEnum.INFO.value
+        self.current_tab = 'tab-0'
+        self.selectables_as_tabs = selectables_as_tabs
+        self.hide_log_div = hide_log_div
+
+        # used for each of the param combo tabs
+        # used only for the custom params tab
+        self.custom_prog_container: Optional[VirtualJobProgressContainer] = None
+
+        self.selectable_param = None
+        self.selectable_to_prog_containers: Dict[Selectable, Optional[VirtualJobProgressContainer]] = {}
+        self.selectable_id_to_selectable: Dict[int, Selectable] = {}
+
+    def refresh_selectables_info(self):
+        self.selectable_param = self.selectable_param or type(self.job_definition).single_selectable_param_name()
+        if self.selectable_param is None:
+            return
+
+        self.logger.debug(f"refresh_selectables_info - selectable_param: {self.selectable_param}")
+
+        # get container from job def service - job def service contains the latest info
+        latest_containers = self.job_def_service.get_containers_by_job_id(self.job_definition.id, by_selectables=True)
+        for selectable, new_container in latest_containers.items():
+            if selectable not in self.selectable_to_prog_containers:
+                # if we don't have the container in our dict, add it
+                self.selectable_to_prog_containers[selectable] = new_container
+            else:
+                # if we do have the container, check if it's the same as the new one, update it if not
+                if new_container != self.selectable_to_prog_containers[selectable]:
+                    self.selectable_to_prog_containers[selectable] = new_container
+
+        self.logger.debug(f"refresh_selectables_info - selectables: {self.selectable_to_prog_containers.keys()}")
+
+        self.selectable_id_to_selectable = {
+            selectable.get_value(): selectable
+            for selectable in self.selectable_to_prog_containers.keys()
+        }
 
     @classmethod
     def handle_any_input(cls, *args, triggering_id, instance):
@@ -55,9 +103,47 @@ class JobCard(ComponentWithInternalCallback):
         session: Session = Session.object_session(job_def)
         session.refresh(job_def)
 
+        instance.refresh_selectables_info()
+        instance.logger.debug(
+            f"num containers in progress: {len([i for i in instance.selectable_to_prog_containers.values() if i is not None])}"
+        )
+
         callback_context = dash.callback_context
         error_messages = {}
-        if triggering_id.startswith(JOB_RUNNER_BTN_ID):
+        if triggering_id.startswith(JOB_CARD_TABS_ID):
+            state_mapping = instance.get_callback_state(JOB_CARD_TABS_ID, args)
+            instance.current_tab = state_mapping[JOB_CARD_TABS_ID]
+        elif triggering_id.startswith(JOB_SELECTABLE_RUNNER_BTN_ID):
+            instance.logger.info(f"Running job {job_def.name} with selectable {instance.selectable_param}")
+            # don't need to worry about getting parameters from different input boxes,
+            # convert frozen set of tuples to dict
+            if SELECTABLE_ADDITIONAL_ID not in callback_context.triggered_id:
+                instance.logger.error(f"Callback Context.triggered_id does not have {SELECTABLE_ADDITIONAL_ID}")
+                raise PreventUpdate
+
+            selectable_id = int(callback_context.triggered_id[SELECTABLE_ADDITIONAL_ID])
+
+            if selectable_id not in instance.selectable_id_to_selectable:
+                instance.logger.error(
+                    f"Selectable id {selectable_id} not found in instance.selectable_id_to_selectable"
+                    f". Available ids: {', '.join(str(key) for key in instance.selectable_id_to_selectable.keys())}"
+                )
+                raise PreventUpdate
+
+            # todo: handle JobAlreadyRunningError
+            selectable = instance.selectable_id_to_selectable[selectable_id]
+            instance.selectable_to_prog_containers[selectable] = (
+                instance.job_def_service.run_job(
+                    job_def=instance.job_definition,
+                    selectable=selectable,
+                    parameter_values={instance.selectable_param: selectable_id},
+                    log_level=instance.log_level # todo: fix
+                )
+            )
+
+            instance.job_definition.rehydrate_events_from_db(session)
+
+        elif triggering_id.startswith(JOB_RUNNER_BTN_ID):
             """
                 dash.callback_context = {
                     ...
@@ -85,8 +171,14 @@ class JobCard(ComponentWithInternalCallback):
             log_level: LogLevel = LogLevelsEnum.INFO.value
             for state in callback_context.states_list[0]:
                 if 'id' in state and 'index' in state['id']:
-                    instance_id, param_name = tuple(state['id']['index'].split(INDEX_DELIMITER))
-                    if int(instance_id) != instance._instance_id:
+                    if "index" not in state['id'] or "param_name" not in state["id"]:
+                        instance.logger.error(f"Index or param_name not in state['id']: {state['id']}")
+                        raise PreventUpdate
+
+                    instance_id = state['id']['index']
+                    param_name = state['id']['param_name']
+
+                    if instance_id != instance._instance_id:
                         continue
 
                     param_def: JobDefinitionParameter = param_defs_dict[param_name]
@@ -104,6 +196,8 @@ class JobCard(ComponentWithInternalCallback):
                         error_messages[param_def] = str(e)
                         should_run = False
 
+            # convert param_to_value_map to a frozen set of tuples
+            # instance.current_param_combination = frozenset(param_to_value_map.items())
             if len(callback_context.states_list) >= 2:
                 # find log level at index 1
                 if len(callback_context.states_list[1]) > 0:
@@ -118,18 +212,29 @@ class JobCard(ComponentWithInternalCallback):
             instance.log_level = log_level
 
             if should_run:
-                instance.progress_container = instance.job_def_service.run_job(
+                instance.custom_prog_container = instance.job_def_service.run_job(
                     job_def=instance.job_definition, parameter_values=param_to_value_map,
                     log_level=log_level
                 )
 
-                instance.job_definition.rehydrate_events_from_db()
+                instance.job_definition.rehydrate_events_from_db(session)
+        elif triggering_id.startswith(JOB_CARD_INTERVAL_ID):
+            # session.refresh(job_def)
+            pass
 
         return [instance.__render_job_card(form_messages=error_messages, footer=instance.footer)]
 
     def render(self, wrapper_style_override=None):
         if wrapper_style_override is None:
             wrapper_style_override = {}
+
+        session: Session = Session.object_session(self.job_definition)
+        session.refresh(self.job_definition)
+
+        self.refresh_selectables_info()
+
+        # self.logger.debug(f"render - selectables:"
+        #                  f" {', '.join(key.get_label() for key in self.selectable_to_prog_containers.keys())}")
 
         return html.Div(
             children=[
@@ -154,14 +259,26 @@ class JobCard(ComponentWithInternalCallback):
                     StateMapping(
                         state_id=JOB_CARD_PARAM_INPUT_ID,
                         state_property="value",
-                        index=ALL
+                        additional_key="param_name",
+                        additional_value=ALL
                     ),
                     StateMapping(
                         state_id=JOB_CARD_LOG_LEVEL_SELECTOR_ID,
                         state_property="value",
-                        index=ALL
+                        additional_key="param_name",
+                        additional_value=ALL
                     ),
                 ]
+            ),
+            InputToState(
+                input_mapping=InputMapping(
+                    input_id=JOB_SELECTABLE_RUNNER_BTN_ID,
+                    input_property="n_clicks",
+                    index=MATCH,
+                    additional_key=SELECTABLE_ADDITIONAL_ID,
+                    additional_value=ALL
+                ),
+                states=[]
             ),
             InputToState(
                 input_mapping=InputMapping(
@@ -169,17 +286,51 @@ class JobCard(ComponentWithInternalCallback):
                     input_property="n_intervals"
                 ),
                 states=[]
+            ),
+            InputToState(
+                input_mapping=InputMapping(
+                    input_id=JOB_CARD_LONG_INTERVAL_ID,
+                    input_property="n_intervals"
+                ),
+                states=[]
+            ),
+            InputToState(
+                input_mapping=InputMapping(
+                    input_id=JOB_CARD_TABS_ID,
+                    input_property="active_tab"
+                ),
+                states=[
+                    StateMapping(
+                        state_id=JOB_CARD_TABS_ID,
+                        state_property="active_tab",
+                    )
+                ]
             )
         ]
 
-    def render_log_div(self, wrapper_div_style=None):
+    def __any_in_progress(self) -> Tuple[bool, bool]:
+        return any([
+            container.is_in_progress() for container in self.selectable_to_prog_containers.values()
+            if container is not None
+        ]), (
+            self.custom_prog_container is not None and self.custom_prog_container.is_in_progress()
+        )
+
+    def render_log_div(self, container: VirtualJobProgressContainer, wrapper_div_style=None):
+        if self.hide_log_div:
+            return None
+
         if wrapper_div_style is None:
             wrapper_div_style = {}
 
-        if not self.job_definition.is_in_progress():
+        if not (container is not None and container.is_in_progress()):
+            # if container doesn't exist or if it does and is not in progress, return None
             return None
 
-        logs = self.job_definition.current_prog_container.logs
+        if container.logs is None:
+            logs = []
+        else:
+            logs = container.logs
 
         children = []
         for log in logs:
@@ -224,8 +375,9 @@ class JobCard(ComponentWithInternalCallback):
         )
 
     def __render_job_card(
-            self, form_messages: Dict[JobDefinitionParameter, Optional[str]] = None,
-            footer=None
+            self,
+            form_messages: Dict[JobDefinitionParameter, Optional[str]] = None,
+            footer=None,
     ):
         if form_messages is None:
             form_messages = {}
@@ -234,15 +386,13 @@ class JobCard(ComponentWithInternalCallback):
             footer = []
 
         job = self.job_definition
-        is_in_progress = job.current_prog_container is not None
+        selectable_in_progress, custom_in_progress = self.__any_in_progress()
 
         last_run_error_message = None
-
+        last_run_date = None
         if len(job.job_instances) > 0:
             job_instance = sorted(job.job_instances)[-1]
             last_run_date = job_instance.start_time
-            difference = datetime.datetime.now() - last_run_date
-            difference_in_days = f"{difference / datetime.timedelta(days=1):.1f} day(s) ago"
 
             if job_instance.result.status in [StatusesEnum.FAILURE, StatusesEnum.WARNING]:
                 last_run_error_message = html.Div(
@@ -254,8 +404,250 @@ class JobCard(ComponentWithInternalCallback):
                     ],
                     style={"marginTop": "20px", "width": "100%", "float": "left"}
                 )
-        else:
-            difference_in_days = "N/A"
+
+        num_historical_dots = 45
+        margin_right = 4
+        #
+        # self.logger.debug(f"__render_job_card - selectables:"
+        #                  f" {', '.join(key.get_label() for key in self.selectable_to_prog_containers.keys())}")
+
+        job_card = SmallCard(
+            title=html.H3(job.name),
+            body=html.Div(
+                children=[
+                    html.Div(job.description) if job.description is not None else None,
+                    html.Div(
+                        f"Last Ran {date_utils.readable_time_since(last_run_date)}"
+                        f"{' ago' if last_run_date is not None else ''}"
+                        if not custom_in_progress or selectable_in_progress else "In Progress",
+                        style={"marginTop": "5px", "marginBottom": "5px", "fontSize": "18px", "fontWeight": "bold"}
+                    ),
+                    html.Div(
+                        children=[
+                            historical_dots.render_from_resultable_events(
+                                job.events[-num_historical_dots:],
+                                dot_style_override={
+                                    "marginRight": f"{margin_right}px",
+                                    "width": f"calc((100% - {margin_right}px "
+                                             f"* {num_historical_dots}) / {num_historical_dots})",
+                                    "marginLeft": "0px",
+                                    "height": "26px"
+                                },
+                                use_tooltips=True
+                            )
+                        ]
+                    ),
+                    dcc.Interval(
+                        interval=1000,
+                        disabled=not (custom_in_progress or selectable_in_progress),
+                        id={"type": JOB_CARD_INTERVAL_ID, "index": self._instance_id}
+                    ),
+                    dcc.Interval(
+                        interval=30000,
+                        disabled=(custom_in_progress or selectable_in_progress),
+                        id={"type": JOB_CARD_LONG_INTERVAL_ID, "index": self._instance_id}
+                    ),
+                ]
+            ),
+            actions=html.Div(
+                children=[
+                    dbc.Label(
+                        "Log Level",
+                        html_for={
+                            "type": JOB_CARD_LOG_LEVEL_SELECTOR_ID,
+                            "index": self._instance_id
+                        },
+                        style={"marginTop": "20px", "position": "relative", "float": "left",
+                               "clear": "left"}
+                    ),
+                    SimpleSelector(
+                        comp_id={"type": JOB_CARD_LOG_LEVEL_SELECTOR_ID,
+                                 "index": self._instance_id},
+                        selectables=[level.value for level in LogLevelsEnum],
+                        placeholder="Log Level",
+                        style={"width": "100%", "marginBottom": "10px"},
+                        disabled=custom_in_progress,
+                        currently_selected_value=self.log_level.get_value()
+                    ).render(),
+                    html.Div(
+                        children=[
+                            dbc.Button(
+                                "",
+                                id={"type": JOB_RUNNER_BTN_ID, "index": self._instance_id},
+                                style={"display": "none"}
+                            ), # yet another hacky solution
+                            dbc.Tabs(
+                                children=[
+                                    self.__render_selectable_tab(
+                                        selectable=selectable,
+                                        container=container,
+                                    )
+                                    for selectable, container in self.selectable_to_prog_containers.items()
+                                ],
+                                id={"type": JOB_CARD_TABS_ID, "index": self._instance_id},
+                                style={
+                                    "position": "relative",
+                                    "float": "left",
+                                    "width": "100%",
+                                    "marginTop": "10px",
+                                    "overflowX": "scroll",
+                                    "overflowY": "hidden",
+                                    "flexWrap": "nowrap",
+                                },
+                                active_tab=self.current_tab,
+                            ) if self.selectables_as_tabs else
+                            html.Div(
+                                children=[
+                                    self.__render_selectable_div(selectable, container)
+                                    for selectable, container in self.selectable_to_prog_containers.items()
+                                ] + [
+                                    html.Div(
+                                        "",
+                                        id={"type": JOB_CARD_TABS_ID, "index": self._instance_id},
+                                        style={"display": "none"}
+                                    )
+                                ],
+                                style={"maxHeight": "800px", "overflowY": "scroll"}
+                            )
+                        ],
+                        style={"width": "100%", "overflow": "scroll"}
+                    ) if self.selectable_param is not None else
+                    html.Div(
+                        children=[
+                            self.__render_non_selectable_tab(
+                                form_messages=form_messages, container=self.custom_prog_container
+                            ),
+                            html.Div(
+                                "",
+                                id={"type": JOB_CARD_TABS_ID, "index": self._instance_id},
+                                style={"display": "none"}
+                            )
+                        ]
+                    ),
+                    last_run_error_message,
+                    html.Div(
+                        footer,
+                        style={
+                            "position": "relative", "float": "left", "width": "100%", "marginTop": "10px"
+                        }
+                    )
+                ]
+            )
+        ).render()
+
+        return job_card
+
+    def __render_btn_and_prog_bar(
+            self, run_btn_id: str, run_btn_index: Union[str, int],
+            container: VirtualJobProgressContainer = None,
+            selectable_id: int = None
+    ):
+        in_progress = container is not None and container.is_in_progress()
+        progress = container.progress if container is not None and container.is_in_progress() else 0
+        duration = container.get_duration() if container is not None else 0
+        return html.Div(
+            children=[
+                dbc.Button(
+                    f"{duration:.0f}s" if in_progress else "Run",
+                    style={
+                        "position": "relative", "float": "left", "width": "100px"
+                    },
+                    id={
+                        "type": run_btn_id,
+                        "index": run_btn_index,
+                        **({SELECTABLE_ADDITIONAL_ID: str(selectable_id)} if selectable_id is not None else {})
+                    },
+                    disabled=in_progress
+                ),
+                dbc.Progress(
+                    value=progress,
+                    style={
+                        "position": "relative", "float": "left",
+                        "width": "calc(100% - 116px)", "marginLeft": "10px",
+                        "marginTop": "12px"
+                    },
+                    label=f"{progress / 100 or 0:.1%}",
+                    hide_label=not in_progress or progress is None or progress == 0
+                ),
+                html.Div(
+                    children=self.render_log_div(
+                        container=container,
+                        wrapper_div_style={
+                            "position": "relative", "float": "left",
+                            "marginTop": "10px", "marginBottom": "10px",
+                            "minHeight": "300px",
+                            "maxHeight": "300px"
+                        }
+                    ),
+                ),
+            ],
+            style={
+                "position": "relative", "clear": "left",
+                "width": "100%",
+                "marginTop": "20px", "marginBottom": "20px",
+                "float": "left"
+            }
+        )
+
+    def __render_selectable_div(self, selectable: Selectable, container: VirtualJobProgressContainer = None):
+        if selectable is None:
+            raise ValueError("Selectable cannot be None")
+
+        last_exec_for_selectable = type(self.job_definition).get_latest_exec_for_selectable(
+            selectable, self.job_definition.dbm.get_session()
+        )
+        last_run_time = last_exec_for_selectable.start_time if last_exec_for_selectable is not None else None
+        next_run_time = (datetime.timedelta(seconds=self.job_definition.seconds_between_runs)
+                         + last_run_time) if last_run_time is not None else datetime.datetime.now()
+
+        return html.Div(
+            children=[
+                selectable.get_label_div(),
+                html.Div(f"Last Ran {date_utils.readable_time_since(last_run_time)} ago"),
+                html.Div(
+                    f"Next run in {date_utils.readable_time_since(next_run_time)}"
+                ) if self.job_definition.repeats else None,
+                self.__render_btn_and_prog_bar(
+                    run_btn_id=JOB_SELECTABLE_RUNNER_BTN_ID,
+                    run_btn_index=self._instance_id,
+                    container=container,
+                    selectable_id=selectable.get_value()
+                )
+            ],
+            style={
+                "position": "relative", "float": "left", "clear": "left",
+                "width": "100%", "marginTop": "10px"
+            }
+        )
+
+    def __render_selectable_tab(self, selectable: Selectable, container: VirtualJobProgressContainer = None):
+        if selectable is None:
+            raise ValueError("Selectable cannot be None")
+
+        return dbc.Tab(
+            label=selectable.get_label(),
+            label_style={
+                "animation": "blinker_animation 0.6s cubic-bezier(1, 0, 0, 1) infinite alternate",
+            } if container is not None and container.is_in_progress() else {},
+            children=[
+                self.__render_btn_and_prog_bar(
+                    run_btn_id=JOB_SELECTABLE_RUNNER_BTN_ID,
+                    run_btn_index=self._instance_id,
+                    container=container,
+                    selectable_id=selectable.get_value()
+                )
+            ]
+        )
+
+    def __render_non_selectable_tab(
+        self, form_messages: Dict[JobDefinitionParameter, str] = None,
+        container: VirtualJobProgressContainer = None
+    ):
+        if form_messages is None:
+            form_messages = {}
+
+        custom_in_progress = container is not None and container.is_in_progress()
+        job: JobDefinition = self.job_definition
 
         parameter_defs: List[JobDefinitionParameter] = job.parameters
         rendered_params = []
@@ -266,13 +658,14 @@ class JobCard(ComponentWithInternalCallback):
                         label=param.user_facing_param_name,
                         input_id={
                             "type": JOB_CARD_PARAM_INPUT_ID,
-                            "index": f"{self._instance_id}{INDEX_DELIMITER}{param.variable_name}"
+                            "index": self._instance_id,  # f"{self._instance_id}{INDEX_DELIMITER}{param.variable_name}",
+                            "param_name": param.variable_name
                         },
                         input_type="number" if param.param_type in [int, float] else "text",
                         placeholder=param.placeholder,
                         initial_validity=None if param not in form_messages else False,
                         invalid_form_feedback=form_messages[param] if param in form_messages else None,
-                        disabled=param.editable is False or is_in_progress,
+                        disabled=param.editable is False or custom_in_progress,
                         starting_value=param.default_value,
                         style_override={"marginBottom": "20px"}
                     ).render(wrapper_style_override={"marginTop": "0px"})
@@ -291,8 +684,10 @@ class JobCard(ComponentWithInternalCallback):
 
                 comp_id = {
                     "type": JOB_CARD_PARAM_INPUT_ID,
-                    "index": f"{self._instance_id}{INDEX_DELIMITER}{param.variable_name}"
+                    "index": self._instance_id,  # f"{self._instance_id}{INDEX_DELIMITER}{param.variable_name}"
+                    "param_name": param.variable_name
                 }
+
                 if param.user_facing_param_name is not None:
                     rendered_params.append(dbc.Label(param.user_facing_param_name, html_for=comp_id))
 
@@ -304,104 +699,24 @@ class JobCard(ComponentWithInternalCallback):
                         style={
                             "width": "100%", "marginBottom": "20px", "padding": "10px"
                         },
-                        disabled=param.editable is False or is_in_progress,
+                        disabled=param.editable is False or custom_in_progress,
                     ).render(),
                 )
 
-        num_historical_dots = 15
-        margin_right = 4
-        progress = job.current_prog_container.progress if is_in_progress else 0
-        job_card = SmallCard(
-            title=html.H3(job.name),
-            body=html.Div(
-                children=[
-                    html.Div(job.description) if job.description is not None else None,
-                    html.Div(f"Last Run: {difference_in_days}" if not is_in_progress else "In Progress"),
-                    html.Div(
-                        children=[
-                            historical_dots.render_from_resultable_events(
-                                job.events[-num_historical_dots:],
-                                dot_style_override={
-                                    "marginRight": f"{margin_right}px",
-                                    "width": f"calc((100% - {margin_right}px "
-                                             f"* {num_historical_dots}) / {num_historical_dots})",
-                                    "marginLeft": "0px"
-                                },
-                                use_tooltips=True
-                            )
-                        ]
-                    ),
-                ]
-            ),
-            actions=html.Div(
-                children=[
-                    html.Div(
-                        children=[
-                            dbc.Button(
-                                f"{job.get_current_duration()}s" if is_in_progress else "Run",
-                                style={
-                                    "position": "relative", "float": "left", "width": "100px"
-                                },
-                                id={"type": JOB_RUNNER_BTN_ID, "index": self._instance_id},
-                                disabled=is_in_progress
-                            ),
-                            dbc.Progress(
-                                value=progress,
-                                style={
-                                    "position": "relative", "float": "left",
-                                    "width": "calc(100% - 116px)", "marginLeft": "10px",
-                                    "marginTop": "10px"
-                                },
-                                label=f"{(progress / 100) or 0:.1%}",
-                                hide_label=not is_in_progress or progress is None or progress == 0
-                            ),
-                            dcc.Interval(
-                                interval=1000,
-                                disabled=not is_in_progress,
-                                id={"type": JOB_CARD_INTERVAL_ID, "index": self._instance_id}
-                            ),
-                            dbc.Label(
-                                "Log Level",
-                                html_for={"type": JOB_CARD_LOG_LEVEL_SELECTOR_ID, "index": self._instance_id},
-                                style={"marginTop": "20px", "position": "relative", "float": "left", "clear": "left"}
-                            ),
-                            SimpleSelector(
-                                comp_id={"type": JOB_CARD_LOG_LEVEL_SELECTOR_ID, "index": self._instance_id},
-                                selectables=[level.value for level in LogLevelsEnum],
-                                placeholder="Log Level",
-                                style={"width": "100%", "marginBottom": "10px"},
-                                disabled=is_in_progress,
-                                currently_selected_value=self.log_level.get_value()
-                            ).render(),
-                            last_run_error_message,
-                            html.Div(
-                                children=rendered_params,
-                                style={
-                                    "width": "100%", "position": "relative", "float": "left", "marginBottom": "10px"
-                                }
-                            ) if len(rendered_params) > 0 and not is_in_progress else None,
-                            html.Div(
-                                children=self.render_log_div(
-                                    wrapper_div_style={
-                                        "minHeight": "300px",
-                                        "maxHeight": "300px"
-                                    }
-                                ),
-                            ),
-                            html.Div(
-                                children=footer,
-                                style={
-                                    "width": "100%", "position": "relative", "float": "left", "marginBottom": "10px"
-                                }
-                            ) if footer is not None else None
-                        ],
-                        style={
-                            "position": "relative", "clear": "left",
-                            "width": "100%", "padding": "10px"
-                        }
-                    ),
-                ],
-            ),
-        ).render()
-
-        return job_card
+        return dbc.Tab(
+            label="Custom Params",
+            children=[
+                self.__render_btn_and_prog_bar(
+                    run_btn_id=JOB_RUNNER_BTN_ID,
+                    run_btn_index=self._instance_id,
+                    container=self.custom_prog_container
+                ),
+                html.Div(
+                    children=rendered_params,
+                    style={
+                        "width": "100%", "position": "relative", "float": "left",
+                        "marginBottom": "10px"
+                    }
+                ) if len(rendered_params) > 0 and not custom_in_progress else None,
+            ]
+        )

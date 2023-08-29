@@ -9,17 +9,17 @@ from base_dash_app.virtual_objects.interfaces.nameable import Nameable
 class ExternalTriggerEvent(Enum):
     SERVER_START = "SERVER_START"
     SERVER_SHUTDOWN = "SERVER_SHUTDOWN"
+    SCHEDULED = "SCHEDULED"
+    HUMAN = "NONE"
     NONE = "NONE"
 
 
 class Startable:
-    STARTABLE_DICT: Dict[ExternalTriggerEvent, list] = {
-        ExternalTriggerEvent.SERVER_SHUTDOWN: [],
-        ExternalTriggerEvent.SERVER_START: [],
-        ExternalTriggerEvent.NONE: []
+    STARTABLE_DICT: Dict[ExternalTriggerEvent, List['Startable']] = {
+        e: [] for e in ExternalTriggerEvent
     }
 
-    def __init__(self, trigger: ExternalTriggerEvent = ExternalTriggerEvent.NONE):
+    def __init__(self, trigger: ExternalTriggerEvent = ExternalTriggerEvent.HUMAN):
         self.start_trigger = trigger
         Startable.STARTABLE_DICT[trigger].append(self)
 

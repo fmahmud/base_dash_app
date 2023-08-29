@@ -42,6 +42,7 @@ class AppDescriptor:
             components_with_internal_callbacks: List[Type['ComponentWithInternalCallback']] = None,
             use_scoped_session: bool = False,
             max_num_threads: int = 5,
+            scheduler_interval_seconds: int = 60,
     ):
         """
         :param global_inputs: 
@@ -70,6 +71,7 @@ class AppDescriptor:
         :param components_with_internal_callbacks: List of components that have internal callbacks
         :param use_scoped_session: If True, uses a scoped session for the db
         :param max_num_threads: Max number of threads to use for the app
+        :param scheduler_interval_seconds: How often the scheduler runs in seconds
         """
 
         self.db_descriptor: DbDescriptor = db_descriptor
@@ -97,3 +99,4 @@ class AppDescriptor:
         self.components_with_internal_callbacks = components_with_internal_callbacks or []
         self.use_scoped_session: bool = use_scoped_session
         self.max_num_threads: int = max_num_threads
+        self.scheduler_interval_seconds: int = scheduler_interval_seconds

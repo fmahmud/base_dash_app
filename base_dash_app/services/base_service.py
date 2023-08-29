@@ -1,9 +1,7 @@
-import logging
-from abc import ABC, abstractmethod
+from abc import ABC
+from typing import TypeVar, Type, List, Generic
 
 from sqlalchemy.orm import Session
-
-from typing import TypeVar, Type, List, Generic, Callable, Union, Optional
 
 from base_dash_app.models.base_model import BaseModel
 from base_dash_app.virtual_objects.virtual_framework_obj import VirtualFrameworkObject

@@ -139,13 +139,15 @@ class AsyncTaskControls(ComponentWithInternalCallback):
             )
         ]
 
-    def render(self, override_style=None):
+    def render(self, override_style=None, extra_text=None):
         if override_style is None:
             override_style = {}
 
         return html.Div(
             children=[
-                self.__render_controls()
+                self.__render_controls(
+                    extra_text=extra_text or self.extra_text,
+                )
             ],
             style={
                 "position": "relative",
@@ -158,7 +160,7 @@ class AsyncTaskControls(ComponentWithInternalCallback):
             id={"type": AsyncTaskControls.get_wrapper_div_id(), "index": self._instance_id}
         )
 
-    def __render_controls(self):
+    def __render_controls(self, extra_text=None):
         other_buttons = []
         if self.collapsable:
             other_buttons.append(
@@ -209,7 +211,7 @@ class AsyncTaskControls(ComponentWithInternalCallback):
                             },
                         ),
                         html.Div(
-                            f"{self.extra_text}",
+                            f"{extra_text}",
                             style={
                                 "paddingBottom": "10px",
                                 "fontSize": "16px",
@@ -217,7 +219,7 @@ class AsyncTaskControls(ComponentWithInternalCallback):
                                 "float": "left",
                                 "clear": "left",
                             }
-                        ) if self.extra_text else None,
+                        ) if extra_text else None,
                         construct_down_ref_btgrp(
                             download_btn_id={
                                 "type": ASYNC_TASK_DOWNLOAD_BTN_ID,
@@ -257,5 +259,5 @@ class AsyncTaskControls(ComponentWithInternalCallback):
                     },
                 ),
                 self.async_task.render() if not self.collapsed else None,
-            ],
+            ]
         )

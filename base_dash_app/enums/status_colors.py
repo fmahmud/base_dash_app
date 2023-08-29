@@ -28,3 +28,20 @@ class StatusesEnum(Enum):
 
         raise Exception(f"Could not find StatusesEnum with id {id}.")
 
+    @staticmethod
+    def get_passing_statuses():
+        return [StatusesEnum.SUCCESS, StatusesEnum.WARNING]
+
+    @staticmethod
+    def get_failing_statuses():
+        return [StatusesEnum.FAILURE]
+
+    @staticmethod
+    def get_terminal_statuses():
+        return [StatusesEnum.SUCCESS, StatusesEnum.WARNING, StatusesEnum.FAILURE]
+
+    @staticmethod
+    def get_non_terminal_statuses():
+        return [StatusesEnum.IN_PROGRESS, StatusesEnum.PENDING]
+
+

@@ -61,7 +61,7 @@ class ComponentWithInternalCallback(BaseComponent, VirtualFrameworkObject, ABC):
 
         for its in input_to_states_map:
             its.input.is_dynamic = True
-            its.input.index = MATCH
+            its.input.index = its.input.index or MATCH
 
             for state in its.states:
                 state.is_dynamic = True
@@ -73,15 +73,19 @@ class ComponentWithInternalCallback(BaseComponent, VirtualFrameworkObject, ABC):
                 output=[Output({"type": cls.get_wrapper_div_id(), "index": MATCH}, "children")],
                 inputs=[its.input.get_as_input() for its in input_to_states_map],
                 state=[state.get_as_state() for its in input_to_states_map for state in its.states],
-                function=cls.__pre_handle_any_input
+                function=cls.__pre_handle_any_input,
+                prevent_initial_call=True
             )
 
     def get_callback_state(self, input_id, args):
-        input_to_states_map = type(self).get_input_to_states_map()
+        input_to_states_map: List[InputToState] = type(self).get_input_to_states_map()
 
         return get_state_values_for_input_from_args_list(
             input_id=input_id,
-            input_string_ids_map=input_to_states_map,
+            input_string_ids_map={
+                input_to_state.input.get_string_id(): input_to_state
+                for input_to_state in input_to_states_map
+            },
             args_list=list(args[len(input_to_states_map):])
         )
 
@@ -110,6 +114,9 @@ class ComponentWithInternalCallback(BaseComponent, VirtualFrameworkObject, ABC):
         # todo - decide if index should reuse IDs as they get destroyed or should instance IDs be always increasing
         if cls not in ComponentWithInternalCallback.type_to_instances_map:
             raise Exception(f"Class {cls.__name__} was not found in type to instance map!")
+
+        if (type(index) == int and index < 1) or triggering_id is None or triggering_id == ".":
+            raise PreventUpdate()
 
         if index not in ComponentWithInternalCallback.type_to_instances_map[cls]:
             raise Exception(f"Instance ID {index} for class {cls} was not found!")

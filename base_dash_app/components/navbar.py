@@ -1,5 +1,7 @@
 from typing import List
 
+from dash import html
+
 from base_dash_app.components.base_component import BaseComponent
 import dash_bootstrap_components as dbc
 
@@ -41,15 +43,86 @@ class NavGroup:
 
 
 class NavBar(BaseComponent):
-    def __init__(self, title: str, nav_items, *, nav_groups: List[NavGroup] = None, extra_components=None):
+    def __init__(
+        self, title: str, nav_items, *args,
+        nav_groups: List[NavGroup] = None, extra_components=None,
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
         self.nav_items = nav_items
         self.title = title if title is not None else ""
         self.nav_groups = nav_groups if nav_groups is not None else []
         self.extra_components = extra_components if extra_components is not None else []
+        self.memory_consumption_bar = html.Div(
+            children=[
+                html.Div(
+                    "0 MB",
+                    id="nav-bar-memory-consumption-label",
+                    style={
+                        "marginRight": "10px", "color": "white", "fontSize": "14px",
+                        "position": "relative", "float": "left", "width": "65px"
+                    },
+                ),
+                dbc.Progress(
+                    max=1000,
+                    value=0,
+                    style={
+                        "height": "18px", "width": "200px",
+                        "position": "relative", "float": "left"
+                    },
+                    hide_label=True,
+                    id="nav-bar-memory-consumption-bar"
+                ),
+            ],
+            style={
+                "position": "relative", "float": "left",
+                "width": "300px", "height": "20px"
+            }
+        )
+
+        self.cpu_usage_bar = html.Div(
+            children=[
+                html.Div(
+                    "0.0%",
+                    id="nav-bar-cpu-usage-label",
+                    style={
+                        "marginRight": "10px", "color": "white", "fontSize": "14px",
+                        "position": "relative", "float": "left", "width": "65px"
+                    },
+                ),
+                dbc.Progress(
+                    max=100,
+                    value=0,
+                    style={
+                        "height": "18px", "width": "200px",
+                        "position": "relative", "float": "left"
+                    },
+                    hide_label=True,
+                    id="nav-bar-cpu-usage-bar"
+                ),
+            ],
+            style={
+                "position": "relative", "float": "left",
+                "width": "300px", "height": "20px", "marginTop": "5px"
+            }
+        )
 
     def render(self):
         return dbc.NavbarSimple(
-            children=self.nav_items + [ng.render() for ng in self.nav_groups] + self.extra_components,
+            children=(
+                [
+                    html.Div(
+                        children=[
+                            self.memory_consumption_bar,
+                            self.cpu_usage_bar
+                        ],
+                        style={"height": "50px", "width": "300px", "paddingTop": "3px"}
+                    )
+                ]
+                + self.nav_items
+                + [ng.render() for ng in self.nav_groups]
+                + self.extra_components
+            ),
             brand=self.title,
             color="primary",
             sticky="top",
