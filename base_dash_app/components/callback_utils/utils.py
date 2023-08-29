@@ -28,6 +28,7 @@ def get_triggering_id_from_callback_context(callback_context):
         triggering_id = triggering_id.split("}.")[0] + "}"
         id_as_json = json.loads(triggering_id)
         if "type" in id_as_json and "index" in id_as_json:
+            # can't force index to be int, as it could be composed of multiple parts (1||||asdf)
             return id_as_json["type"], id_as_json["index"]
         else:
             # invalid json payload as triggering id:

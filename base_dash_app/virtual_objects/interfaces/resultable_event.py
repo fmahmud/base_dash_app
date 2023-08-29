@@ -48,6 +48,9 @@ class CachedResultableEvent(ResultableEvent):
             tooltip_id=self.tooltip_id
         )
 
+    def is_in_progress(self):
+        return self.result.status in StatusesEnum.get_non_terminal_statuses()
+
     def get_status_color(self, *, perspective=None) -> StatusesEnum:
         return self.result.status
 

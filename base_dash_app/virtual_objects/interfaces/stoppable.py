@@ -9,7 +9,7 @@ class Stoppable:
     for trigger in ExternalTriggerEvent:
         STOPPABLE_DICT[trigger] = []
 
-    def __init__(self, trigger: ExternalTriggerEvent = ExternalTriggerEvent.NONE):
+    def __init__(self, trigger: ExternalTriggerEvent = ExternalTriggerEvent.HUMAN):
         self.stop_trigger = trigger
 
     @abc.abstractmethod

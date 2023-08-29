@@ -18,6 +18,23 @@ class GraphTypes(Enum):
 
 
 class GraphableSeries(Nameable):
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, item):
+        if type(item) != int:
+            raise TypeError(f"Must be an int, got val={item} type=({type(item)}) instead.")
+        return self.data[item]
+
+    def __setitem__(self, key, value):
+        if type(key) != int:
+            raise TypeError(f"Must be an int, got val={key} type=({type(key)}) instead.")
+
+        if not isinstance(value, Graphable):
+            raise TypeError(f"Must be an instance of Graphable, got val={value} type=({type(value)}) instead.")
+
+        self.data[key] = value
+
     def get_name(self):
         return self.name
 

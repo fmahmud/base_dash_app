@@ -2,15 +2,19 @@ import datetime
 import logging
 import os
 import traceback
-from typing import List, Callable, Dict, Type, Union
+from operator import itemgetter
+from typing import List, Callable, Dict, Type, Union, TypeVar, Any
 from urllib.parse import unquote
 
 import dash
 import dash_auth
+import psutil
 import sqlalchemy.exc
+from apscheduler.schedulers.background import BackgroundScheduler
 from dash import dcc, html
 from dash.dependencies import Output, Input, State, ALL
 from dash.exceptions import PreventUpdate
+from pympler import tracker
 from sqlalchemy.orm import Session
 
 from base_dash_app.apis.api import API
@@ -26,16 +30,20 @@ from base_dash_app.components.cards.tsdp_sparkline_stat_card import TsdpSparklin
 from base_dash_app.components.dashboards.simple_timeseries_dashboard import SimpleTimeSeriesDashboard
 from base_dash_app.components.datatable.datatable_wrapper import DataTableWrapper
 from base_dash_app.components.navbar import NavBar, NavDefinition, NavGroup
+from base_dash_app.models.job_instance import JobInstance
 from base_dash_app.services.async_handler_service import AsyncHandlerService
 from base_dash_app.services.base_service import BaseService
 from base_dash_app.services.global_state_service import GlobalStateService
-from base_dash_app.services.job_definition_service import JobDefinitionService
+from base_dash_app.services.job_definition_service import JobDefinitionService, JobAlreadyRunningException
 from base_dash_app.utils.db_utils import DbManager
 from base_dash_app.utils.env_vars.env_var_def import EnvVarDefinition
 from base_dash_app.views.admin_statistics_dash import AdminStatisticsDash
 from base_dash_app.views.base_view import BaseView
+from base_dash_app.virtual_objects.interfaces.selectable import Selectable
 from base_dash_app.virtual_objects.interfaces.startable import Startable, ExternalTriggerEvent
 from base_dash_app.models.job_definition import JobDefinition
+from base_dash_app.virtual_objects.timeseries.time_series import TimeSeries
+from base_dash_app.virtual_objects.timeseries.time_series_data_point import TimeSeriesDataPoint
 
 ALERTS_WRAPPER_INTERVAL_ID = "alerts-wrapper-interval-id"
 
@@ -44,6 +52,7 @@ ALERTS_WRAPPER_DIV_ID = "alerts-wrapper-div-id"
 
 class RuntimeApplication:
     def __init__(self, app_descriptor: AppDescriptor):
+        self.last_job_check = None
         from base_dash_app.utils.logger_utils import configure_logging
         configure_logging(
             logging_format=app_descriptor.logging_format,
@@ -93,7 +102,8 @@ class RuntimeApplication:
             if alert is not None and alert in self.active_alerts:
                 self.active_alerts.remove(alert)
 
-        def get_service_by_type(service_class: Type) -> BaseService:
+        Service = TypeVar("Service", bound=BaseService)
+        def get_service_by_type(service_class: Type) -> Service:
             return self.services.get(service_class)
 
         def get_api_by_type(api_class: Type) -> API:
@@ -117,7 +127,17 @@ class RuntimeApplication:
         if self.dbm is not None and app_descriptor.upgrade_db:
             self.dbm.upgrade_db(drop_first=app_descriptor.drop_tables)
 
-        base_service_args = {
+        self.memory_history_timeseries: TimeSeries = TimeSeries(
+            title="Memory History",
+            unique_id="memory_history",
+        )
+
+        self.cpu_history_timeseries: TimeSeries = TimeSeries(
+            title="CPU History",
+            unique_id="cpu_history",
+        )
+
+        self.base_service_args = base_service_args = {
             "dbm": self.dbm,
             "service_provider": get_service_by_type,
             "api_provider": get_api_by_type,
@@ -167,7 +187,11 @@ class RuntimeApplication:
         for view in app_descriptor.views:
             self.views[view] = view(**base_view_args)
 
-        self.views[AdminStatisticsDash] = AdminStatisticsDash(**base_view_args)
+        self.views[AdminStatisticsDash] = AdminStatisticsDash(
+            memory_timeseries=self.memory_history_timeseries,
+            cpu_timeseries=self.cpu_history_timeseries,
+            **base_view_args
+        )
 
         wrapped_get_handler = self.bind_to_self(self.handle_get_call)
 
@@ -188,7 +212,13 @@ class RuntimeApplication:
         )
 
         self.register_callback(
-            output=Output(ALERTS_WRAPPER_DIV_ID, "children"),
+            output=[
+                Output(ALERTS_WRAPPER_DIV_ID, "children"),
+                Output("nav-bar-memory-consumption-bar", "value"),
+                Output("nav-bar-memory-consumption-label", "children"),
+                Output("nav-bar-cpu-usage-bar", "value"),
+                Output("nav-bar-cpu-usage-label", "children"),
+            ],
             inputs=[
                 Input({"type": alerts.DISMISS_ALERT_BTN_ID, "index": ALL}, "n_clicks"),
                 Input(ALERTS_WRAPPER_INTERVAL_ID, "n_intervals"),
@@ -208,9 +238,20 @@ class RuntimeApplication:
         for comp_class in components_with_internal_callbacks:
             comp_class.do_registrations(self.register_callback)
 
-        self.navbar = self.initialize_navbar(app_descriptor.extra_nav_bar_components, app_descriptor.view_groups)
+        self.navbar = self.initialize_navbar(
+            app_descriptor.extra_nav_bar_components, app_descriptor.view_groups
+        )
 
         self.app.layout = self.get_layout
+
+        self.bg_scheduler = BackgroundScheduler()
+        self.bg_scheduler.add_job(
+            lambda: self.handle_scheduler_interval(),
+            trigger='interval', seconds=app_descriptor.scheduler_interval_seconds,
+            next_run_time=datetime.datetime.now() + datetime.timedelta(seconds=20),
+            max_instances=1
+        )
+        self.bg_scheduler.start()
 
     def handle_alerts(self, n_clicks, n_interval, clear_all_nclicks, *args, **kwargs):
         if invalid_n_clicks(n_clicks) and invalid_n_clicks(n_interval) \
@@ -237,12 +278,98 @@ class RuntimeApplication:
                     and alert.created_at + datetime.timedelta(seconds=alert.duration) <= datetime.datetime.now():
                 self.active_alerts.remove(alert)
 
+        latest_memory = self.memory_history_timeseries[-1].value if len(self.memory_history_timeseries) > 0 else 0
+        latest_cpu = self.cpu_history_timeseries[-1].value if len(self.cpu_history_timeseries) > 0 else 0
+
         return [
-            alerts.render_alerts_div(self.active_alerts)
+            alerts.render_alerts_div(self.active_alerts),
+            latest_memory,
+            f"{latest_memory:.1f} MB",
+            latest_cpu,
+            f"{latest_cpu:.1f}%"
         ]
+
+    def handle_scheduler_interval(self):
+        self.app.logger.debug("Handling two mins interval")
+        self.track_memory_usage()
+        self.check_for_scheduled_jobs()
+
+    def track_memory_usage(self):
+        self.app.logger.info("Capturing memory usage")
+
+        mem = tracker.SummaryTracker()
+        memory_usages = list(sorted(mem.create_summary(), reverse=True, key=itemgetter(2)))
+        self.memory_history_timeseries.add_tsdp(
+            TimeSeriesDataPoint(
+                date=datetime.datetime.now(),
+                value=sum([mu[2] for mu in memory_usages]) / (1024 ** 2)
+            )
+        )
+
+        self.cpu_history_timeseries.add_tsdp(
+            TimeSeriesDataPoint(
+                date=datetime.datetime.now(),
+                value=psutil.cpu_percent()
+            )
+        )
+        # print(f"CPU Usage: {psutil.cpu_percent()}")
+
+    def check_for_scheduled_jobs(self):
+        self.app.logger.info("Checking for scheduled jobs")
+        self.last_job_check = datetime.datetime.now()
+        session: Session = self.dbm.new_session()
+        job_def_service: JobDefinitionService = self.base_service_args["service_provider"](JobDefinitionService)
+        try:
+            for job in job_def_service.get_all():
+                job: JobDefinition
+                job.set_vars_from_kwargs(**self.base_service_args)
+                selectable_param_name = job.single_selectable_param_name
+                selectables: List[Selectable] = job.selectables
+                for selectable in selectables:
+                    latest_instance: JobInstance = job.get_latest_exec_for_selectable(selectable, session)
+
+                    if job.repeats and (
+                        latest_instance is None or
+                        latest_instance.start_time + datetime.timedelta(seconds=job.seconds_between_runs)
+                        <= datetime.datetime.now()
+                    ) and (latest_instance is None or latest_instance.end_time is not None):
+                        self.app.logger.debug(
+                            f"Running job {job.name} with {selectable_param_name} = {selectable.get_label()}"
+                        )
+                        try:
+                            job_def_service.run_job(
+                                job_def=job,
+                                selectable=selectable,
+                                parameters={selectable_param_name: selectable.get_value()}
+                            )
+
+                            self.base_service_args["push_alert"](
+                                Alert(
+                                    f"Running job {job.name} with {selectable_param_name} = {selectable.get_label()}",
+                                    duration=15,
+                                    color="success"
+                                )
+                            )
+                        except JobAlreadyRunningException as jare:
+                            self.app.logger.warning(
+                                f"Job {job.name} with {selectable_param_name} = {selectable.get_label()} is already running"
+                            )
+                        except Exception as inner_e:
+                            stack_trace = traceback.format_exc()
+                            self.app.logger.error(
+                                f"Error while running job {job.name} "
+                                f"with {selectable_param_name} = {selectable.get_label()}: {inner_e}\n{stack_trace}"
+                            )
+        except Exception as e:
+            stack_trace = traceback.format_exc()
+            self.app.logger.error(f"Error while checking for scheduled jobs: {e}\n{stack_trace}")
+            session.rollback()
+        finally:
+            session.close()
 
     def run_server(self, debug=False, host="0.0.0.0", port=8050, **kwargs):
         for startable in Startable.STARTABLE_DICT[ExternalTriggerEvent.SERVER_START]:
+            startable: Startable
             startable.start()
         try:
             self.app.run_server(
@@ -320,9 +447,16 @@ class RuntimeApplication:
             style={"fontFamily": "'Roboto', sans-serif"}
         )
 
-    def register_callback(self, output: Union[Output, List[Output]], inputs: List[Input], state: List[State],
-                          function: Callable):
-        self.app.callback(output=output, inputs=inputs, state=state)(function)
+    def register_callback(
+            self, output: Union[Output, List[Output]], inputs: List[Input], state: List[State],
+            function: Callable, prevent_initial_call: bool = True
+    ):
+        self.app.callback(
+            output=output,
+            inputs=inputs,
+            state=state,
+            prevent_initial_call=prevent_initial_call
+        )(function)
 
     def bind_to_self(self, func):
         bound_method = func.__get__(self, self.__class__)

@@ -1,13 +1,14 @@
 import datetime
+import json
 import random
 import re
 import time
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 
 import dash_bootstrap_components as dbc
 from dash import html
 from dash.dash_table.Format import Format, Scheme
-from sqlalchemy import Column, Integer, Sequence, String
+from sqlalchemy import Column, Integer, Sequence, String, or_
 from sqlalchemy.orm import Session
 
 from base_dash_app.components.alerts import Alert
@@ -20,6 +21,7 @@ from base_dash_app.components.cards.tsdp_sparkline_stat_card import TsdpSparklin
 from base_dash_app.components.dashboards.simple_timeseries_dashboard import SimpleTimeSeriesDashboard
 from base_dash_app.components.data_visualization.simple_area_graph import AreaGraph
 from base_dash_app.components.data_visualization.simple_line_graph import LineGraph, GraphTypes
+from base_dash_app.models.job_instance import JobInstance
 from base_dash_app.services.async_handler_service import AsyncWorkProgressContainer
 from base_dash_app.virtual_objects.timeseries.timeseries_wrapper import TimeSeriesWrapper
 from base_dash_app.virtual_objects.timeseries.date_range_aggregation_descriptor import DateRangeAggregatorDescriptor
@@ -93,12 +95,36 @@ class MySelectablesService(BaseService):
 
 
 class TestJobDef(JobDefinition):
+    @classmethod
+    def single_selectable_param_name(cls) -> Optional[str]:
+        return "param_4"
+
+    @classmethod
+    def get_latest_exec_for_selectable(cls, selectable: Selectable, session: Session) -> Optional[JobInstance]:
+        param_substring = f"\"{cls.single_selectable_param_name()}\": {selectable.get_value()}"
+
+        instance: JobInstance = (
+            session.query(JobInstance)
+            .filter(JobInstance.job_definition_id == cls.id)
+            .filter(JobInstance.start_time.isnot(None))
+            .filter(or_(
+                JobInstance.parameters.like(f"%{param_substring},%"),
+                JobInstance.parameters.like(f"%{param_substring}" + "}%")
+            ))
+            .order_by(JobInstance.start_time.desc())
+            .first()
+        )
+
+        return instance
+
     __mapper_args__ = {
         "polymorphic_identity": "TestJobDef"
     }
 
     @classmethod
-    def get_cached_selectables_by_param_name(cls, variable_name, session: Session):
+    def get_cached_selectables_by_param_name(
+            cls, variable_name, session: Session
+    ) -> List[CachedSelectable]:
         if variable_name == "param_4":
             all_selectables = session.query(MySelectableModel).all()
             return [CachedSelectable.from_selectable(s) for s in all_selectables]
@@ -154,48 +180,55 @@ class TestJobDef(JobDefinition):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.repeats = True
+        self.seconds_between_runs = 60
 
     def check_completion_criteria(self, *args, prog_container: VirtualJobProgressContainer, **kwargs) -> StatusesEnum:
         return prog_container.execution_status
 
     def check_prerequisites(self, *args, prog_container: VirtualJobProgressContainer, parameter_values: Dict,
                             **kwargs) -> StatusesEnum:
-        self.info_log("starting prereq. check")
-        self.info_log("Example info log")
-        self.debug_log("Example debug log")
-        self.critical_log("Example critical log")
-        self.warn_log("Example warn log")
-        self.error_log("Example error log")
+        prog_container.info_log("starting prereq. check")
+        prog_container.info_log("Example info log")
+        prog_container.debug_log("Example debug log")
+        prog_container.critical_log("Example critical log")
+        prog_container.warn_log("Example warn log")
+        prog_container.error_log("Example error log")
 
         prog_container.result = 1
         return StatusesEnum.SUCCESS
 
     def start(self, *args, prog_container: VirtualJobProgressContainer, parameter_values: Dict,
               **kwargs) -> StatusesEnum:
+
+        if prog_container is None:
+            raise ValueError("prog_container is None!")
+
         if "session" not in kwargs:
             prog_container.end_reason = "Didn't receive session!"
-            self.critical_log("Didn't receive session.")
+            prog_container.critical_log("Didn't receive session.")
             return StatusesEnum.FAILURE
 
         session: Session = kwargs["session"]
 
         time.sleep(1)
         prog_container.progress += 20
-        self.info_log("1 second passed")
+        prog_container.info_log("1 second passed")
         time.sleep(1)
         prog_container.progress += 20
-        self.info_log("2 seconds passed")
+        prog_container.info_log("2 seconds passed")
         time.sleep(1)
         prog_container.progress += 20
-        self.info_log("3 seconds passed")
+        prog_container.info_log("3 seconds passed")
         time.sleep(1)
         prog_container.progress += 20
-        self.info_log("4 seconds passed")
+        prog_container.info_log("4 seconds passed")
 
         if "param_4" in parameter_values:
             my_selectable: MySelectableModel = session.query(MySelectableModel) \
-                .filter_by(id=int(parameter_values["param_4"])).first()
-            self.info_log(my_selectable.get_label())
+                .filter_by(id=parameter_values["param_4"]).first()
+            # .filter_by(id=int(parameter_values["param_4"])).first()
+            prog_container.info_log(my_selectable.get_label())
 
         time.sleep(1)
 
@@ -344,7 +377,13 @@ class DemoView(BaseView):
             children=[
                 dbc.Tab(
                     children=[
-                        JobCard(job, job_def_service, footer="footer").render()
+                        JobCard(
+                            job,
+                            job_def_service,
+                            footer="footer",
+                            selectables_as_tabs=False,
+                            hide_log_div=True
+                        ).render()
                     ],
                     label="Job Card Demo",
                     style={"padding": "20px"}
@@ -515,6 +554,8 @@ class DemoView(BaseView):
         )
 
     def render(self, query_params, *args):
+        job_def_service: JobDefinitionService = self.get_service(JobDefinitionService)
+        test_job_def: TestJobDef = job_def_service.get_by_id(self.test_job_id)
         session: Session = self.dbm.get_session()
         current_selectables = session.query(MySelectableModel).all()
         if len(current_selectables) == 0:
@@ -525,10 +566,11 @@ class DemoView(BaseView):
 
             try:
                 session.commit()
-            except:
+                test_job_def.sync_single_selectable_data(session=session)
+            except Exception as e:
+                self.logger.error(f"Failed to commit session: {e}")
                 session.rollback()
 
-        job_def_service: JobDefinitionService = self.get_service(JobDefinitionService)
         self.logger.debug("This is debug log")
         self.logger.info("This is info log")
         self.logger.warn("This is warn log")

@@ -1,7 +1,9 @@
+import abc
 import logging
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any, Tuple, FrozenSet
 
-from sqlalchemy import Column, Integer, Sequence, String, orm, Boolean
+from sqlalchemy import Column, Integer, Sequence, String, orm, Boolean, select, func
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship, Session
 
 from base_dash_app.enums.log_levels import LogLevelsEnum
@@ -9,8 +11,10 @@ from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.models.base_model import BaseModel
 from base_dash_app.models.job_definition_parameter import JobDefinitionParameter
 from base_dash_app.models.job_instance import JobInstance
+from base_dash_app.utils.db_utils import DbManager
 from base_dash_app.virtual_objects.interfaces.resultable_event_series import ResultableEventSeries, \
     CachedResultableEventSeries
+from base_dash_app.virtual_objects.interfaces.selectable import Selectable
 from base_dash_app.virtual_objects.interfaces.startable import Startable
 from base_dash_app.virtual_objects.interfaces.stoppable import Stoppable
 from base_dash_app.virtual_objects.job_progress_container import VirtualJobProgressContainer
@@ -18,12 +22,24 @@ from base_dash_app.virtual_objects.virtual_framework_obj import VirtualFramework
 
 
 class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel, VirtualFrameworkObject):
+    def get_start_time(self):
+        pass
+
+    def get_end_time(self):
+        pass
+
     __tablename__ = "job_definitions"
 
     id = Column(Integer, Sequence("job_definitions_id_seq"), primary_key=True)
     name = Column(String)
     job_class = Column(String)
-    job_instances = relationship("JobInstance", back_populates="job_definition")
+    job_instances = relationship(
+        "JobInstance",
+        back_populates="job_definition",
+        order_by="desc(JobInstance.start_time)",
+        lazy="select"
+    )
+
     parameters = relationship("JobDefinitionParameter", back_populates="job_definition")
 
     repeats = Column(Boolean, default=False)
@@ -54,47 +70,36 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
         # todo
         pass
 
-    def info_log(self, message):
-        self.logger.info(message)
-        if self.current_prog_container is not None \
-                and self.current_prog_container.log_level <= LogLevelsEnum.INFO.value:
-            self.current_prog_container.logs.append(f"[INFO]{message}")
+    @hybrid_property
+    def latest_start_time(self):
+        # This part works at the instance level.
+        return max((instance.start_time for instance in self.job_instances), default=None)
 
-    def error_log(self, message):
-        self.logger.error(message)
-        if self.current_prog_container is not None \
-                and self.current_prog_container.log_level <= LogLevelsEnum.ERROR.value:
-            self.current_prog_container.logs.append(f"[ERROR]{message}")
-
-    def critical_log(self, message):
-        self.logger.critical(message)
-        if self.current_prog_container is not None \
-                and self.current_prog_container.log_level <= LogLevelsEnum.CRITICAL.value:
-            self.current_prog_container.logs.append(f"[CRITICAL]{message}")
-
-    def debug_log(self, message):
-        self.logger.debug(message)
-        if self.current_prog_container is not None \
-                and self.current_prog_container.log_level <= LogLevelsEnum.DEBUG.value:
-            self.current_prog_container.logs.append(f"[DEBUG]{message}")
-
-    def warn_log(self, message):
-        self.logger.warning(message)
-        if self.current_prog_container is not None \
-                and self.current_prog_container.log_level <= LogLevelsEnum.WARNING.value:
-            self.current_prog_container.logs.append(f"[WARN]{message}")
+    @latest_start_time.expression
+    def latest_child_timestamp(cls):
+        # This part works at the class/query level.
+        return (select([func.max(JobInstance.start_time)]).
+                where(JobInstance.parent_id == cls.id).
+                label('latest_start_time'))
 
     @classmethod
-    def get_cached_selectables_by_param_name(cls, param_name, session: Session):
+    def get_latest_exec_for_selectable(cls, selectable: Selectable, session: Session) -> Optional[JobInstance]:
+        return None
+
+    @classmethod
+    @abc.abstractmethod
+    def get_cached_selectables_by_param_name(
+        cls,
+        param_name: str,
+        session: Session
+    ) -> List[Selectable]:
         """
         Child classes of JobDefinition must implement this function.
-        :param kwargs:
+        :param session:
+        :param param_name:
         :return:
         """
-        if cls == JobDefinition:
-            raise Exception("Cannot make instance of class JobDefinition.")
-
-        raise Exception(f"Class {cls} needs to override get_cached_selectables_by_param_name function.")
+        pass
 
     @classmethod
     def force_update(cls):
@@ -108,16 +113,9 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
         return False
 
     @classmethod
+    @abc.abstractmethod
     def construct_instance(cls, **kwargs):
-        """
-        Child classes of JobDefinition must implement this function.
-        :param kwargs:
-        :return:
-        """
-        if cls == JobDefinition:
-            raise Exception("Cannot make instance of class JobDefinition.")
-
-        raise Exception(f"Class {cls} needs to override construct_instance function.")
+        pass
 
     @classmethod
     def autoinitialize(cls):
@@ -133,48 +131,62 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
     def get_general_params(cls):
         return []
 
-    def __init__(self, *args, **kwargs):
+    @classmethod
+    @abc.abstractmethod
+    def single_selectable_param_name(cls) -> Optional[str]:
+        return None
+
+    def __init__(
+            self,
+            dbm: DbManager = None,
+            *args, **kwargs
+    ):
         ResultableEventSeries.__init__(self)
         Startable.__init__(self)
         Stoppable.__init__(self)
         VirtualFrameworkObject.__init__(self, **kwargs)
 
-        self.__current_job_instance: Optional[JobInstance] = None
-        self.current_prog_container: Optional[VirtualJobProgressContainer] = None
+        self.selectables: List[Selectable] = []
+        self.single_selectable_param_name: str = type(self).single_selectable_param_name()
+
+        if dbm is not None:
+            session: Session = dbm.get_session()
+            self.sync_single_selectable_data(session=session)
+
         self.logger = logging.getLogger(self.name)
+
+    def sync_single_selectable_data(self, session: Session):
+        if self.single_selectable_param_name is not None:
+            self.selectables = type(self).get_cached_selectables_by_param_name(
+                self.single_selectable_param_name,
+                session=session
+            )
 
     @orm.reconstructor
     def init_on_load(self):
+        JobDefinition.__init__(self)
         ResultableEventSeries.__init__(self)
         Startable.__init__(self)
         Stoppable.__init__(self)
-
-        self.__current_job_instance: Optional[JobInstance] = None
-        self.current_prog_container: Optional[VirtualJobProgressContainer] = None
+        session: Session = Session.object_session(self)
+        self.sync_single_selectable_data(session=session)
         self.logger = logging.getLogger(self.name)
+        self.rehydrate_events_from_db(session)
 
-        self.rehydrate_events_from_db()
-
-    def rehydrate_events_from_db(self):
+    def rehydrate_events_from_db(self, session: Session = None):
         self.clear_all()
+        # in_progress_job_instances = [ji for ji in self.job_instances if ji.is_in_progress()]
+        # for ji in in_progress_job_instances:
+        #     session.expunge(ji)
+
+        session.refresh(self)
+
         for ji in self.job_instances:
             ji: JobInstance
             self.process_result(ji.get_result(), ji)
 
-    def is_in_progress(self):
-        return self.current_prog_container is not None
-
-    def get_progress(self):
-        if self.is_in_progress():
-            return self.current_prog_container.progress
-
-        return 0
-
-    def get_current_duration(self):
-        if self.is_in_progress():
-            return int(self.current_prog_container.get_duration())
-
-        return 0
+    def is_in_progress(self) -> bool:
+        raise Exception("Deprecated")
 
     def get_parameters(self) -> List[JobDefinitionParameter]:
         return self.parameters
