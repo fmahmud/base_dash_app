@@ -71,7 +71,7 @@ class AppDescriptor:
         :param components_with_internal_callbacks: List of components that have internal callbacks
         :param use_scoped_session: If True, uses a scoped session for the db
         :param max_num_threads: Max number of threads to use for the app
-        :param scheduler_interval_seconds: How often the scheduler runs in seconds
+        :param scheduler_interval_seconds: How often the scheduler runs in seconds (<=0 means never)
         """
 
         self.db_descriptor: DbDescriptor = db_descriptor

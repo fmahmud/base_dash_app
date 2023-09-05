@@ -2,6 +2,9 @@
 
 ![example](https://img.shields.io/github/actions/workflow/status/fmahmud/base_dash_app/python-package.yml?branch=master&style=for-the-badge)
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/fmahmud/base_dash_app?color=green&style=for-the-badge)
+![GitHub commit activity (branch)](https://img.shields.io/github/commit-activity/t/fmahmud/base_dash_app?style=for-the-badge&color=darkred)
+
+
 
 
 ## Demo App Usage
@@ -53,7 +56,7 @@ Sure, I'll create a markdown documentation for the `AppDescriptor` class:
 - **`components_with_internal_callbacks`** (`List[Type[ComponentWithInternalCallback]]`): List of components that have internal callbacks.
 - **`use_scoped_session`** (`bool`): If set to True, uses a scoped session for the database.
 - **`max_num_threads`** (`int`): Maximum number of threads to use for the app.
-- **`scheduler_interval_seconds`** (`int`): Interval in seconds for the background scheduler to run at.
+- **`scheduler_interval_seconds`** (`int`): Interval in seconds for the background scheduler to run at (<=0 means never)
 
 ## Usage
 
