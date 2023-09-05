@@ -244,14 +244,16 @@ class RuntimeApplication:
 
         self.app.layout = self.get_layout
 
-        self.bg_scheduler = BackgroundScheduler()
-        self.bg_scheduler.add_job(
-            lambda: self.handle_scheduler_interval(),
-            trigger='interval', seconds=app_descriptor.scheduler_interval_seconds,
-            next_run_time=datetime.datetime.now() + datetime.timedelta(seconds=20),
-            max_instances=1
-        )
-        self.bg_scheduler.start()
+        if self.app_descriptor.scheduler_interval_seconds is not None \
+                and self.app_descriptor.scheduler_interval_seconds > 0:
+            self.bg_scheduler = BackgroundScheduler()
+            self.bg_scheduler.add_job(
+                lambda: self.handle_scheduler_interval(),
+                trigger='interval', seconds=app_descriptor.scheduler_interval_seconds,
+                next_run_time=datetime.datetime.now() + datetime.timedelta(seconds=20),
+                max_instances=1
+            )
+            self.bg_scheduler.start()
 
     def handle_alerts(self, n_clicks, n_interval, clear_all_nclicks, *args, **kwargs):
         if invalid_n_clicks(n_clicks) and invalid_n_clicks(n_interval) \
