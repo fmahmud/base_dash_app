@@ -53,13 +53,14 @@ ALERTS_WRAPPER_DIV_ID = "alerts-wrapper-div-id"
 class RuntimeApplication:
     def __init__(self, app_descriptor: AppDescriptor):
         self.last_job_check = None
+        self.app_descriptor: AppDescriptor = app_descriptor
+
         from base_dash_app.utils.logger_utils import configure_logging
         configure_logging(
             logging_format=app_descriptor.logging_format,
-            log_level=app_descriptor.log_level
+            log_level=app_descriptor.log_level,
+            std_out_formatter=app_descriptor.std_out_formatter
         )
-
-        self.app_descriptor: AppDescriptor = app_descriptor
 
         self.app = dash.Dash(
             title=app_descriptor.title,

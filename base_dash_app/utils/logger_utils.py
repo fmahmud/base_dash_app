@@ -1,70 +1,43 @@
 import logging
 import sys
-from enum import Enum
 
-
-class BColors(Enum):
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-    WHITE = '\033[37m'
-    ENDC = '\033[0m'
-
-    def __str__(self):
-        return self.value
-
-
-LEVEL_COLORS = {
-    'DEBUG': f"{BColors.OKBLUE}",
-    'INFO': f"{BColors.OKGREEN}",
-    'WARNING': f"{BColors.WARNING}",
-    'ERROR': f"{BColors.FAIL}",
-    'CRITICAL': f"{BColors.BOLD}{BColors.FAIL}"
-}
-
-LEVEL_ENDC = {
-    'DEBUG': f"{BColors.ENDC}",
-    'INFO': f"{BColors.ENDC}",
-    'WARNING': f"{BColors.ENDC}",
-    'ERROR': f"{BColors.ENDC}",
-    'CRITICAL': f"{BColors.ENDC}{BColors.ENDC}"
-}
-
-
-class ColoredFormatter(logging.Formatter):
-    def format(self, record):
-        level_color = LEVEL_COLORS.get(record.levelname, f"{BColors.WHITE}")
-        level_endc = LEVEL_ENDC.get(record.levelname, f"{BColors.ENDC}")
-        formatted_msg = super(ColoredFormatter, self).format(record)
-        formatted_level = f'{level_color}{record.levelname}{level_endc}'
-        return formatted_msg.replace(record.levelname, formatted_level)
-
+from base_dash_app.utils.bcolors import BColors
 
 LOGGING_FORMAT = f'{BColors.WHITE}[%(asctime)s]{BColors.ENDC}' \
                  f'{BColors.OKCYAN}[%(name)30s]{BColors.ENDC}' \
-                 f'[%(levelname)10s]:' \
+                 f'{BColors.BOLD}[%(levelname)10s]:{BColors.ENDC} ' \
                  f'%(message)s'
 
 
-def configure_logging(logging_format=None, log_level=None, stream=sys.stdout):
+def configure_logging(
+        logging_format=None,
+        log_level=None,
+        std_out_formatter=None,
+        std_err_formatter=None
+):
     if logging_format is None:
         logging_format = LOGGING_FORMAT
 
     if log_level is None:
         log_level = logging.INFO
 
-    formatter = ColoredFormatter(logging_format)
-    handler = logging.StreamHandler(stream)
-    handler.setFormatter(formatter)
+    if std_out_formatter is not None:
+        std_out_handler = logging.StreamHandler(sys.stdout)
+        std_out_handler.setFormatter(std_out_formatter)
+        root_logger = logging.getLogger()
+        root_logger.addHandler(std_out_handler)
+        root_logger.setLevel(log_level)
+    else:
+        logging.basicConfig(format=logging_format, level=log_level, stream=sys.stdout)
 
-    root_logger = logging.getLogger()
-    root_logger.addHandler(handler)
-    root_logger.setLevel(log_level)
+    if std_err_formatter is not None:
+        std_err_handler = logging.StreamHandler(sys.stderr)
+        std_err_handler.setFormatter(std_err_formatter)
+        root_logger = logging.getLogger()
+        root_logger.addHandler(std_err_handler)
+        root_logger.setLevel(log_level)
+
+
 
 
 # configure_logging()
