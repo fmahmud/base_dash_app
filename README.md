@@ -57,6 +57,7 @@ Sure, I'll create a markdown documentation for the `AppDescriptor` class:
 - **`use_scoped_session`** (`bool`): If set to True, uses a scoped session for the database.
 - **`max_num_threads`** (`int`): Maximum number of threads to use for the app.
 - **`scheduler_interval_seconds`** (`int`): Interval in seconds for the background scheduler to run at (<=0 means never)
+- **`std_out_formatter`** (`logging.Formatter`): Optional - Formatter to use for stdout
 
 ## Usage
 

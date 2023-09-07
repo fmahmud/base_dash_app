@@ -59,31 +59,34 @@ TEST_ALERT_BTN_ID = "test-alert-btn-id"
 
 
 class MySelectableModel(BaseModel, Selectable):
+    def __lt__(self, other):
+        if type(other) != type(self):
+            return False
+
+        return self.id < other.id
+
     __tablename__ = "my_selectables"
 
     id = Column(Integer, Sequence("my_selectables_id_seq"), primary_key=True)
     name = Column(String)
-
-    def __lt__(self, other):
-        pass
-
-    def __eq__(self, other):
-        pass
-
-    def __hash__(self):
-        pass
-
-    def __repr__(self):
-        pass
-
-    def __str__(self):
-        pass
 
     def get_label(self):
         return self.name
 
     def get_value(self):
         return self.id
+
+    def __str__(self):
+        return Selectable.__str__(self)
+
+    def __repr__(self):
+        return self.__str__()
+
+    def __hash__(self):
+        return Selectable.__hash__(self)
+
+    def __eq__(self, other):
+        return Selectable.__eq__(self, other)
 
 
 class MySelectablesService(BaseService):
@@ -127,7 +130,7 @@ class TestJobDef(JobDefinition):
     ) -> List[CachedSelectable]:
         if variable_name == "param_4":
             all_selectables = session.query(MySelectableModel).all()
-            return [CachedSelectable.from_selectable(s) for s in all_selectables]
+            return [s for s in all_selectables]
 
     @classmethod
     def force_update(cls):

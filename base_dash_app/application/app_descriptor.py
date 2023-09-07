@@ -43,6 +43,7 @@ class AppDescriptor:
             use_scoped_session: bool = False,
             max_num_threads: int = 5,
             scheduler_interval_seconds: int = 60,
+            std_out_formatter=None,
     ):
         """
         :param global_inputs: 
@@ -72,6 +73,7 @@ class AppDescriptor:
         :param use_scoped_session: If True, uses a scoped session for the db
         :param max_num_threads: Max number of threads to use for the app
         :param scheduler_interval_seconds: How often the scheduler runs in seconds (<=0 means never)
+        :param std_out_formatter: Optional - Formatter to use for stdout
         """
 
         self.db_descriptor: DbDescriptor = db_descriptor
@@ -100,3 +102,4 @@ class AppDescriptor:
         self.use_scoped_session: bool = use_scoped_session
         self.max_num_threads: int = max_num_threads
         self.scheduler_interval_seconds: int = scheduler_interval_seconds
+        self.std_out_formatter = std_out_formatter
