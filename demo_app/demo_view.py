@@ -130,7 +130,11 @@ class TestJobDef(JobDefinition):
     ) -> List[CachedSelectable]:
         if variable_name == "param_4":
             all_selectables = session.query(MySelectableModel).all()
-            return [s for s in all_selectables]
+            return [
+                CachedSelectable(
+                    s.get_label(), s.get_value(), s.get_label_div()
+                ) for s in all_selectables
+            ]
 
     @classmethod
     def force_update(cls):
@@ -214,20 +218,27 @@ class TestJobDef(JobDefinition):
 
         session: Session = kwargs["session"]
 
+        prog_container.push_changes_to_redis()
         time.sleep(1)
         prog_container.progress += 20
         prog_container.info_log("1 second passed")
+        prog_container.push_changes_to_redis()
         time.sleep(1)
         prog_container.progress += 20
         prog_container.info_log("2 seconds passed")
+        prog_container.push_changes_to_redis()
         time.sleep(1)
         prog_container.progress += 20
         prog_container.info_log("3 seconds passed")
+        prog_container.push_changes_to_redis()
         time.sleep(1)
         prog_container.progress += 20
         prog_container.info_log("4 seconds passed")
+        prog_container.push_changes_to_redis()
 
         if "param_4" in parameter_values:
+            prog_container.info_log(f"Received param_4: {parameter_values['param_4']}")
+
             my_selectable: MySelectableModel = session.query(MySelectableModel) \
                 .filter_by(id=parameter_values["param_4"]).first()
             # .filter_by(id=int(parameter_values["param_4"])).first()
@@ -238,11 +249,13 @@ class TestJobDef(JobDefinition):
         ran = random.random()
         if ran < 0.5:
             prog_container.end_reason = "Failed Successfully!"
+            prog_container.push_changes_to_redis()
             return StatusesEnum.FAILURE
         else:
             prog_container.end_reason = "Everything succeeded!"
             prog_container.progress += 20
             time.sleep(1)
+            prog_container.push_changes_to_redis()
             return StatusesEnum.SUCCESS
 
     def stop(self, *args, prog_container: VirtualJobProgressContainer, **kwargs) -> StatusesEnum:
@@ -279,6 +292,7 @@ class DemoView(BaseView):
                 )
             ],
         )
+        self.job_card = None
         self.sub_views = None
         self.simple_tsdp_dash = None
         self.tsdp_datatables = []
@@ -295,20 +309,21 @@ class DemoView(BaseView):
             self.push_alert(Alert("Test Warning Alert!", color="warning", duration=5))
             self.push_alert(Alert("Test DANGER Alert!", color="danger", duration=20))
 
-        job_def_service: JobDefinitionService = self.get_service(JobDefinitionService)
-        job_def: TestJobDef = job_def_service.get_by_id(self.test_job_id)
+        with self.dbm as dbm:
+            job_def_service: JobDefinitionService = self.get_service(JobDefinitionService)
+            job_def: TestJobDef = job_def_service.get_by_id(self.test_job_id, session=dbm.get_session())
 
-        return [
-            DemoView.raw_render(
-                self.watchlist,
-                job_def_service.get_by_id(self.test_job_id),
-                job_def_service,
-                data_tables=self.data_tables,
-                tsdp_data_tables=self.tsdp_datatables,
-                simple_tsdp_dash=self.simple_tsdp_dash,
-                sub_views=self.sub_views
-            )
-        ]
+            return [
+                DemoView.raw_render(
+                    self.watchlist,
+                    job_def,
+                    job_def_service,
+                    data_tables=self.data_tables,
+                    tsdp_data_tables=self.tsdp_datatables,
+                    simple_tsdp_dash=self.simple_tsdp_dash,
+                    sub_views=self.sub_views
+                )
+            ]
 
     @staticmethod
     def render_watchlist(watchlist):
@@ -337,7 +352,8 @@ class DemoView(BaseView):
             tsdp_data_tables: List[TimeSeriesDataTableWrapper] = None,
             simple_tsdp_dash: SimpleTimeSeriesDashboard = None,
             sub_views: Dict[str, BaseView] = None,
-            current_tab_id: str = 'tab-0'
+            current_tab_id: str = 'tab-0',
+            job_card: JobCard = None
     ):
         # return todo_list_component.render()
         if data_tables is None:
@@ -380,13 +396,7 @@ class DemoView(BaseView):
             children=[
                 dbc.Tab(
                     children=[
-                        JobCard(
-                            job,
-                            job_def_service,
-                            footer="footer",
-                            selectables_as_tabs=False,
-                            hide_log_div=True
-                        ).render()
+                        job_card.render()
                     ],
                     label="Job Card Demo",
                     style={"padding": "20px"}
@@ -551,209 +561,223 @@ class DemoView(BaseView):
                     StatusToCount(state_name="A", count=5, color=StatusesEnum.PENDING),
                     StatusToCount(state_name="B", count=5, color=StatusesEnum.IN_PROGRESS)
                 ]),
-                tabs_div
+                tabs_div,
             ],
             style={"margin": "0 auto", "padding": "20px"}
         )
 
     def render(self, query_params, *args):
-        job_def_service: JobDefinitionService = self.get_service(JobDefinitionService)
-        test_job_def: TestJobDef = job_def_service.get_by_id(self.test_job_id)
-        session: Session = self.dbm.get_session()
-        current_selectables = session.query(MySelectableModel).all()
-        if len(current_selectables) == 0:
-            for i in range(10):
-                new_selectable_model: MySelectableModel = MySelectableModel()
-                new_selectable_model.name = f"MySelectableModel{i}"
-                session.add(new_selectable_model)
+        with self.dbm as dbm:
+            session: Session = dbm.get_session()
+            job_def_service: JobDefinitionService = self.get_service(JobDefinitionService)
+            test_job_def: TestJobDef = job_def_service.get_by_id(self.test_job_id, session)
 
-            try:
-                session.commit()
-                test_job_def.sync_single_selectable_data(session=session)
-            except Exception as e:
-                self.logger.error(f"Failed to commit session: {e}")
-                session.rollback()
+            current_selectables = session.query(MySelectableModel).all()
 
-        self.logger.debug("This is debug log")
-        self.logger.info("This is info log")
-        self.logger.warn("This is warn log")
-        self.logger.error("This is error log")
-        self.logger.critical("This is critical log")
+            if self.job_card is None:
+                self.job_card = JobCard(
+                    test_job_def,
+                    job_def_service,
+                    footer="footer",
+                    selectables_as_tabs=False,
+                    hide_log_div=True,
+                    **self.produce_kwargs()
+                )
 
-        if len(self.data_tables) == 0:
+            if len(current_selectables) == 0:
+                for i in range(10):
+                    new_selectable_model: MySelectableModel = MySelectableModel()
+                    new_selectable_model.name = f"MySelectableModel{i}"
+                    session.add(new_selectable_model)
+
+                try:
+                    session.commit()
+                    test_job_def.sync_single_selectable_data(session=session)
+                except Exception as e:
+                    self.logger.error(f"Failed to commit session: {e}")
+                    session.rollback()
+
+            self.logger.debug("This is debug log")
+            self.logger.info("This is info log")
+            self.logger.warn("This is warn log")
+            self.logger.error("This is error log")
+            self.logger.critical("This is critical log")
+
+            if len(self.data_tables) == 0:
+                numeric_format = Format(precision=2, scheme=Scheme.fixed).group(True)
+                dtw: DataTableWrapper = DataTableWrapper(
+                    title="Data Table 1 ",
+                    columns=[
+                        {"id": f"{i}", "type": "numeric", "format": numeric_format, "name": f"Column {i}"}
+                        for i in range(10)
+                    ],
+                    service_provider=self.get_service
+                )
+
+                def fill_data(async_container: Optional[AsyncWorkProgressContainer] = None, **kwargs):
+                    if async_container is None:
+                        async_container = AsyncWorkProgressContainer()
+
+                    data = []
+                    for row in range(100):
+                        row_data = {f"{col}": random.random() * 100 for col in range(10)}
+                        data.append(row_data)
+                        async_container.progress += 0.5
+                        if row % 25 == 0:
+                            time.sleep(0.5)
+
+                    return data
+
+                dtw.set_data(fill_data())
+                dtw.reload_data_function = fill_data
+
+                self.data_tables.append(dtw)
+
             numeric_format = Format(precision=2, scheme=Scheme.fixed).group(True)
-            dtw: DataTableWrapper = DataTableWrapper(
-                title="Data Table 1 ",
-                columns=[
-                    {"id": f"{i}", "type": "numeric", "format": numeric_format, "name": f"Column {i}"}
-                    for i in range(10)
-                ],
-                service_provider=self.get_service
-            )
+            end_date = datetime.datetime.now()
+            start_date = end_date - datetime.timedelta(days=120)
+            interval_size = datetime.timedelta(days=1)
 
-            def fill_data(async_container: Optional[AsyncWorkProgressContainer] = None, **kwargs):
-                if async_container is None:
-                    async_container = AsyncWorkProgressContainer()
+            def wrapper_generate_data(num_series, interval, offset=0, sleep_delay=0):
+                def generate_data(async_container: Optional[AsyncWorkProgressContainer] = None):
+                    if async_container is None:
+                        async_container = AsyncWorkProgressContainer()
 
-                data = []
-                for row in range(100):
-                    row_data = {f"{col}": random.random() * 100 for col in range(10)}
-                    data.append(row_data)
-                    async_container.progress += 0.5
-                    if row % 25 == 0:
-                        time.sleep(0.5)
-
-                return data
-
-            dtw.set_data(fill_data())
-            dtw.reload_data_function = fill_data
-
-            self.data_tables.append(dtw)
-
-        numeric_format = Format(precision=2, scheme=Scheme.fixed).group(True)
-        end_date = datetime.datetime.now()
-        start_date = end_date - datetime.timedelta(days=120)
-        interval_size = datetime.timedelta(days=1)
-
-        def wrapper_generate_data(num_series, interval, offset=0, sleep_delay=0):
-            def generate_data(async_container: Optional[AsyncWorkProgressContainer] = None):
-                if async_container is None:
-                    async_container = AsyncWorkProgressContainer()
-
-                all_series = []
-                for i in range(offset, num_series + offset):
-                    timeseries: TimeSeries = TimeSeries(
-                        title=f"Series {i + 1}",
-                        unique_id=f"series-{i + 1}",
-                        unit="$",
-                        description="This is a test series"
-                    )
-
-                    for i in range((end_date - start_date) // interval + 1):
-                        timeseries.add_tsdp(
-                            TimeSeriesDataPoint(
-                                date=start_date + (i * interval),
-                                value=random.random() * 100
-                            )
+                    all_series = []
+                    for i in range(offset, num_series + offset):
+                        timeseries: TimeSeries = TimeSeries(
+                            title=f"Series {i + 1}",
+                            unique_id=f"series-{i + 1}",
+                            unit="$",
+                            description="This is a test series"
                         )
 
-                    all_series.append(timeseries)
-                    async_container.progress += 50.0 / num_series
-                    time.sleep(max(sleep_delay, 0))
-                return all_series
+                        for i in range((end_date - start_date) // interval + 1):
+                            timeseries.add_tsdp(
+                                TimeSeriesDataPoint(
+                                    date=start_date + (i * interval),
+                                    value=random.random() * 100
+                                )
+                            )
 
-            return generate_data
+                        all_series.append(timeseries)
+                        async_container.progress += 50.0 / num_series
+                        time.sleep(max(sleep_delay, 0))
+                    return all_series
 
-        if len(self.tsdp_datatables) == 0:
-            tsdp_dtw: TimeSeriesDataTableWrapper = TimeSeriesDataTableWrapper(
-                title="Data Table 1",
-                start_date=start_date,
-                end_date=end_date,
-                interval_size=interval_size,
-                aggregation_method=TsdpAggregationFuncs.SUM,
-                reload_data_function=wrapper_generate_data(2, datetime.timedelta(hours=1))
+                return generate_data
+
+            if len(self.tsdp_datatables) == 0:
+                tsdp_dtw: TimeSeriesDataTableWrapper = TimeSeriesDataTableWrapper(
+                    title="Data Table 1",
+                    start_date=start_date,
+                    end_date=end_date,
+                    interval_size=interval_size,
+                    aggregation_method=TsdpAggregationFuncs.SUM,
+                    reload_data_function=wrapper_generate_data(2, datetime.timedelta(hours=1))
+                )
+
+                timeseries = TimeSeries(
+                    title=f"Series Hourly",
+                    unit="SGD",
+                    unique_id=f"series-1"
+                )
+
+                timeseries2 = TimeSeries(
+                    title=f"Series Hourly 2",
+                    unit="USD",
+                    unique_id=f"series-2"
+                )
+
+                tsdp_dtw.add_timeseries(
+                    timeseries=timeseries,
+                    format=numeric_format,
+                    datatype="numeric"
+                )
+
+                tsdp_dtw.add_timeseries(
+                    timeseries=timeseries2,
+                    format=numeric_format,
+                    datatype="numeric"
+                )
+
+                self.tsdp_datatables.append(tsdp_dtw)
+
+            if self.simple_tsdp_dash is None:
+                date_range = DateRangeAggregatorDescriptor(
+                    start_date=start_date,
+                    end_date=end_date,
+                    interval=interval_size,
+                    aggregation_method=TsdpAggregationFuncs.SUM
+                )
+
+                tsw1 = TimeSeriesWrapper(
+                    title=f"Series Hourly",
+                    unique_id=f"series-3",
+                    stat_card_descriptors=[
+                        TsdpStatCardDescriptor(
+                            title="TS 1 Means over Time",
+                            graph_height=140,
+                            time_periods_to_show=[
+                                TimePeriodsEnum.LAST_24HRS, TimePeriodsEnum.LAST_7_DAYS,
+                                TimePeriodsEnum.LAST_30_DAYS, TimePeriodsEnum.LATEST
+                            ],
+                            aggregation_to_use=TsdpAggregationFuncs.SEGMENT_START,
+                        ),
+                    ],
+                    column_format=numeric_format,
+                )
+
+                tsw2 = TimeSeriesWrapper(
+                    title=f"Series Hourly 2",
+                    unique_id=f"series-4",
+                    stat_card_descriptors=[
+                        TsdpStatCardDescriptor(
+                            title="TS 2 Means over Time",
+                            graph_height=210,
+                            time_periods_to_show=[
+                                TimePeriodsEnum.LAST_24HRS, TimePeriodsEnum.LAST_7_DAYS,
+                                TimePeriodsEnum.LAST_30_DAYS, TimePeriodsEnum.LATEST
+                            ],
+                            aggregation_to_use=TsdpAggregationFuncs.SEGMENT_START,
+                            description="This is a very long description."
+                                        " Lorem Ipsum is simply dummy text of the printing and typesetting industry."
+                                        " Lorem Ipsum has been the industry's standard dummy text ever since the 1500s,",
+                            unit="USD",
+                            show_expand_button=True
+                        ),
+                    ],
+                    column_format=numeric_format,
+                )
+
+                self.simple_tsdp_dash = SimpleTimeSeriesDashboard(
+                    title="Test Simple Time Series Dashboard",
+                    base_date_range=date_range,
+                    reload_data_function=wrapper_generate_data(2, datetime.timedelta(days=1), offset=2, sleep_delay=1),
+                    service_provider=self.get_service
+                )
+
+                self.simple_tsdp_dash.add_timeseries(tsw1)
+                self.simple_tsdp_dash.add_timeseries(tsw2)
+
+            if not self.sub_views:
+                from demo_app.area_graph_view import AreaGraphView
+                from demo_app.async_demo_view import AsyncDemoView
+                self.sub_views = {
+                    "Area Graph Demo": self.get_view(AreaGraphView),
+                    "Async Graph Demo": self.get_view(AsyncDemoView),
+                }
+
+            return html.Div(
+                children=DemoView.raw_render(
+                    self.watchlist,
+                    job_def_service.get_by_id(self.test_job_id, session),
+                    job_def_service,
+                    data_tables=self.data_tables,
+                    tsdp_data_tables=self.tsdp_datatables,
+                    simple_tsdp_dash=self.simple_tsdp_dash,
+                    sub_views=self.sub_views,
+                    job_card=self.job_card
+                ),
+                id=self.wrapper_div_id
             )
-
-            timeseries = TimeSeries(
-                title=f"Series Hourly",
-                unit="SGD",
-                unique_id=f"series-1"
-            )
-
-            timeseries2 = TimeSeries(
-                title=f"Series Hourly 2",
-                unit="USD",
-                unique_id=f"series-2"
-            )
-
-            tsdp_dtw.add_timeseries(
-                timeseries=timeseries,
-                format=numeric_format,
-                datatype="numeric"
-            )
-
-            tsdp_dtw.add_timeseries(
-                timeseries=timeseries2,
-                format=numeric_format,
-                datatype="numeric"
-            )
-
-            self.tsdp_datatables.append(tsdp_dtw)
-
-        if self.simple_tsdp_dash is None:
-            date_range = DateRangeAggregatorDescriptor(
-                start_date=start_date,
-                end_date=end_date,
-                interval=interval_size,
-                aggregation_method=TsdpAggregationFuncs.SUM
-            )
-
-            tsw1 = TimeSeriesWrapper(
-                title=f"Series Hourly",
-                unique_id=f"series-3",
-                stat_card_descriptors=[
-                    TsdpStatCardDescriptor(
-                        title="TS 1 Means over Time",
-                        graph_height=140,
-                        time_periods_to_show=[
-                            TimePeriodsEnum.LAST_24HRS, TimePeriodsEnum.LAST_7_DAYS,
-                            TimePeriodsEnum.LAST_30_DAYS, TimePeriodsEnum.LATEST
-                        ],
-                        aggregation_to_use=TsdpAggregationFuncs.SEGMENT_START,
-                    ),
-                ],
-                column_format=numeric_format,
-            )
-
-            tsw2 = TimeSeriesWrapper(
-                title=f"Series Hourly 2",
-                unique_id=f"series-4",
-                stat_card_descriptors=[
-                    TsdpStatCardDescriptor(
-                        title="TS 2 Means over Time",
-                        graph_height=210,
-                        time_periods_to_show=[
-                            TimePeriodsEnum.LAST_24HRS, TimePeriodsEnum.LAST_7_DAYS,
-                            TimePeriodsEnum.LAST_30_DAYS, TimePeriodsEnum.LATEST
-                        ],
-                        aggregation_to_use=TsdpAggregationFuncs.SEGMENT_START,
-                        description="This is a very long description."
-                                    " Lorem Ipsum is simply dummy text of the printing and typesetting industry."
-                                    " Lorem Ipsum has been the industry's standard dummy text ever since the 1500s,",
-                        unit="USD",
-                        show_expand_button=True
-                    ),
-                ],
-                column_format=numeric_format,
-            )
-
-            self.simple_tsdp_dash = SimpleTimeSeriesDashboard(
-                title="Test Simple Time Series Dashboard",
-                base_date_range=date_range,
-                reload_data_function=wrapper_generate_data(2, datetime.timedelta(days=1), offset=2, sleep_delay=1),
-                service_provider=self.get_service
-            )
-
-            self.simple_tsdp_dash.add_timeseries(tsw1)
-            self.simple_tsdp_dash.add_timeseries(tsw2)
-
-        if not self.sub_views:
-            from demo_app.area_graph_view import AreaGraphView
-            from demo_app.async_demo_view import AsyncDemoView
-            self.sub_views = {
-                "Area Graph Demo": self.get_view(AreaGraphView),
-                "Async Graph Demo": self.get_view(AsyncDemoView),
-            }
-
-        return html.Div(
-            children=DemoView.raw_render(
-                self.watchlist,
-                job_def_service.get_by_id(self.test_job_id),
-                job_def_service,
-                data_tables=self.data_tables,
-                tsdp_data_tables=self.tsdp_datatables,
-                simple_tsdp_dash=self.simple_tsdp_dash,
-                sub_views=self.sub_views
-            ),
-            id=self.wrapper_div_id
-        )

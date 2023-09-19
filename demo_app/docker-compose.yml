@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "60000:60000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/testdb
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    command: ["gunicorn", "test_app:server", "-b", "0.0.0.0:60000"]
+    depends_on:
+      - redis
+      - db
+  worker:
+    build: .
+    command: celery -A celery_app.celery worker --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/testdb
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - web
+      - redis
+      - db
+  beat:
+    build: .
+    command: celery -A celery_app.celery beat --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/testdb
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - web
+      - redis
+      - db
+  redis:
+    image: "redis:alpine"
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: testdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+#    volumes:
+#      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+#volumes:
+#  pgdata:

@@ -49,7 +49,9 @@ class CachedSelectable(Selectable):
             label_div=selectable.get_label_div()
         )
 
-    def __init__(self, label, value, label_div=None):
+    def __init__(
+        self, label, value, label_div=None
+    ):
         self.label = label
         self.value = value
         self.label_div = label_div or super().get_label_div()

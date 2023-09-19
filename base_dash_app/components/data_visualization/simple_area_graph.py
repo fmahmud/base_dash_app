@@ -1,5 +1,6 @@
 from typing import List, Dict
-import dash_core_components as dcc
+from dash import dcc
+
 import plotly.graph_objects as go
 from plotly.graph_objs.scatter import Line
 
@@ -8,7 +9,8 @@ from base_dash_app.virtual_objects.interfaces.graphable import Graphable
 
 
 class AreaGraph(BaseComponent):
-    def __init__(self, title: str = ""):
+    def __init__(self, title: str = "", *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.title: str = title
         self.series: Dict[str, List[Graphable]] = {}
 

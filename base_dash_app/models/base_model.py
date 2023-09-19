@@ -1,16 +1,16 @@
 import abc
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
-from sqlalchemy.ext.declarative import DeclarativeMeta
+from flask_sqlalchemy import DefaultMeta
 
-from base_dash_app.utils.base_definition import get_base_class
+from base_dash_app.application.db_declaration import db
 
 
-class DeclarativeABCMeta(DeclarativeMeta, abc.ABCMeta):
+class CombinedMeta(abc.ABCMeta, DefaultMeta):
     pass
 
 
-class BaseModel(get_base_class(), ABC, metaclass=DeclarativeABCMeta):
+class BaseModel(db.Model, metaclass=CombinedMeta):
     __abstract__ = True
 
     @abstractmethod

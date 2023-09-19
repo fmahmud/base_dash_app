@@ -55,32 +55,7 @@ class AsyncDemoView(BaseView):
         return
 
     def gen_work_func(self):
-        def gen_graph_data(prog_container: AsyncWorkProgressContainer, prev_result=None, *args, **kwargs):
-            self.logger.info("Starting work func")
-            time.sleep(random.randint(1, 2))
-            prog_container.set_progress(25)
-            prog_container.set_status_message("Generating Data...")
-            time.sleep(1)
-            prog_container.set_progress(50)
-            time.sleep(random.randint(1, 2))
-            prog_container.set_progress(75)
-            if prev_result:
-                data = prev_result
-                for d in data:
-                    d.value += random.randint(0, 100)
-            else:
-                data = [
-                    TimeSeriesDataPoint(
-                        date=datetime.datetime(year=2023, day=1, month=1) + datetime.timedelta(days=i),
-                        value=random.randint(0, 100)
-                    )
-                    for i in range(100)
-                ]
-            prog_container.complete(
-                result=data,
-                status_message="Finished generating data"
-            )
-            self.logger.info("Finished work func")
+
 
         return gen_graph_data
 

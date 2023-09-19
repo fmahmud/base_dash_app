@@ -1,5 +1,6 @@
 import concurrent
 import datetime
+import json
 import traceback
 import uuid
 from concurrent.futures import ThreadPoolExecutor, Future, wait, FIRST_EXCEPTION
@@ -30,6 +31,8 @@ class WorkContainer(BaseWorkContainer, BaseComponent):
         self.name = name
         self.color = color
         self.is_hidden = is_hidden
+        self.redis_client = None
+        self.container_uuid = None
 
     def reset(self):
         self.execution_status = StatusesEnum.PENDING
@@ -40,11 +43,67 @@ class WorkContainer(BaseWorkContainer, BaseComponent):
         self.progress = 0.0
         self.status_message = None
 
+    def use_redis(self, redis_client, result_uuid: str = None):
+        self.redis_client = redis_client
+        self.container_uuid = self.container_uuid or result_uuid
+
+    def push_latest_to_redis(self):
+        if self.redis_client is None or self.container_uuid is None:
+            return
+
+        self.redis_client.hmset(self.container_uuid, self.to_dict())
+
+    def fetch_latest_from_redis(self):
+        if self.redis_client is None or self.container_uuid is None:
+            return
+
+        prog_container_bin_dict = self.redis_client.hgetall(self.container_uuid)
+
+        if len(prog_container_bin_dict) == 0:
+            print(f"Could not find {self.container_uuid} in redis")
+            return
+
+        self.from_dict(prog_container_bin_dict)
+
+    def to_dict(self):
+        return {
+            "execution_status": (
+                self.execution_status.name if self.execution_status else StatusesEnum.PENDING.value.name
+            ),
+            "result": json.dumps(self.result),
+            "start_time": str(self.start_time),
+            "end_time": str(self.end_time),
+            "stacktrace": str(self.stacktrace),
+            "progress": self.progress,
+            "status_message": self.status_message,
+            "name": self.name,
+            "color": self.color,
+            "is_hidden": str(self.is_hidden),
+        }
+
+    def from_dict(self, d):
+        self.execution_status = (
+            StatusesEnum.get_by_name(d["execution_status"]) if d["execution_status"] else StatusesEnum.PENDING
+        )
+
+        self.result = json.loads(d["result"]) if d["result"] else None
+        self.start_time = d["start_time"]
+        self.end_time = d["end_time"]
+        self.stacktrace = d["stacktrace"]
+        self.progress = d["progress"]
+        self.status_message = d["status_message"]
+        self.name = d["name"]
+        self.color = d["color"]
+        self.is_hidden = d["is_hidden"]
+
     def get_name(self):
         return self.name
 
     def set_progress(self, progress: float):
         self.progress = progress
+
+        if self.redis_client and self.container_uuid:
+            self.redis_client.hset(self.container_uuid, "progress", progress)
 
     def set_status_message(self, status_message: str):
         if status_message:

@@ -1,3 +1,6 @@
+import time
+time.sleep(10)
+
 import logging
 
 import dash_bootstrap_components as dbc
@@ -20,7 +23,6 @@ external_stylesheets = [
     FONT_AWESOME
 ]
 
-
 db_descriptor: DbDescriptor = DbDescriptor(
     db_uri="db:5432/testdb",
     engine_type=DbEngineTypes.POSTGRES,
@@ -32,13 +34,12 @@ my_app_descriptor = AppDescriptor(
     db_descriptor=db_descriptor,
     title="Test App",
     external_stylesheets=external_stylesheets,
-    views=[DemoView, AreaGraphView, AsyncDemoView], view_groups={"Test": [DemoView]},
+    views=[DemoView, AreaGraphView, AsyncDemoView],
+    view_groups={"Test": [DemoView]},
     jobs=[TestJobDef], service_classes=[MySelectablesService],
-    upgrade_db=True,
-    drop_tables=False,
     use_auth=True,
     valid_user_pairs={"test": "test"},
-    log_level=logging.DEBUG,
+    log_level=logging.INFO,
     alerts_refresh_timeout=2000,
     assets_folder_path="/assets",
     # std_out_formatter=ColoredFormatter()
@@ -49,7 +50,6 @@ my_app_descriptor = AppDescriptor(
     ],
     use_scoped_session=True,
 )
-
 
 from base_dash_app.application.celery_decleration import CelerySingleton
 celery = CelerySingleton.get_instance().get_celery()

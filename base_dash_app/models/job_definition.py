@@ -14,7 +14,7 @@ from base_dash_app.models.job_instance import JobInstance
 from base_dash_app.utils.db_utils import DbManager
 from base_dash_app.virtual_objects.interfaces.resultable_event_series import ResultableEventSeries, \
     CachedResultableEventSeries
-from base_dash_app.virtual_objects.interfaces.selectable import Selectable
+from base_dash_app.virtual_objects.interfaces.selectable import Selectable, CachedSelectable
 from base_dash_app.virtual_objects.interfaces.startable import Startable
 from base_dash_app.virtual_objects.interfaces.stoppable import Stoppable
 from base_dash_app.virtual_objects.job_progress_container import VirtualJobProgressContainer
@@ -78,9 +78,11 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
     @latest_start_time.expression
     def latest_child_timestamp(cls):
         # This part works at the class/query level.
-        return (select([func.max(JobInstance.start_time)]).
-                where(JobInstance.parent_id == cls.id).
-                label('latest_start_time'))
+        return (
+            select([func.max(JobInstance.start_time)])
+            .where(JobInstance.job_definition_id == cls.id)
+            .label('latest_start_time')
+        )
 
     @classmethod
     def get_latest_exec_for_selectable(cls, selectable: Selectable, session: Session) -> Optional[JobInstance]:
@@ -146,18 +148,19 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
         Stoppable.__init__(self)
         VirtualFrameworkObject.__init__(self, **kwargs)
 
-        self.selectables: List[Selectable] = []
+        self.cached_selectables: List[CachedSelectable] = []
         self.single_selectable_param_name: str = type(self).single_selectable_param_name()
 
         if dbm is not None:
-            session: Session = dbm.get_session()
-            self.sync_single_selectable_data(session=session)
+            with dbm as dbm:
+                session: Session = dbm.get_session()
+                self.sync_single_selectable_data(session=session)
 
         self.logger = logging.getLogger(self.name)
 
     def sync_single_selectable_data(self, session: Session):
         if self.single_selectable_param_name is not None:
-            self.selectables = type(self).get_cached_selectables_by_param_name(
+            self.cached_selectables = type(self).get_cached_selectables_by_param_name(
                 self.single_selectable_param_name,
                 session=session
             )
@@ -168,18 +171,11 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
         ResultableEventSeries.__init__(self)
         Startable.__init__(self)
         Stoppable.__init__(self)
-        session: Session = Session.object_session(self)
-        self.sync_single_selectable_data(session=session)
         self.logger = logging.getLogger(self.name)
-        self.rehydrate_events_from_db(session)
+        self.rehydrate_events_from_db()
 
-    def rehydrate_events_from_db(self, session: Session = None):
+    def rehydrate_events_from_db(self):
         self.clear_all()
-        # in_progress_job_instances = [ji for ji in self.job_instances if ji.is_in_progress()]
-        # for ji in in_progress_job_instances:
-        #     session.expunge(ji)
-
-        session.refresh(self)
 
         for ji in self.job_instances:
             ji: JobInstance

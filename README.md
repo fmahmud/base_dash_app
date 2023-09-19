@@ -83,9 +83,18 @@ app_descriptor = AppDescriptor(
 ## Repo Usage
 
 ### Requirements
-`pip3 install twine setuptools wheel`
+`pip3 install twine setuptools wheel pipenv`
 
-### Installation
+### Setup Environment
+`pipenv install --dev`
+
+### Generate Requirements
+`pip3 freeze > requirements.txt`
+
+### Package into wheel
+` python setup.py bdist_wheel`
+
+### Using the Wheel
 `pip install <path_to_wheel>`
 
 e.g. `pip install ./dist/base_dash_app-0.1.8-py3-none-any.whl`
@@ -94,9 +103,3 @@ e.g. `pip install ./dist/base_dash_app-0.1.8-py3-none-any.whl`
 `pip uninstall <path_to_wheel>`
 
 e.g. `pip uninstall ./dist/base_dash_app-0.1.8-py3-none-any.whl`
-
-### Generate Requirements
-`pip3 freeze > requirements.txt`
-
-### Package into wheel
-` python setup.py bdist_wheel`

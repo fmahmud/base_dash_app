@@ -1,24 +1,31 @@
 import datetime
 import logging
 import os
+import threading
 import traceback
 from operator import itemgetter
-from typing import List, Callable, Dict, Type, Union, TypeVar, Any
+from typing import List, Callable, Dict, Type, Union, TypeVar, Any, Optional
 from urllib.parse import unquote
 
 import dash
 import dash_auth
 import psutil
+import redis
 import sqlalchemy.exc
 from apscheduler.schedulers.background import BackgroundScheduler
+from celery import Celery
+from celery.schedules import crontab
 from dash import dcc, html
 from dash.dependencies import Output, Input, State, ALL
 from dash.exceptions import PreventUpdate
 from pympler import tracker
+from redis import Redis
 from sqlalchemy.orm import Session
+from typing_extensions import deprecated
 
 from base_dash_app.apis.api import API
 from base_dash_app.application.app_descriptor import AppDescriptor
+from base_dash_app.application.db_declaration import db
 from base_dash_app.components import alerts
 from base_dash_app.components.alerts import Alert
 from base_dash_app.components.async_task_controls import AsyncTaskControls
@@ -44,6 +51,7 @@ from base_dash_app.virtual_objects.interfaces.startable import Startable, Extern
 from base_dash_app.models.job_definition import JobDefinition
 from base_dash_app.virtual_objects.timeseries.time_series import TimeSeries
 from base_dash_app.virtual_objects.timeseries.time_series_data_point import TimeSeriesDataPoint
+from base_dash_app.virtual_objects.virtual_framework_obj import VirtualFrameworkObject
 
 ALERTS_WRAPPER_INTERVAL_ID = "alerts-wrapper-interval-id"
 
@@ -51,7 +59,30 @@ ALERTS_WRAPPER_DIV_ID = "alerts-wrapper-div-id"
 
 
 class RuntimeApplication:
+    _instance = None
+
+    @classmethod
+    def get_instance(cls):
+        if cls._instance is None:
+            raise Exception("RuntimeApplication is not initialized.")
+        return cls._instance
+
+    def construct_dbm(self):
+        if self.app_descriptor.db_descriptor is not None:
+            return DbManager(
+                self.app_descriptor.db_descriptor,
+                app=self.app.server,
+                db=db
+            )
+
     def __init__(self, app_descriptor: AppDescriptor):
+        # will not be used if running in gunicorn or celery
+        self.bg_scheduler: Optional[BackgroundScheduler] = None
+        if RuntimeApplication._instance is not None:
+            return
+
+        RuntimeApplication._instance = self
+
         self.last_job_check = None
         self.app_descriptor: AppDescriptor = app_descriptor
 
@@ -66,7 +97,8 @@ class RuntimeApplication:
             title=app_descriptor.title,
             external_stylesheets=app_descriptor.external_stylesheets,
             suppress_callback_exceptions=True,
-            assets_folder=app_descriptor.assets_folder_path or "assets"
+            assets_folder=app_descriptor.assets_folder_path or "assets",
+            update_title=None
         )
 
         self.app.logger.handlers.clear()
@@ -79,6 +111,20 @@ class RuntimeApplication:
             )
 
         self.server = self.app.server
+        self.redis_client: Redis = redis.StrictRedis(
+            host=os.getenv("REDIS_HOST", "redis"), port=6379, db=1,
+            decode_responses=True
+        )
+
+        try:
+            if self.redis_client.ping():
+                self.app.logger.debug("Connected to Redis.")
+        except redis.exceptions.ConnectionError:
+            self.app.logger.error("Could not connect to Redis.")
+
+        # need to set celery instance from outside, so it can be referenced when decorating tasks
+        self.celery: Optional[Celery] = None
+
         self.dbm = None
 
         self.active_alerts: List[Alert] = []
@@ -89,7 +135,7 @@ class RuntimeApplication:
         self.jobs: Dict[Type, JobDefinition] = {}
         for e in self.app_descriptor.env_vars:
             e.value = e.var_type(os.getenv(e.name))
-            if e.value is None and e.required:
+            if e.value is None or e.value == "None" and e.required:
                 raise Exception(f"Could not find required environment variable: {e.name}.")
 
             self.env_vars[e.name] = e
@@ -104,6 +150,7 @@ class RuntimeApplication:
                 self.active_alerts.remove(alert)
 
         Service = TypeVar("Service", bound=BaseService)
+
         def get_service_by_type(service_class: Type) -> Service:
             return self.services.get(service_class)
 
@@ -119,142 +166,136 @@ class RuntimeApplication:
         def get_view_by_type(view_class: Type) -> BaseView:
             return self.views.get(view_class)
 
-        if app_descriptor.db_descriptor is not None:
-            self.dbm = DbManager(
-                app_descriptor.db_descriptor,
-                use_scoped_sessions=app_descriptor.use_scoped_session
+        with self.app.server.app_context():
+            if app_descriptor.db_descriptor is not None:
+                self.dbm = DbManager(
+                    app_descriptor.db_descriptor,
+                    app=self.app.server,
+                    db=db
+                )
+
+            if self.dbm is not None and app_descriptor.upgrade_db:
+                self.dbm.upgrade_db(drop_first=app_descriptor.drop_tables)
+
+            self.last_mem_check = datetime.datetime(1970, 1, 1)
+            self.memory_history_timeseries: TimeSeries = TimeSeries(
+                title="Memory History",
+                unique_id="memory_history",
             )
 
-        if self.dbm is not None and app_descriptor.upgrade_db:
-            self.dbm.upgrade_db(drop_first=app_descriptor.drop_tables)
-
-        self.memory_history_timeseries: TimeSeries = TimeSeries(
-            title="Memory History",
-            unique_id="memory_history",
-        )
-
-        self.cpu_history_timeseries: TimeSeries = TimeSeries(
-            title="CPU History",
-            unique_id="cpu_history",
-        )
-
-        self.base_service_args = base_service_args = {
-            "dbm": self.dbm,
-            "service_provider": get_service_by_type,
-            "api_provider": get_api_by_type,
-            "all_apis": get_all_apis,
-            "register_callback_func": self.register_callback,
-            "push_alert": push_new_alert,
-            "remove_alert": remove_alert,
-            "env_vars": self.env_vars,
-            "job_provider": get_job_by_class,
-            "view_provider": get_view_by_type,
-        }
-
-        for api_type in app_descriptor.apis:
-            self.apis[api_type] = api_type(**base_service_args)  # parent constructor vars will come from child
-
-        job_def_service: JobDefinitionService = JobDefinitionService(**base_service_args)
-        all_jobs_from_db: List[JobDefinition] = job_def_service.get_all()
-        all_job_classes = set([type(jd) for jd in all_jobs_from_db])
-
-        required_job_to_class_map = {job_type.__name__: job_type for job_type in app_descriptor.jobs}
-
-        for class_name, job_class in required_job_to_class_map.items():
-            if issubclass(job_class, JobDefinition) and job_class.autoinitialize():
-                if job_class not in all_job_classes:
-                    # job was never saved to DB and it should be autoinitialized
-                    job = job_class.construct_instance(**base_service_args)
-                    job_def_service.save(job)
-
-                    all_jobs_from_db.append(job)
-                    all_job_classes.add(job_class)
-                elif job_class.force_update():
-                    # todo
-                    pass
-
-        for s in app_descriptor.service_classes:
-            self.services[s] = s(**base_service_args)
-
-        self.services[GlobalStateService] = GlobalStateService(initial_state=app_descriptor.initial_global_state)
-        self.services[JobDefinitionService] = job_def_service
-        self.services[AsyncHandlerService] = AsyncHandlerService(
-            **base_service_args,
-            max_workers=app_descriptor.max_num_threads
-        )
-
-        base_view_args = base_service_args
-
-        for view in app_descriptor.views:
-            self.views[view] = view(**base_view_args)
-
-        self.views[AdminStatisticsDash] = AdminStatisticsDash(
-            memory_timeseries=self.memory_history_timeseries,
-            cpu_timeseries=self.cpu_history_timeseries,
-            **base_view_args
-        )
-
-        wrapped_get_handler = self.bind_to_self(self.handle_get_call)
-
-        self.__global_inputs = app_descriptor.global_inputs
-        self.__global_input_string_ids_map = {its.get_input_string_id(): its for its in self.__global_inputs}
-        resulting_inputs = [Input('url', 'pathname'), Input('url', 'search')]
-        resulting_states = []
-        for g_input in app_descriptor.global_inputs:
-            g_input: InputToState
-            resulting_inputs.append(g_input.input.get_as_input())
-            resulting_states += [s.get_as_state() for s in g_input.states]
-
-        self.register_callback(
-            output=Output('page-content', 'children'),
-            inputs=resulting_inputs,
-            function=wrapped_get_handler,
-            state=resulting_states
-        )
-
-        self.register_callback(
-            output=[
-                Output(ALERTS_WRAPPER_DIV_ID, "children"),
-                Output("nav-bar-memory-consumption-bar", "value"),
-                Output("nav-bar-memory-consumption-label", "children"),
-                Output("nav-bar-cpu-usage-bar", "value"),
-                Output("nav-bar-cpu-usage-label", "children"),
-            ],
-            inputs=[
-                Input({"type": alerts.DISMISS_ALERT_BTN_ID, "index": ALL}, "n_clicks"),
-                Input(ALERTS_WRAPPER_INTERVAL_ID, "n_intervals"),
-                Input(alerts.CLEAR_ALL_ALERTS_BTN_ID, "n_clicks"),
-            ],
-            state=[],
-            function=self.bind_to_self(self.handle_alerts)
-        )
-
-        # register internal callback components
-        components_with_internal_callbacks = [
-            JobCard, DataTableWrapper, SimpleTimeSeriesDashboard, TsdpSparklineStatCard,
-            AsyncTaskControls,
-            *app_descriptor.components_with_internal_callbacks
-        ]
-
-        for comp_class in components_with_internal_callbacks:
-            comp_class.do_registrations(self.register_callback)
-
-        self.navbar = self.initialize_navbar(
-            app_descriptor.extra_nav_bar_components, app_descriptor.view_groups
-        )
-
-        self.app.layout = self.get_layout
-
-        if self.app_descriptor.scheduler_interval_seconds is not None \
-                and self.app_descriptor.scheduler_interval_seconds > 0:
-            self.bg_scheduler = BackgroundScheduler()
-            self.bg_scheduler.add_job(
-                lambda: self.handle_scheduler_interval(),
-                trigger='interval', seconds=app_descriptor.scheduler_interval_seconds,
-                next_run_time=datetime.datetime.now() + datetime.timedelta(seconds=20),
-                max_instances=1
+            self.cpu_history_timeseries: TimeSeries = TimeSeries(
+                title="CPU History",
+                unique_id="cpu_history",
             )
-            self.bg_scheduler.start()
+
+            self.base_service_args = base_service_args = {
+                "dbm": self.dbm,
+                "service_provider": get_service_by_type,
+                "api_provider": get_api_by_type,
+                "all_apis": get_all_apis,
+                "register_callback_func": self.register_callback,
+                "push_alert": push_new_alert,
+                "remove_alert": remove_alert,
+                "env_vars": self.env_vars,
+                "job_provider": get_job_by_class,
+                "view_provider": get_view_by_type,
+                "redis_client": self.redis_client
+            }
+
+            for api_type in app_descriptor.apis:
+                self.apis[api_type] = api_type(**base_service_args)  # parent constructor vars will come from child
+
+            session: Session = self.dbm.get_session()
+            job_def_service: JobDefinitionService = JobDefinitionService(**base_service_args)
+            all_jobs_from_db: List[JobDefinition] = job_def_service.get_all(session)
+            all_job_classes = set([type(jd) for jd in all_jobs_from_db])
+
+            required_job_to_class_map = {job_type.__name__: job_type for job_type in app_descriptor.jobs}
+
+            for class_name, job_class in required_job_to_class_map.items():
+                if issubclass(job_class, JobDefinition) and job_class.autoinitialize():
+                    if job_class not in all_job_classes:
+                        # job was never saved to DB and it should be autoinitialized
+                        job = job_class.construct_instance(**base_service_args)
+                        job_def_service.save(job, session=session)
+
+                        all_jobs_from_db.append(job)
+                        all_job_classes.add(job_class)
+                    elif job_class.force_update():
+                        # todo
+                        pass
+
+            for s in app_descriptor.service_classes:
+                self.services[s] = s(**base_service_args)
+
+            self.services[GlobalStateService] = GlobalStateService(initial_state=app_descriptor.initial_global_state)
+            self.services[JobDefinitionService] = job_def_service
+            self.services[AsyncHandlerService] = AsyncHandlerService(
+                **base_service_args,
+                max_workers=app_descriptor.max_num_threads
+            )
+
+            base_view_args = base_service_args
+
+            for view in app_descriptor.views:
+                self.views[view] = view(**base_view_args)
+
+            self.views[AdminStatisticsDash] = AdminStatisticsDash(
+                memory_timeseries=self.memory_history_timeseries,
+                cpu_timeseries=self.cpu_history_timeseries,
+                **base_view_args
+            )
+
+            wrapped_get_handler = self.bind_to_self(self.handle_get_call)
+
+            self.__global_inputs = app_descriptor.global_inputs
+            self.__global_input_string_ids_map = {its.get_input_string_id(): its for its in self.__global_inputs}
+            resulting_inputs = [Input('url', 'pathname'), Input('url', 'search')]
+            resulting_states = []
+            for g_input in app_descriptor.global_inputs:
+                g_input: InputToState
+                resulting_inputs.append(g_input.input.get_as_input())
+                resulting_states += [s.get_as_state() for s in g_input.states]
+
+            self.register_callback(
+                output=Output('page-content', 'children'),
+                inputs=resulting_inputs,
+                function=wrapped_get_handler,
+                state=resulting_states
+            )
+
+            self.register_callback(
+                output=[
+                    Output(ALERTS_WRAPPER_DIV_ID, "children"),
+                    Output("nav-bar-memory-consumption-bar", "value"),
+                    Output("nav-bar-memory-consumption-label", "children"),
+                    Output("nav-bar-cpu-usage-bar", "value"),
+                    Output("nav-bar-cpu-usage-label", "children"),
+                ],
+                inputs=[
+                    Input({"type": alerts.DISMISS_ALERT_BTN_ID, "index": ALL}, "n_clicks"),
+                    Input(ALERTS_WRAPPER_INTERVAL_ID, "n_intervals"),
+                    Input(alerts.CLEAR_ALL_ALERTS_BTN_ID, "n_clicks"),
+                ],
+                state=[],
+                function=self.bind_to_self(self.handle_alerts)
+            )
+
+            # register internal callback components
+            components_with_internal_callbacks = [
+                JobCard, DataTableWrapper, SimpleTimeSeriesDashboard, TsdpSparklineStatCard,
+                AsyncTaskControls,
+                *app_descriptor.components_with_internal_callbacks
+            ]
+
+            for comp_class in components_with_internal_callbacks:
+                comp_class.do_registrations(self.register_callback)
+
+            self.navbar = self.initialize_navbar(
+                app_descriptor.extra_nav_bar_components, app_descriptor.view_groups
+            )
+
+            self.app.layout = self.get_layout
 
     def handle_alerts(self, n_clicks, n_interval, clear_all_nclicks, *args, **kwargs):
         if invalid_n_clicks(n_clicks) and invalid_n_clicks(n_interval) \
@@ -281,6 +322,9 @@ class RuntimeApplication:
                     and alert.created_at + datetime.timedelta(seconds=alert.duration) <= datetime.datetime.now():
                 self.active_alerts.remove(alert)
 
+        if self.last_mem_check < datetime.datetime.now() - datetime.timedelta(seconds=60):
+            self.track_memory_usage()
+
         latest_memory = self.memory_history_timeseries[-1].value if len(self.memory_history_timeseries) > 0 else 0
         latest_cpu = self.cpu_history_timeseries[-1].value if len(self.cpu_history_timeseries) > 0 else 0
 
@@ -291,11 +335,6 @@ class RuntimeApplication:
             latest_cpu,
             f"{latest_cpu:.1f}%"
         ]
-
-    def handle_scheduler_interval(self):
-        self.app.logger.debug("Handling two mins interval")
-        self.track_memory_usage()
-        self.check_for_scheduled_jobs()
 
     def track_memory_usage(self):
         self.app.logger.info("Capturing memory usage")
@@ -315,74 +354,106 @@ class RuntimeApplication:
                 value=psutil.cpu_percent()
             )
         )
-        # print(f"CPU Usage: {psutil.cpu_percent()}")
+        self.last_mem_check = datetime.datetime.now()
 
     def check_for_scheduled_jobs(self):
-        self.app.logger.info("Checking for scheduled jobs")
+        self.app.logger.debug("Checking for scheduled jobs")
         self.last_job_check = datetime.datetime.now()
-        session: Session = self.dbm.new_session()
-        job_def_service: JobDefinitionService = self.base_service_args["service_provider"](JobDefinitionService)
-        try:
-            for job in job_def_service.get_all():
-                job: JobDefinition
-                job.set_vars_from_kwargs(**self.base_service_args)
-                selectable_param_name = job.single_selectable_param_name
-                selectables: List[Selectable] = job.selectables
-                for selectable in selectables:
-                    latest_instance: JobInstance = job.get_latest_exec_for_selectable(selectable, session)
+        # print current process and thread ids
+        self.app.logger.debug(f"Current process id: {os.getpid()}")
+        self.app.logger.debug(f"Current thread id: {threading.current_thread().ident}")
 
-                    if job.repeats and (
-                        latest_instance is None or
-                        latest_instance.start_time + datetime.timedelta(seconds=job.seconds_between_runs)
-                        <= datetime.datetime.now()
-                    ) and (latest_instance is None or latest_instance.end_time is not None):
-                        self.app.logger.debug(
-                            f"Running job {job.name} with {selectable_param_name} = {selectable.get_label()}"
+        with self.dbm as dbm:
+            session: Session = dbm.get_session()
+            job_def_service: JobDefinitionService = self.base_service_args["service_provider"](JobDefinitionService)
+            try:
+                jobs: List[JobDefinition] = job_def_service.get_all(session=session)
+                self.app.logger.debug(f"Checking {len(jobs)} jobs for scheduled runs.")
+                for job in jobs:
+                    self.app.logger.debug(f"Checking job {job.name}")
+
+                    job: JobDefinition
+                    job.set_vars_from_kwargs(**self.base_service_args)
+                    job.sync_single_selectable_data(session=session)
+                    selectable_param_name = job.single_selectable_param_name
+                    selectables: List[Selectable] = job.cached_selectables
+                    for selectable in selectables:
+                        latest_instance: JobInstance = job.get_latest_exec_for_selectable(selectable, session)
+
+                        self.app.logger.info(
+                            f"job.repeats: {job.repeats}, "
+                            f"latest_instance is None: {latest_instance is None}, "
+                            f"seconds_between_runs: {job.seconds_between_runs}, "
+                            f"selectable value: {selectable.get_value()}, "
                         )
-                        try:
-                            job_def_service.run_job(
-                                job_def=job,
-                                selectable=selectable,
-                                parameters={selectable_param_name: selectable.get_value()}
-                            )
 
-                            self.base_service_args["push_alert"](
-                                Alert(
-                                    f"Running job {job.name} with {selectable_param_name} = {selectable.get_label()}",
-                                    duration=15,
-                                    color="success"
+                        if not job.repeats:
+                            continue
+
+                        if latest_instance is not None and latest_instance.end_time is None:
+                            # job still in progress
+                            self.app.logger.info(f"Job {job.name} is still in progress.")
+                            continue
+
+                        last_start_time = (
+                            latest_instance.start_time
+                            if latest_instance is not None else datetime.datetime(1970, 1, 1)
+                        )
+
+                        next_start_time = last_start_time + datetime.timedelta(seconds=job.seconds_between_runs)
+
+                        self.app.logger.info(
+                            f"Checking job {job.name} with {selectable_param_name} = {selectable.get_label()}:"
+                            f"last_start_time: {last_start_time}, "
+                            f"next_start_time: {next_start_time}"
+                        )
+
+                        if next_start_time <= datetime.datetime.now():
+                            self.app.logger.info(
+                                f"Running job {job.name} with {selectable_param_name} = {selectable.get_label()}"
+                            )
+                            try:
+                                job_def_service.run_job(
+                                    job_def=job,
+                                    selectable=selectable,
+                                    parameters={selectable_param_name: selectable.get_value()}
                                 )
-                            )
-                        except JobAlreadyRunningException as jare:
-                            self.app.logger.warning(
-                                f"Job {job.name} with {selectable_param_name} = {selectable.get_label()} is already running"
-                            )
-                        except Exception as inner_e:
-                            stack_trace = traceback.format_exc()
-                            self.app.logger.error(
-                                f"Error while running job {job.name} "
-                                f"with {selectable_param_name} = {selectable.get_label()}: {inner_e}\n{stack_trace}"
-                            )
-        except Exception as e:
-            stack_trace = traceback.format_exc()
-            self.app.logger.error(f"Error while checking for scheduled jobs: {e}\n{stack_trace}")
-            session.rollback()
-        finally:
-            session.close()
 
-    def run_server(self, debug=False, host="0.0.0.0", port=8050, **kwargs):
-        for startable in Startable.STARTABLE_DICT[ExternalTriggerEvent.SERVER_START]:
-            startable: Startable
-            startable.start()
-        try:
-            self.app.run_server(
-                debug=debug, host=host, port=port,
-                dev_tools_silence_routes_logging=self.app_descriptor.silence_routes_logging
-            )
-        except:
-            raise
-        finally:
-            self.dbm.session.close_all()
+                                self.base_service_args["push_alert"](
+                                    Alert(
+                                        f"Running job {job.name} "
+                                        f"with {selectable_param_name} = {selectable.get_label()}",
+                                        duration=15,
+                                        color="success"
+                                    )
+                                )
+
+                                # return
+                            except JobAlreadyRunningException as jare:
+                                self.app.logger.warning(
+                                    f"Job {job.name} with {selectable_param_name} = {selectable.get_label()} is already running"
+                                )
+                            except Exception as inner_e:
+                                stack_trace = traceback.format_exc()
+                                self.app.logger.error(
+                                    f"Error while running job {job.name} "
+                                    f"with {selectable_param_name} = {selectable.get_label()}: {inner_e}\n{stack_trace}"
+                                )
+            except Exception as e:
+                stack_trace = traceback.format_exc()
+                self.app.logger.error(f"Error while checking for scheduled jobs: {e}\n{stack_trace}")
+                session.rollback()
+            finally:
+                session.close()
+
+    @deprecated
+    def run_server(self, **kwargs):
+        """
+        this no longer does anything - deprecated
+        :param kwargs:
+        :return:
+        """
+        pass
 
     def initialize_navbar(self, extra_components: List, view_groups: Dict[str, List[Type[BaseView]]]) -> NavBar:
         nav_items = []
@@ -489,9 +560,10 @@ class RuntimeApplication:
                 try:
                     return page.render(decoded_params, states_for_input)
                 except sqlalchemy.exc.SQLAlchemyError:
+                    # todo: this should no longer happen
                     exception_trace = traceback.format_exc()
                     self.app.logger.error(exception_trace)
-                    self.dbm.session.rollback()
+                    self.dbm.get_session().rollback()
                     return self.handle_get_call(url, query_params, *args)
                 except Exception:
                     exception_trace = traceback.format_exc()

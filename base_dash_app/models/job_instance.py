@@ -37,10 +37,10 @@ class JobInstance(CachedResultableEvent, Progressable, BaseModel):
     logs = Column(String)
 
     def __repr__(self):
-        return vars(self)
+        return str(vars(self))
 
     def __str__(self):
-        pass
+        return f"{self.job_definition} - {self.id}"
 
     def get_formatted_start_time(self, format="%Y-%m-%d %H:%M"):
         if self.start_time is not None:
@@ -65,14 +65,16 @@ class JobInstance(CachedResultableEvent, Progressable, BaseModel):
         return self.end_time - self.start_time
 
     def set_status(self, status: StatusesEnum):
+        self.execution_status_id = status.value.id
         self.result.status = status
+
+    def get_status_color(self, *, perspective=None) -> StatusesEnum:
+        return StatusesEnum.get_by_id(self.execution_status_id)
 
     def set_result(self, result: Result):
         self.result = result
 
     def __init__(self, *args, **kwargs):
-        Startable.__init__(self)
-        Stoppable.__init__(self)
         CachedResultableEvent.__init__(
             self, result=Result(0, StatusesEnum.PENDING),
             date=datetime.datetime.now()
@@ -83,8 +85,6 @@ class JobInstance(CachedResultableEvent, Progressable, BaseModel):
 
     @orm.reconstructor
     def init_on_load(self):
-        Startable.__init__(self)
-        Stoppable.__init__(self)
         CachedResultableEvent.__init__(
             self, result=Result(
                 self.resultable_value,

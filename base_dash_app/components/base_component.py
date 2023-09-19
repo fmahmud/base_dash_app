@@ -3,9 +3,10 @@ from abc import ABC, abstractmethod
 from typing import Callable, List
 
 import dash
-from dash import ALL, MATCH, Output
+from dash import ALL, MATCH, Output, dcc
 from dash.exceptions import PreventUpdate
 
+from base_dash_app.components.callback_utils.exceptions import ComponentInstanceNotFoundException
 from base_dash_app.components.callback_utils.mappers import InputToState
 from base_dash_app.components.callback_utils.utils import get_state_values_for_input_from_args_list, invalid_n_clicks, \
     get_triggering_id_from_callback_context
@@ -113,7 +114,7 @@ class ComponentWithInternalCallback(BaseComponent, VirtualFrameworkObject, ABC):
         # get triggering instance
         # todo - decide if index should reuse IDs as they get destroyed or should instance IDs be always increasing
         if cls not in ComponentWithInternalCallback.type_to_instances_map:
-            raise Exception(f"Class {cls.__name__} was not found in type to instance map!")
+            raise PreventUpdate()
 
         if (type(index) == int and index < 1) or triggering_id is None or triggering_id == ".":
             raise PreventUpdate()
