@@ -9,6 +9,7 @@ from dash import html, dcc
 
 from base_dash_app.components.async_task_controls import AsyncTaskControls
 from base_dash_app.components.callback_utils.mappers import InputToState, InputMapping
+from base_dash_app.components.celery_task_controls import CeleryTaskControls
 from base_dash_app.components.data_visualization.simple_area_graph import AreaGraph
 from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.services.async_handler_service import AsyncOrderedTaskGroup, AsyncTask, AsyncWorkProgressContainer, \
@@ -16,7 +17,10 @@ from base_dash_app.services.async_handler_service import AsyncOrderedTaskGroup, 
 from base_dash_app.utils import tsdp_utils
 from base_dash_app.utils.tsdp_utils import get_max_for_each_moment
 from base_dash_app.views.base_view import BaseView
+from base_dash_app.virtual_objects.async_vos.celery_task import CeleryOrderedTaskGroup, CeleryTask, \
+    CeleryUnorderedTaskGroup
 from base_dash_app.virtual_objects.timeseries.time_series_data_point import TimeSeriesDataPoint
+from demo_app import celery_tasks
 
 ASYNC_VIEW_INTERVAL_ID = "async-view-interval-id"
 
@@ -49,38 +53,94 @@ class AsyncDemoView(BaseView):
         )
 
         self.task_controls = []
-        self.async_groups = []
+        self.celery_groups = []
+
+        if len(self.celery_groups) == 0:
+            self.celery_groups = [
+                CeleryOrderedTaskGroup(
+                    name="Ordered Task Group 1",
+                    tasks=[
+                        CeleryTask(
+                            name="Celery Task 1 ",
+                            work_func=celery_tasks.gen_graph_data,
+                        ),
+                        CeleryTask(
+                            name="Celery Task 2",
+                            work_func=celery_tasks.gen_graph_data
+                        ),
+                        CeleryOrderedTaskGroup(
+                            name="Ordered Task Group 2",
+                            tasks=[
+                                CeleryTask(
+                                    name="Task 3",
+                                    work_func=celery_tasks.gen_graph_data
+                                ),
+                                CeleryTask(
+                                    name="Task 4",
+                                    work_func=celery_tasks.gen_graph_data
+                                ),
+                            ]
+                        ),
+                        CeleryUnorderedTaskGroup(
+                            name="Unordered Task Group 2",
+                            tasks=[
+                                CeleryTask(
+                                    name="Task 5",
+                                    work_func=celery_tasks.gen_graph_data
+                                ),
+                                CeleryTask(
+                                    name="Long Sleep Task",
+                                    work_func=celery_tasks.long_sleep_task
+                                ),
+                                CeleryTask(
+                                    name="Failure Task",
+                                    work_func=celery_tasks.throw_exception_func
+                                ),
+                            ],
+                        )
+                    ]
+                )
+            ]
+
+            if self.task_controls is None or len(self.task_controls) == 0:
+                self.task_controls = []
+                for cg in self.celery_groups:
+                    ctc: CeleryTaskControls = CeleryTaskControls(
+                        **self.produce_kwargs(),
+                        celery_task=cg,
+                        show_download_button=True,
+                        download_formatter_func=tsdp_utils.tsdp_array_to_csv,
+                        download_file_format="csv",
+                    )
+                    self.task_controls.append(ctc.render(override_style={"width": "560px"}))
 
     def validate_state_on_trigger(self):
         return
 
-    def gen_work_func(self):
-
-
-        return gen_graph_data
-
     def handle_any_input(self, *args, triggering_id, index):
-        async_service: AsyncHandlerService = self.get_service(AsyncHandlerService)
-        if triggering_id.startswith(START_ASYNC_GROUP_TASKS):
+        for cg in self.celery_groups:
+            if cg.redis_client:
+                cg.refresh_all()
 
-            for ag in self.async_groups:
-                async_service.submit_async_task(ag)
-
-        return [AsyncDemoView.raw_render(self.async_groups, self.task_controls)]
+        return [AsyncDemoView.raw_render(self.celery_groups, self.task_controls)]
 
     @staticmethod
-    def raw_render(async_groups: List[AsyncOrderedTaskGroup], task_controls: List[AsyncTaskControls]):
+    def raw_render(celery_groups: List[CeleryOrderedTaskGroup], task_controls: List[CeleryTaskControls]):
         area_graph = AreaGraph()
 
-        for ag in async_groups:
+        for cg in celery_groups:
             # for at in ag.work_containers:
-            if ag.get_status() == StatusesEnum.SUCCESS:
+            if cg.get_status() == StatusesEnum.SUCCESS:
+                list_of_dicts = cg.get_result()
+
                 area_graph.add_series(
-                    graphables=sorted(ag.get_result()),
-                    name=ag.get_name()
+                    graphables=sorted([
+                        TimeSeriesDataPoint().from_dict(d) for d in list_of_dicts
+                    ]),
+                    name=cg.get_name()
                 )
 
-        disabled = (all(ag is None or ag.get_status() != StatusesEnum.IN_PROGRESS for ag in async_groups))
+        disabled = (all(cg is None or cg.get_status() != StatusesEnum.IN_PROGRESS for cg in celery_groups))
 
         return html.Div(
             children=[
@@ -101,77 +161,11 @@ class AsyncDemoView(BaseView):
         )
 
     def render(self, *args, **kwargs):
-        def throw_exception_func(x, y, z):
-            raise Exception("This is a test exception")
-
-        def long_sleep_task(x, y, z):
-            time.sleep(20)
-            x.complete(result=y, status_message="Finished sleeping")
-
-        async_service: AsyncHandlerService = self.get_service(AsyncHandlerService)
-        if len(self.async_groups) == 0:
-            self.async_groups = [
-                AsyncOrderedTaskGroup(
-                    task_group_title="Ordered Task Group 1",
-                    async_tasks=[
-                        AsyncTask(
-                            task_name="Task 1",
-                            work_func=self.gen_work_func()
-                        ),
-                        AsyncTask(
-                            task_name="Task 2",
-                            work_func=self.gen_work_func()
-                        ),
-                        AsyncOrderedTaskGroup(
-                            task_group_title="Ordered Task Group 2",
-                            async_tasks=[
-                                AsyncTask(
-                                    task_name="Task 3",
-                                    work_func=self.gen_work_func()
-                                ),
-                                AsyncTask(
-                                    task_name="Task 4",
-                                    work_func=self.gen_work_func()
-                                ),
-
-                            ]
-                        ),
-                        AsyncUnorderedTaskGroup(
-                            task_group_title="Unordered Task Group 2",
-                            async_tasks=[
-                                AsyncTask(
-                                    task_name="Task 5",
-                                    work_func=self.gen_work_func()
-                                ),
-                                AsyncTask(
-                                    task_name="Long Sleep Task",
-                                    work_func=long_sleep_task
-                                ),
-                                AsyncTask(
-                                    task_name="Failure Task",
-                                    work_func=throw_exception_func
-                                ),
-                            ],
-                            async_service=async_service,
-                            reducer_func=get_max_for_each_moment
-                        )
-                    ]
-                )
-            ]
-
-            if self.task_controls is None or len(self.task_controls) == 0:
-                self.task_controls = []
-                for ag in self.async_groups:
-                    atc: AsyncTaskControls = AsyncTaskControls(
-                        **self.produce_kwargs(),
-                        async_task=ag,
-                        show_download_button=True,
-                        download_formatter_func=tsdp_utils.tsdp_array_to_csv,
-                        download_file_format="csv",
-                    )
-                    self.task_controls.append(atc.render(override_style={"width": "560px"}))
+        for cg in self.celery_groups:
+            if cg.redis_client:
+                cg.refresh_all()
 
         return html.Div(
             id=self.wrapper_div_id,
-            children=AsyncDemoView.raw_render(self.async_groups, self.task_controls)
+            children=AsyncDemoView.raw_render(self.celery_groups, self.task_controls)
         )

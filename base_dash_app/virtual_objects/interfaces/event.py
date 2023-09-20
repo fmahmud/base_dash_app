@@ -12,6 +12,9 @@ class Event(ABC):
     def get_string_date(self):
         return self.date.strftime("%Y-%m-%d %H:%M")
 
+    def set_date_from_string(self, date_string: str):
+        self.date = datetime.datetime.strptime(date_string, "%Y-%m-%d %H:%M")
+
     def __lt__(self, other):
         if type(other) != type(self):
             return False

@@ -7,7 +7,9 @@ from base_dash_app.virtual_objects.interfaces.graphable import Graphable
 
 class TimeSeriesDataPoint(Graphable, Event):
     def __init__(
-            self, date: datetime.datetime, value: float,
+            self,
+            date: datetime.datetime = None,
+            value: float = None,
             label_func: Callable[[datetime.datetime, float], str] = None
     ):
         super().__init__(date=date)
@@ -45,4 +47,9 @@ class TimeSeriesDataPoint(Graphable, Event):
             "date": self.get_string_date(),
             "value": self.value
         }
+
+    def from_dict(self, d):
+        self.set_date_from_string(d["date"])
+        self.value = d["value"]
+        return self
 

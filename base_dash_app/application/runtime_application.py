@@ -34,12 +34,14 @@ from base_dash_app.components.callback_utils.utils import get_triggering_id_from
     get_state_values_for_input_from_args_list, invalid_n_clicks
 from base_dash_app.components.cards.special_cards.job_card import JobCard
 from base_dash_app.components.cards.tsdp_sparkline_stat_card import TsdpSparklineStatCard
+from base_dash_app.components.celery_task_controls import CeleryTaskControls
 from base_dash_app.components.dashboards.simple_timeseries_dashboard import SimpleTimeSeriesDashboard
 from base_dash_app.components.datatable.datatable_wrapper import DataTableWrapper
 from base_dash_app.components.navbar import NavBar, NavDefinition, NavGroup
 from base_dash_app.models.job_instance import JobInstance
 from base_dash_app.services.async_handler_service import AsyncHandlerService
 from base_dash_app.services.base_service import BaseService
+from base_dash_app.services.celery_handler_service import CeleryHandlerService
 from base_dash_app.services.global_state_service import GlobalStateService
 from base_dash_app.services.job_definition_service import JobDefinitionService, JobAlreadyRunningException
 from base_dash_app.utils.db_utils import DbManager
@@ -234,6 +236,7 @@ class RuntimeApplication:
                 **base_service_args,
                 max_workers=app_descriptor.max_num_threads
             )
+            self.services[CeleryHandlerService] = CeleryHandlerService(**base_service_args)
 
             base_view_args = base_service_args
 
@@ -284,7 +287,7 @@ class RuntimeApplication:
             # register internal callback components
             components_with_internal_callbacks = [
                 JobCard, DataTableWrapper, SimpleTimeSeriesDashboard, TsdpSparklineStatCard,
-                AsyncTaskControls,
+                AsyncTaskControls, CeleryTaskControls,
                 *app_descriptor.components_with_internal_callbacks
             ]
 

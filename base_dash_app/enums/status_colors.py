@@ -26,7 +26,7 @@ class StatusesEnum(Enum):
             if e.value.name.lower() == name.lower():
                 return e
 
-        raise Exception(f"Could not find StatusesEnum with name {name}.")
+        raise Exception(f"Could not find StatusesEnum with name {name}")
 
     @staticmethod
     def get_by_id(id: int) -> 'StatusesEnum':

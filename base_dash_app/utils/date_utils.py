@@ -10,6 +10,11 @@ SECONDS_IN_DAY = SECONDS_IN_HOUR * 24
 SECONDS_IN_WEEK = SECONDS_IN_DAY * 7
 
 
+STANDARD_DATE_FORMAT = "%Y-%m-%d"
+STANDARD_TIME_FORMAT = "%H:%M:%S"
+STANDARD_DATETIME_FORMAT = f"{STANDARD_DATE_FORMAT} {STANDARD_TIME_FORMAT}"
+
+
 def get_num_days_in_month(month_number, year=datetime.datetime.now().year):
     from calendar import monthrange
     return monthrange(year, month_number)[1]
