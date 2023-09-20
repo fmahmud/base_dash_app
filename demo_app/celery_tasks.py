@@ -3,9 +3,10 @@ import json
 import logging
 import random
 import time
+import traceback
 from typing import List
 
-from celery import shared_task
+from celery import shared_task, Task, states
 from redis import StrictRedis
 
 from base_dash_app.enums.status_colors import StatusesEnum
@@ -59,18 +60,28 @@ def gen_graph_data(*args, prog_container_uuid: str, prev_result_uuids: List[str]
     logger.info("Finished work func")
 
 
-@shared_task
-def throw_exception_func(*args, prog_container_uuid: str, **kwargs):
+@shared_task(bind=True)
+def throw_exception_func(task: Task, *args, prog_container_uuid: str, **kwargs):
     from base_dash_app.application.runtime_application import RuntimeApplication
     redis_client: StrictRedis = RuntimeApplication.get_instance().redis_client
     prog_container = CeleryTask().use_redis(redis_client, prog_container_uuid).hydrate_from_redis()
     prog_container.set_status(StatusesEnum.IN_PROGRESS)
     time.sleep(1)
-    prog_container.complete(
-        status=StatusesEnum.FAILURE,
-        status_message="Demo Exception thrown",
-        result="",
-    )
+    try:
+        raise Exception("Sample Exception")
+    except Exception as ex:
+        prog_container.complete(
+            status=StatusesEnum.FAILURE,
+            status_message="Demo Exception thrown",
+            result="",
+        )
+        task.update_state(
+            state=states.FAILURE,
+            meta={
+                'exc_type': type(ex).__name__,
+                'exc_message': traceback.format_exc().split('\n'),
+             }
+        )
 
 
 @shared_task

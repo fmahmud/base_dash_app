@@ -80,6 +80,8 @@ redis = "*"
 pre-commit = "*"
 black = "*"
 pylint = "*"
+pygithub = "*"
+pyyaml = "*"
 
 [requires]
 python_version = "3.9"

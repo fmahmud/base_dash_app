@@ -224,7 +224,7 @@ class RuntimeApplication:
                         all_jobs_from_db.append(job)
                         all_job_classes.add(job_class)
                     elif job_class.force_update():
-                        # todo
+                        #issue: (issue: 176): properly handle JobDefinitions when force update is True - or remove functionality
                         pass
 
             for s in app_descriptor.service_classes:
@@ -563,7 +563,7 @@ class RuntimeApplication:
                 try:
                     return page.render(decoded_params, states_for_input)
                 except sqlalchemy.exc.SQLAlchemyError:
-                    # todo: this should no longer happen
+                    #issue: (issue: 177): Try reproducing this error and remove if not possible
                     exception_trace = traceback.format_exc()
                     self.app.logger.error(exception_trace)
                     self.dbm.get_session().rollback()

@@ -34,7 +34,7 @@ class Selectable(ABC):
         return hash(self.__str__())
 
     def __eq__(self, other):
-        if type(other) != type(self):
+        if not isinstance(other, Selectable):
             return False
 
         return hash(self) == hash(other)

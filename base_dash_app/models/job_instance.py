@@ -15,6 +15,12 @@ passing_statuses = [StatusesEnum.WARNING, StatusesEnum.SUCCESS]
 
 
 class JobInstance(CachedResultableEvent, Progressable, BaseModel):
+    def get_label(self):
+        return f"{self.job_definition.name} - {self.id}"
+
+    def get_value(self):
+        return self.id
+
     __tablename__ = "job_instances"
 
     id = Column(Integer, Sequence("job_instances_id_seq"), primary_key=True)

@@ -80,6 +80,7 @@ redis = "*"
 pre-commit = "*"
 black = "*"
 pylint = "*"
+pathspec = "*"
 
 [requires]
 python_version = "3.9"

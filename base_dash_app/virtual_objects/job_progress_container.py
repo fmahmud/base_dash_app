@@ -1,12 +1,15 @@
 import datetime
+import json
 import logging
 from enum import Enum
 from typing import Optional, TypeVar, Type
 
-from redis import Redis
+from redis import Redis, StrictRedis
 
 from base_dash_app.enums.log_levels import LogLevelsEnum, LogLevel
 from base_dash_app.enums.status_colors import StatusesEnum
+from base_dash_app.utils import date_utils
+from base_dash_app.virtual_objects.abstract_redis_dto import AbstractRedisDto
 from base_dash_app.virtual_objects.interfaces.selectable import Selectable
 
 passing_statuses = [StatusesEnum.WARNING, StatusesEnum.SUCCESS]
@@ -18,25 +21,65 @@ class ContainerNotFoundError(Exception):
     pass
 
 
-class VJPCRedisKeys(Enum):
-    PROGRESS = lambda instance_id: f"{BASE_KEY}_{instance_id}.progress"
-    EXECUTION_STATUS = lambda instance_id: f"{BASE_KEY}_{instance_id}.execution_status"
-    PREREQUISITES_STATUS = lambda instance_id: f"{BASE_KEY}_{instance_id}.prerequisites_status"
-    COMPLETION_CRITERIA_STATUS = lambda instance_id: f"{BASE_KEY}_{instance_id}.completion_criteria_status"
-    LAST_STATUS_UPDATED_AT = lambda instance_id: f"{BASE_KEY}_{instance_id}.last_status_updated_at"
-    LOGS = lambda instance_id: f"{BASE_KEY}_{instance_id}.logs"
-
-    def __call__(self, *args, **kwargs):
-        return self.value(*args, **kwargs)
-
-
-class VirtualJobProgressContainer:
+class VirtualJobProgressContainer(AbstractRedisDto):
     """
     Instances of this class will be created to help communicate between the executor thread and the
     server thread. It will contain the progress of the job as it runs.
     """
 
-    def __init__(self, job_instance_id: int, job_definition_id: int):
+    @staticmethod
+    def get_from_redis_by_uuid(redis_client: StrictRedis, uuid: str) -> Optional["VirtualJobProgressContainer"]:
+        if not redis_client:
+            raise ValueError("Redis client is None")
+
+        if not uuid or uuid == "":
+            raise ValueError("UUID is required")
+
+        exists_in_redis = redis_client.exists(uuid)
+        if exists_in_redis == 0:
+            raise ContainerNotFoundError(f"Container with uuid {uuid} not found in redis")
+
+        container = VirtualJobProgressContainer(job_instance_id=-2, job_definition_id=-2)
+        container.use_redis(redis_client, uuid).hydrate_from_redis()
+        return container
+
+    def to_dict(self) -> dict:
+        return {
+            "job_instance_id": str(self.job_instance_id),
+            "job_definition_id": str(self.job_definition_id),
+            "execution_status": self.execution_status.value.name,
+            "prerequisites_status": self.prerequisites_status.value.name,
+            "completion_status": self.completion_criteria_status.value.name,
+            "progress": self.progress if self.progress is not "" else 0.0,
+            "logs": json.dumps(self.logs or []),
+            "completed": "True" if self.completed else "False",
+            "start_time": datetime.datetime.strftime(
+                self.start_time, date_utils.STANDARD_DATETIME_FORMAT
+            ) if self.start_time else "",
+        }
+
+    def from_dict(self, data: dict):
+        self.job_instance_id = int(data.get("job_instance_id", -1))
+        self.job_definition_id = int(data.get("job_definition_id", -1))
+        self.execution_status = StatusesEnum.get_by_name(data.get("execution_status", StatusesEnum.PENDING.value.name))
+        self.prerequisites_status = StatusesEnum.get_by_name(data.get("prerequisites_status", StatusesEnum.PENDING.value.name))
+        self.completion_criteria_status = StatusesEnum.get_by_name(data.get("completion_status", StatusesEnum.PENDING.value.name))
+        self.progress = float(data.get("progress", 0.0))
+        self.uuid = f"{BASE_KEY}_{self.job_instance_id}"
+        self.logs = json.loads(data.get("logs", "[]"))
+        self.completed = data.get("completed", "False") == "True"
+        self.start_time = data.get("start_time", "")
+        if self.start_time == "":
+            self.start_time = None
+        else:
+            self.start_time = datetime.datetime.strptime(
+                self.start_time, date_utils.STANDARD_DATETIME_FORMAT
+            )
+        return self
+
+    def __init__(self, job_instance_id: int, job_definition_id: int, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.uuid = f"{BASE_KEY}_{job_instance_id}"
         self.job_instance_id: int = job_instance_id
         self.job_definition_id: int = job_definition_id
         self.execution_status: Optional[StatusesEnum] = StatusesEnum.PENDING
@@ -56,112 +99,10 @@ class VirtualJobProgressContainer:
         self.last_status_updated_at: Optional[datetime.datetime] = None
         self.redis_client: Optional[Redis] = None
         self.celery_task_id: Optional[str] = None
+        self.logs_tail_id = f"{self.uuid}_logs_tail"
 
     def __repr__(self):
-        return str({
-            "job_instance_id": self.job_instance_id,
-            "job_definition_id": self.job_definition_id,
-            "execution_status": self.execution_status.value.name,
-            "prerequisites_status": self.prerequisites_status.value.name,
-            "completion_criteria_status": self.completion_criteria_status.value.name,
-            "progress": self.progress,
-        })
-
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        # Remove the redis_client and logger before serializing
-        del state['redis_client']
-        del state['logger']
-        del state["execution_status"]
-        del state["prerequisites_status"]
-        del state["completion_criteria_status"]
-        del state["last_status_updated_at"]
-        del state["selectable"]  # todo: how to recover this?
-        state["log_level"] = state["log_level"].id
-        return state
-
-    def __setstate__(self, state):
-        state["log_level"] = LogLevelsEnum.get_by_id(state["log_level"])
-        # Restore the instance's attributes
-        self.__dict__.update(state)
-        # Reinitialize redis_client and logger after deserializing
-        self.redis_client = None
-        self.logger = logging.getLogger(f"job_instance_{self.job_instance_id}")
-        self.execution_status: Optional[StatusesEnum] = StatusesEnum.PENDING
-        self.prerequisites_status: Optional[StatusesEnum] = StatusesEnum.PENDING
-        self.completion_criteria_status: Optional[StatusesEnum] = StatusesEnum.PENDING
-        self.last_status_updated_at: Optional[datetime.datetime] = None
-        self.selectable = None  # todo: how to recover this? do we even need this?
-
-    def use_redis(self, redis_client: Redis):
-        self.redis_client = redis_client
-
-    def fetch_latest_from_redis(self):
-        if self.redis_client is None:
-            self.logger.warning(f"Redis client not set for job_instance_id={self.job_instance_id}")
-            return
-
-        bin_prog_val = self.redis_client.get(VJPCRedisKeys.PROGRESS(self.job_instance_id))
-        bin_exec_val = self.redis_client.get(VJPCRedisKeys.EXECUTION_STATUS(self.job_instance_id))
-        bin_pre_val = self.redis_client.get(VJPCRedisKeys.PREREQUISITES_STATUS(self.job_instance_id))
-        bin_comp_val = self.redis_client.get(VJPCRedisKeys.COMPLETION_CRITERIA_STATUS(self.job_instance_id))
-        bin_last_status_updated_at = self.redis_client.get(VJPCRedisKeys.LAST_STATUS_UPDATED_AT(self.job_instance_id))
-
-        if None not in [
-            bin_prog_val, bin_exec_val, bin_pre_val, bin_comp_val, bin_last_status_updated_at
-        ]:
-            self.logger.debug(f"Found container for job_instance_id={self.job_instance_id}")
-            # something to show?
-            self.progress = float((bin_prog_val or b"0.0").decode("utf-8"))
-            self.execution_status = StatusesEnum.get_by_name((bin_exec_val or b"PENDING").decode('utf-8'))
-            self.prerequisites_status = StatusesEnum.get_by_name((bin_pre_val or b"PENDING").decode('utf-8'))
-            self.completion_criteria_status = StatusesEnum.get_by_name((bin_comp_val or b"PENDING").decode('utf-8'))
-            self.last_status_updated_at = datetime.datetime.strptime(
-                (bin_last_status_updated_at or b"").decode("utf-8"),"%Y-%m-%d %H:%M:%S.%f"
-            ) if bin_last_status_updated_at is not None else None
-        else:
-            self.logger.debug(f"Could not find container for job_instance_id={self.job_instance_id}")
-            raise ContainerNotFoundError(f"Could not find container for job_instance_id={self.job_instance_id}")
-
-        # todo: parse logs?
-        self.logs = (self.redis_client.get(VJPCRedisKeys.LOGS(self.job_instance_id)) or b"").decode("utf-8").split("\n")
-
-    def push_changes_to_redis(self):
-        if self.redis_client is None:
-            return
-
-        self.redis_client.set(
-            VJPCRedisKeys.PROGRESS(self.job_instance_id),
-            self.progress
-        )
-        self.redis_client.set(
-            VJPCRedisKeys.EXECUTION_STATUS(self.job_instance_id),
-            self.execution_status.value.name
-        )
-        self.redis_client.set(
-            VJPCRedisKeys.PREREQUISITES_STATUS(self.job_instance_id),
-            self.prerequisites_status.value.name
-        )
-        self.redis_client.set(
-            VJPCRedisKeys.COMPLETION_CRITERIA_STATUS(self.job_instance_id),
-            self.completion_criteria_status.value.name
-        )
-        self.redis_client.set(
-            VJPCRedisKeys.LAST_STATUS_UPDATED_AT(self.job_instance_id),
-            str(self.last_status_updated_at)
-        )
-
-    def clear_redis(self):
-        if self.redis_client is None:
-            return
-
-        self.logger.info(f"Clearing redis for job_instance_id={self.job_instance_id}")
-        self.redis_client.delete(VJPCRedisKeys.PROGRESS(self.job_instance_id))
-        self.redis_client.delete(VJPCRedisKeys.EXECUTION_STATUS(self.job_instance_id))
-        self.redis_client.delete(VJPCRedisKeys.PREREQUISITES_STATUS(self.job_instance_id))
-        self.redis_client.delete(VJPCRedisKeys.COMPLETION_CRITERIA_STATUS(self.job_instance_id))
-        self.redis_client.delete(VJPCRedisKeys.LAST_STATUS_UPDATED_AT(self.job_instance_id))
-        self.redis_client.delete(VJPCRedisKeys.LOGS(self.job_instance_id))
+        return str(self.to_dict())
 
     def __eq__(self, other):
         if type(other) != type(self):
@@ -188,6 +129,14 @@ class VirtualJobProgressContainer:
                f"logs={self.logs}, " \
                f"selectable: {self.selectable})"
 
+    def set_progress(self, progress):
+        if not progress:
+            print("Progress is none")
+            return
+        self.progress = progress
+        self.last_status_updated_at = datetime.datetime.now()
+        self.set_value_in_redis("progress", progress or 0.0)
+
     def set_pending(self):
         self.execution_status = StatusesEnum.PENDING
         self.prerequisites_status = StatusesEnum.PENDING
@@ -210,7 +159,8 @@ class VirtualJobProgressContainer:
         self.end_time = datetime.datetime.now()
         self.end_reason = status_message
         self.last_status_updated_at = datetime.datetime.now()
-        self.error_log(stacktrace)
+        if stacktrace:
+            self.error_log(stacktrace)
 
     def get_status(self):
         if self.prerequisites_status in passing_statuses:
@@ -239,8 +189,8 @@ class VirtualJobProgressContainer:
             self.logs.append(f"[INFO]{message}")
 
         if self.redis_client is not None:
-            self.redis_client.append(
-                VJPCRedisKeys.LOGS(self.job_instance_id),
+            self.redis_client.rpush(
+                self.logs_tail_id,
                 f"[INFO]{message}\n"
             )
 
@@ -250,8 +200,8 @@ class VirtualJobProgressContainer:
             self.logs.append(f"[ERROR]{message}")
 
         if self.redis_client is not None:
-            self.redis_client.append(
-                VJPCRedisKeys.LOGS(self.job_instance_id),
+            self.redis_client.rpush(
+                self.logs_tail_id,
                 f"[ERROR]{message}\n"
             )
 
@@ -261,8 +211,8 @@ class VirtualJobProgressContainer:
             self.logs.append(f"[CRITICAL]{message}")
 
         if self.redis_client is not None:
-            self.redis_client.append(
-                VJPCRedisKeys.LOGS(self.job_instance_id),
+            self.redis_client.rpush(
+                self.logs_tail_id,
                 f"[CRITICAL]{message}\n"
             )
 
@@ -272,8 +222,8 @@ class VirtualJobProgressContainer:
             self.logs.append(f"[DEBUG]{message}")
 
         if self.redis_client is not None:
-            self.redis_client.append(
-                VJPCRedisKeys.LOGS(self.job_instance_id),
+            self.redis_client.rpush(
+                self.logs_tail_id,
                 f"[DEBUG]{message}\n"
             )
 
@@ -283,7 +233,7 @@ class VirtualJobProgressContainer:
             self.logs.append(f"[WARN]{message}")
 
         if self.redis_client is not None:
-            self.redis_client.append(
-                VJPCRedisKeys.LOGS(self.job_instance_id),
+            self.redis_client.rpush(
+                self.logs_tail_id,
                 f"[WARN]{message}\n"
             )

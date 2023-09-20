@@ -281,7 +281,7 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto
             "name": self.name or "",
             "color": self.color or "",
             "type": "WorkContainerGroup",
-            "error": self.get_status() == StatusesEnum.FAILURE,
+            "error": "True" if self.get_status() == StatusesEnum.FAILURE else "False",
         }
 
     def get_container_by_uuid(self, uuid: str) -> Optional[WorkContainer]:

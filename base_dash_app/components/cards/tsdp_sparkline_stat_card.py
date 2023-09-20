@@ -52,7 +52,7 @@ red_to_green_color_scale = {
 
 
 class TsdpStatCardDescriptor:
-    # todo: make generic stat card descriptor
+    #issue: (issue: 175): make generic stat card descriptor class
     def __init__(
             self,
             title=None,

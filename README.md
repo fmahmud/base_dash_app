@@ -76,8 +76,9 @@ app_descriptor = AppDescriptor(
 
 
 ## Package Usage
-1) Download the latest wheel from the [releases](https://github.com/fmahmud/base_dash_app/releases) page.
-2) Install the wheel using `pip install <path_to_wheel>/base_dash_app-<version>-py3-none-any.whl`
+1) ```pip install https://github.com/fmahmud/base_dash_app/releases/download/0.9.13/base_dash_app-0.9.13-py3-none-any.whl```
+    a) or whatever the latest release is
+2) 
 
 
 ## Repo Usage

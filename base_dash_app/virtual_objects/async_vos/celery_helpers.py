@@ -1,7 +1,7 @@
 import json
 from typing import List
 
-from celery import shared_task
+from celery import shared_task, Task, states
 from redis import StrictRedis
 
 from base_dash_app.enums.status_colors import StatusesEnum
@@ -48,15 +48,17 @@ def serialize_flattened_result_lists(*args, prev_result_uuids: List[str], target
         redis_client.hset(target_uuid, hash_key, json.dumps(results))
 
 
-@shared_task
-def abort_on_failure(*args, target_uuid: str, **kwargs):
+@shared_task(bind=True)
+def abort_on_failure(task: Task, *args, target_uuid: str, **kwargs):
     from base_dash_app.application.runtime_application import RuntimeApplication
     redis_client: StrictRedis = RuntimeApplication.get_instance().redis_client
     key_type = redis_client.type(target_uuid)
     if key_type == "hash":
         value = redis_client.hgetall(target_uuid)
         if "error" in value and value["error"]:
-            raise Exception(f"Aborting due to error(s) in adjacent tasks: {value['error']}")
+            task.update_state(
+                state=states.FAILURE
+            )
 
 
 @shared_task

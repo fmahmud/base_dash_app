@@ -1,4 +1,5 @@
 import datetime
+import pprint
 import time
 import timeit
 from typing import List, Type, Dict, Optional, FrozenSet, Tuple, Any, Union
@@ -148,9 +149,11 @@ class JobCard(ComponentWithInternalCallback):
             job_def: JobDefinition = instance.job_definition
 
             instance.refresh_selectables_info(dbm)
-            instance.logger.debug(
-                f"num containers in progress: {len([i for i in instance.selectable_to_prog_containers.values() if i is not None])}"
-            )
+            in_progress_containers = [i for i in instance.selectable_to_prog_containers.values() if i is not None]
+            instance.logger.debug(f"num containers in progress: {len(in_progress_containers)}")
+
+            if len(in_progress_containers) > 0:
+                instance.logger.debug(f"in progress container: {pprint.pformat(in_progress_containers)}")
 
             callback_context = dash.callback_context
             error_messages = {}
@@ -158,7 +161,7 @@ class JobCard(ComponentWithInternalCallback):
                 state_mapping = instance.get_callback_state(JOB_CARD_TABS_ID, args)
                 instance.current_tab = state_mapping[JOB_CARD_TABS_ID]
             elif triggering_id.startswith(JOB_SELECTABLE_RUNNER_BTN_ID):
-                instance.logger.info(f"Running job {job_def.name} with selectable {instance.selectable_param}")
+                instance.logger.debug(f"Running job {job_def.name} with selectable {instance.selectable_param}")
                 # don't need to worry about getting parameters from different input boxes,
                 # convert frozen set of tuples to dict
                 if SELECTABLE_ADDITIONAL_ID not in callback_context.triggered_id:
@@ -580,7 +583,15 @@ class JobCard(ComponentWithInternalCallback):
                                 html.Div(
                                     children=[
                                         self.__render_selectable_div(selectable, dbm, container)
-                                        for selectable, container in self.selectable_to_prog_containers.items()
+                                        for selectable, container in sorted(
+                                            [*self.selectable_to_prog_containers.items()],
+                                            key=lambda s:
+                                                s[1].start_time
+                                                if s[1] is not None
+                                                and s[1].is_in_progress()
+                                                and s[1].start_time is not None
+                                                else datetime.datetime.now()
+                                        )
                                     ] + [
                                         html.Div(
                                             "",

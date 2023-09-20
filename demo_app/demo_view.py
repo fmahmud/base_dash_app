@@ -3,7 +3,7 @@ import json
 import random
 import re
 import time
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Type
 
 import dash_bootstrap_components as dbc
 from dash import html
@@ -58,7 +58,7 @@ SEARCH_RESULT_DIV_ID = "search-result-div-id"
 TEST_ALERT_BTN_ID = "test-alert-btn-id"
 
 
-class MySelectableModel(BaseModel, Selectable):
+class MySelectableModel(BaseModel):
     def __lt__(self, other):
         if type(other) != type(self):
             return False
@@ -98,6 +98,17 @@ class MySelectablesService(BaseService):
 
 
 class TestJobDef(JobDefinition):
+
+    def get_label(self):
+        return self.name
+
+    def get_value(self):
+        return self.id
+
+    @classmethod
+    def get_selectable_type(cls) -> Optional[Type[BaseModel]]:
+        return MySelectableModel
+
     @classmethod
     def single_selectable_param_name(cls) -> Optional[str]:
         return "param_4"
@@ -111,8 +122,8 @@ class TestJobDef(JobDefinition):
             .filter(JobInstance.job_definition_id == cls.id)
             .filter(JobInstance.start_time.isnot(None))
             .filter(or_(
-                JobInstance.parameters.like(f"%{param_substring},%"),
-                JobInstance.parameters.like(f"%{param_substring}" + "}%")
+                JobInstance.parameters.like(f"%, {param_substring},%"),
+                JobInstance.parameters.like("{" + f"{param_substring}" + "}%")
             ))
             .order_by(JobInstance.start_time.desc())
             .first()
@@ -218,23 +229,19 @@ class TestJobDef(JobDefinition):
 
         session: Session = kwargs["session"]
 
-        prog_container.push_changes_to_redis()
+        prog_container.push_to_redis()
         time.sleep(1)
-        prog_container.progress += 20
+        prog_container.set_progress(prog_container.progress + 20)
         prog_container.info_log("1 second passed")
-        prog_container.push_changes_to_redis()
         time.sleep(1)
-        prog_container.progress += 20
+        prog_container.set_progress(prog_container.progress + 20)
         prog_container.info_log("2 seconds passed")
-        prog_container.push_changes_to_redis()
         time.sleep(1)
-        prog_container.progress += 20
+        prog_container.set_progress(prog_container.progress + 20)
         prog_container.info_log("3 seconds passed")
-        prog_container.push_changes_to_redis()
         time.sleep(1)
-        prog_container.progress += 20
+        prog_container.set_progress(prog_container.progress + 20)
         prog_container.info_log("4 seconds passed")
-        prog_container.push_changes_to_redis()
 
         if "param_4" in parameter_values:
             prog_container.info_log(f"Received param_4: {parameter_values['param_4']}")
@@ -249,13 +256,13 @@ class TestJobDef(JobDefinition):
         ran = random.random()
         if ran < 0.5:
             prog_container.end_reason = "Failed Successfully!"
-            prog_container.push_changes_to_redis()
+            prog_container.push_to_redis()
             return StatusesEnum.FAILURE
         else:
             prog_container.end_reason = "Everything succeeded!"
-            prog_container.progress += 20
+            prog_container.set_progress(prog_container.progress + 20)
             time.sleep(1)
-            prog_container.push_changes_to_redis()
+            prog_container.push_to_redis()
             return StatusesEnum.SUCCESS
 
     def stop(self, *args, prog_container: VirtualJobProgressContainer, **kwargs) -> StatusesEnum:
@@ -544,7 +551,8 @@ class DemoView(BaseView):
                 "clear": "left",
                 "width": "100%",
                 "marginTop": "20px",
-                "height": "42px"
+                "height": "42px",
+                "minWidth": "1500px"
             }
         )
 

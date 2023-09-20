@@ -16,22 +16,26 @@ class AbstractRedisDto(abc.ABC):
         self.read_only: bool = False
 
     def hydrate_from_redis(self):
+        previous_read_only = self.read_only
         self.set_read_only()
         self.fetch_all_from_redis()
-        self.set_read_only(False)
+        self.set_read_only(previous_read_only)
         return self
 
     def set_read_only(self, read_only: bool = True):
         self.read_only = read_only
 
-    def set_value_in_redis(self, key: str, value: str):
+    def set_value_in_redis(self, key: str, value):
         if self.redis_client is None:
             return
 
         if self.read_only:
             return
 
-        self.redis_client.hset(self.uuid, key, value or "")
+        if value is None:
+            value = ""
+
+        self.redis_client.hset(self.uuid, key, value)
 
     def get_value_from_redis(self, key: str) -> str:
         if self.redis_client is None:
@@ -71,10 +75,9 @@ class AbstractRedisDto(abc.ABC):
         data = self.redis_client.hgetall(self.uuid)
 
         if len(data) == 0:
-            print(f"Could not find {self.uuid} in redis")
-            return
+            return None
 
-        self.from_dict(data)
+        return self.from_dict(data)
 
     def destroy_in_redis(self):
         if self.redis_client is None:

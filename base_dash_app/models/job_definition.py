@@ -1,6 +1,9 @@
 import abc
+import json
 import logging
-from typing import Optional, List, Dict, Any, Tuple, FrozenSet
+from abc import ABC
+from operator import or_
+from typing import Optional, List, Dict, Any, Tuple, FrozenSet, TypeVar, Type
 
 from sqlalchemy import Column, Integer, Sequence, String, orm, Boolean, select, func
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -69,6 +72,46 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
     def __str__(self):
         # todo
         pass
+
+    @classmethod
+    def get_selectable_type(cls) -> Optional[Type[BaseModel]]:
+        return None
+
+    @classmethod
+    def get_selectable_for_instance(cls, instance: "JobInstance", session: Session) -> Optional[Selectable]:
+        instance_params = instance.parameters
+        if instance_params is None or instance_params == "" or instance_params == "{}":
+            return None
+
+        param_dict = json.loads(instance_params)
+        selectable_type = cls.get_selectable_type()
+        if cls.single_selectable_param_name() not in param_dict:
+            return None
+
+        if selectable_type is None:
+            return None
+
+        return session.query(selectable_type).get(param_dict[cls.single_selectable_param_name()])
+
+    def get_in_progress_instances_by_selectable(self, session: Session) -> List[JobInstance]:
+        # check for new in progress instances
+        param_substring_comma = "%, " + f"\"{type(self).single_selectable_param_name()}\": %"
+        param_substring_brace = "{" + f"\"{type(self).single_selectable_param_name()}\": %"
+
+        in_progress_instances = (
+            session.query(JobInstance)
+            .filter_by(end_time=None)
+            .filter_by(job_definition_id=self.id)
+            .filter(
+                or_(
+                    JobInstance.parameters.like(param_substring_comma),
+                    JobInstance.parameters.like(param_substring_brace)
+                )
+            )
+            .all()
+        )
+
+        return in_progress_instances
 
     @hybrid_property
     def latest_start_time(self):
