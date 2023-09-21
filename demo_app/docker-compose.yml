@@ -34,6 +34,8 @@ services:
       - db
   redis:
     image: "redis:alpine"
+    ports:
+      - "6379:6379"
   db:
     image: postgres:13
     environment:
@@ -42,6 +44,8 @@ services:
       POSTGRES_PASSWORD: password
     ports:
       - "5432:5432"
+#    volumes:
+#      - pgdata:/var/lib/postgresql/data
 
 #volumes:
 #  pgdata:

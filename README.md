@@ -61,46 +61,277 @@ Sure, I'll create a markdown documentation for the `AppDescriptor` class:
 
 ## Usage
 
-To utilize the `AppDescriptor` class, simply instantiate it with desired parameters:
+### Dependencies
+This package requires the following dependencies to be installed:
+- Python 3.9
+- Docker
+  - [Download Here](https://www.docker.com/)
+- Precommit
+  - ```pip install pre-commit``` or ```pip3 install pre-commit```
+  - ```pre-commit install```
+- Pipenv:
+  - ```pip install pipenv``` or ```pip3 install pipenv```
+  - Activate the virtual environment: ```pipenv shell```
+  - Install dev dependencies: ```pipenv install --dev```
 
+### Docker
+This package is designed to be used with Docker. 
+To use the package, simply create a Dockerfile that looks like this:
+
+```dockerfile
+FROM python:3.9-slim-bookworm as base
+
+# Setup env
+ENV LANG C.UTF-8
+ENV LC_ALL C.UTF-8
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONFAULTHANDLER 1
+
+FROM base AS python-deps
+
+USER root
+# Install pipenv and compilation dependencies
+RUN pip install --upgrade pip
+RUN pip install pipenv
+RUN apt-get update && apt-get install -y libpq5 gcc
+
+# Install python dependencies in /.venv
+COPY ./Pipfile .
+COPY ./Pipfile.lock .
+RUN PIPENV_VENV_IN_PROJECT=1 pipenv install --deploy
+
+# Create and switch to a new user
+RUN useradd --create-home appuser
+WORKDIR /home/appuser
+USER appuser
+
+FROM base AS runtime
+
+# Copy virtual env from python-deps stage
+COPY --from=python-deps /.venv /.venv
+ENV PATH="/.venv/bin:$PATH"
+
+COPY ./ ./
+
+RUN pip install ./*.whl
+```
+
+### Docker Compose
+Dash, which is based on Flask, is supposed to be run with a production WSGI server. In this case, we use Gunicorn.
+In order to setup the app to run with Gunicorn, we use Docker Compose. Additionally, in order to support a larger
+workload, we use Celery to run background tasks. The `docker-compose.yml` file should look like this:
+
+```yaml
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "60000:60000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/testdb
+      - CELERY_BROKER_URL=redis://redis:6379/0
+    # IMPORTANT:
+    # test_app:server is <name_of_file>:<name of server variable>
+    command: ["gunicorn", "test_app:server", "-b", "0.0.0.0:60000"]  
+    depends_on:
+      - redis
+      - db
+  worker:
+    build: .
+    # IMPORTANT:
+    # celery_app:celery is <name_of_file>:<name of celery variable>
+    command: celery -A celery_app.celery worker --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/testdb
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - web
+      - redis
+      - db
+  beat:
+    build: .
+    # IMPORTANT:
+    # celery_app:celery is <name_of_file>:<name of celery variable>
+    command: celery -A celery_app.celery beat --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/testdb
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - web
+      - redis
+      - db
+  redis:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: testdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+```
+
+> **Important Note**: This will expose your server at port 60000 on your localhost. 
+> If you want to expose it at a different port, change the first port number in the `web` service.
+> 
+> **Additionally**, If you want to access any of these services like the DB or redis directly, 
+> you can go to `localhost:5432` or `localhost:6379` respectively. 
+
+
+If you want to preserve the DB between runs, you can mount a volume to the DB container:
+```yaml
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: testdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
+```
+
+### Executing the Demo App
+1) `cd` into the `demo_app` directory
+2) Run `docker-compose up --build`
+3) Use the app at `localhost:60000`
+4) Bring the app down with `docker-compose down` in another terminal (while in the same directory) or `ctrl+c` and then `docker-compose down`
+5) If you want to bring the app down and remove the database, run `docker-compose down -v`
+6) If you want to bring the app down and remove the database and the images, run `docker-compose down -v --rmi all`
+
+## Code Structure
+### Models
+### Services
+### Views
+### APIs
+### Jobs
+### Environment Variables
+### Components
+### Initializing Your Own App
+#### Install the wheel
+> ```pipenv install https://github.com/fmahmud/base_dash_app/releases/download/0.9.13/base_dash_app-0.9.13-py3-none-any.whl```
+>
+> or whatever the latest [release is](https://github.com/fmahmud/base_dash_app/releases)
+
+#### Import base_dash_app
 ```python
-app_descriptor = AppDescriptor(
-    title="My App",
-    service_classes=[MyService],
-    views=[MyView],
-    ...
+from base_dash_app.application.runtime_application import RuntimeApplication
+from base_dash_app.application.app_descriptor import AppDescriptor
+from base_dash_app.utils.db_utils import DbDescriptor, DbEngineTypes
+from base_dash_app.utils.env_vars.env_var_def import EnvVarDefinition
+from base_dash_app.utils.log_formatters.colored_formatter import ColoredFormatter
+```
+
+#### Configure the App
+To utilize the `AppDescriptor` class, simply instantiate it with desired parameters. Here is are two snippets from the
+Demo App (in `demo_app/test_app.py`):
+
+To specify the database to use, you can use the `DbDescriptor` class:
+
+**_DB Descriptor_**
+```python
+db_descriptor: DbDescriptor = DbDescriptor(
+    db_uri="db:5432/testdb",
+    engine_type=DbEngineTypes.POSTGRES,
+    username="postgres",
+    password="password",
 )
 ```
+
+**_App Descriptor_**
+```python
+my_app_descriptor = AppDescriptor(
+    db_descriptor=db_descriptor,
+    title="Test App",
+    external_stylesheets=external_stylesheets,
+    views=[DemoView, AreaGraphView, AsyncDemoView], view_groups={"Test": [DemoView]},
+    jobs=[TestJobDef], service_classes=[MySelectablesService],
+    upgrade_db=True,
+    drop_tables=False,
+    use_auth=True,
+    valid_user_pairs={"test": "test"},
+    log_level=logging.INFO,
+    alerts_refresh_timeout=2000,
+    assets_folder_path="/assets",
+    std_out_formatter=ColoredFormatter(),
+    env_vars=[
+        EnvVarDefinition(
+            name="TEST_ENV_VAR", var_type=bool, required=True
+        )
+    ],
+    use_scoped_session=True,
+)
+```
+#### Running the App
+>  **Note**:
+> - If you are using celery, you need to make the celery instance available as a global variable. 
+> - If you are using gunicorn, you need to make the `rta.server` (the Flask App) available as a global variable.
+> - If you are using gunicorn in local, you can set `server.config["TESTING"] = True` to enable testing mode. This will print out uncaught exception stacktraces
+
+```python
+rta = RuntimeApplication(my_app_descriptor)
+app = rta.app
+server = rta.server
+server.config["TESTING"] = True
+db_manager = rta.dbm
+```
+
+As you might notice, we are passing in a separate file to run celery in our docker-compose file. 
+That is because we want the Celery worker to have access to the `RuntimeApplication` instance, but not 
+make any changes to the database. In order to do that, we need to instantiate a slightly different version of 
+the `RuntimeApplication` instance for celery:
+
+```python
+my_app_descriptor = AppDescriptor(
+    db_descriptor=db_descriptor,
+    title="Test App",
+    views=[DemoView, AreaGraphView, AsyncDemoView],
+    view_groups={"Test": [DemoView]},
+    jobs=[TestJobDef], service_classes=[MySelectablesService],
+    use_auth=True,
+    valid_user_pairs={"test": "test"},
+    log_level=logging.INFO,
+    alerts_refresh_timeout=2000,
+    assets_folder_path="/assets",
+    # std_out_formatter=ColoredFormatter()
+    env_vars=[
+        EnvVarDefinition(
+            name="TEST_ENV_VAR", var_type=bool, required=True
+        )
+    ],
+    use_scoped_session=True,
+)
+```
+>>> Assuming all else is in place, you can run the app with `docker-compose up --build` and access it at `localhost:60000`.
 
 ---
 
 
-## Package Usage
-1) ```pip install https://github.com/fmahmud/base_dash_app/releases/download/0.9.13/base_dash_app-0.9.13-py3-none-any.whl```
-    a) or whatever the latest release is
-2) 
+## Developing the Wheel
 
+#### Update version in `setup.py`
+```python
+from setuptools import find_packages, setup
+setup(
+    name='base_dash_app',
+    packages=find_packages(),
+    version='0.10.0',
+    description='Base Dash Webapp',
+    author='fmahmud',
+    license='MIT',
+)
+```
 
-## Repo Usage
-
-### Requirements
-`pip3 install twine setuptools wheel pipenv`
-
-### Setup Environment
-`pipenv install --dev`
-
-### Generate Requirements
-`pip3 freeze > requirements.txt`
-
-### Package into wheel
-` python setup.py bdist_wheel`
-
-### Using the Wheel
-`pip install <path_to_wheel>`
-
-e.g. `pip install ./dist/base_dash_app-0.1.8-py3-none-any.whl`
-
-### Uninstallation
-`pip uninstall <path_to_wheel>`
-
-e.g. `pip uninstall ./dist/base_dash_app-0.1.8-py3-none-any.whl`
+#### Package into wheel
+```
+pipenv run python setup.py bdist_wheel
+```

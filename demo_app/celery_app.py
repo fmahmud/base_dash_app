@@ -19,11 +19,6 @@ from demo_app.async_demo_view import AsyncDemoView
 from demo_app.demo_view import DemoView, TestJobDef, MySelectablesService
 from demo_app.area_graph_view import AreaGraphView
 
-external_stylesheets = [
-    "https://fonts.googleapis.com/css?family=Roboto&display=swap",
-    dbc.themes.BOOTSTRAP,
-    FONT_AWESOME
-]
 
 db_descriptor: DbDescriptor = DbDescriptor(
     db_uri="db:5432/testdb",
@@ -35,7 +30,6 @@ db_descriptor: DbDescriptor = DbDescriptor(
 my_app_descriptor = AppDescriptor(
     db_descriptor=db_descriptor,
     title="Test App",
-    external_stylesheets=external_stylesheets,
     views=[DemoView, AreaGraphView, AsyncDemoView],
     view_groups={"Test": [DemoView]},
     jobs=[TestJobDef], service_classes=[MySelectablesService],

@@ -32,7 +32,4 @@ ENV PATH="/.venv/bin:$PATH"
 
 COPY ./ ./
 
-# delete temp.* files
-
-
 RUN pip install ./*.whl
