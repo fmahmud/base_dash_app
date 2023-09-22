@@ -335,3 +335,129 @@ setup(
 ```
 pipenv run python setup.py bdist_wheel
 ```
+
+
+## Migrating from 0.9.13 to 0.10.0
+### App execution (Docker, Docker Compose, Gunicorn, Celery, Redis, Env Vars)
+1) Celery, Redis, FlaskSQLAlchemy are all required dependencies now
+2) You should create a separate file for celery execution (e.g. celery_app) to handle the following (see [Running the App](#running-the-app))
+   1) Celery instance needs to be available as a global variable
+   2) Server (Flask App) instance needs to be available as a global variable
+3) For Gunicorn, you need to expose the server instance as a global variable
+4) Make sure the "CELERY_BROKER_URL" environment variable is set to whatever your redis URL is
+   1) e.g. "redis://redis:6379/0" in your docker-compose file
+5) Make sure the "REDIS_URL" environment variable is set to whatever your redis URL is
+   1) e.g. "redis://redis:6379/0" in your docker-compose file
+
+### General Model Life Cycle
+1) Don't store references to the model at the view or service instance level. Instead, store the ID of that model
+and fetch it every time from the DB and pass it to your render functions. This is because you can't assume
+which thread will be serving the request and it will likely be detached from any session as a result.
+
+### App Setup (App Descriptor, DB Descriptor, Runtime Application)
+1) no longer accepts interval seconds being set for scheduler
+2) You might have been using SQLite before in local, now you need to use Postgres which is setup within the
+docker compose file for local. You might have had a piece of code like this:
+```python
+if IS_LOCAL:
+    db_descriptor: DbDescriptor = DbDescriptor(
+        db_uri="./temp.db",
+        engine_type=DbEngineTypes.SQLITE,
+    )
+...
+```
+You need to change it to this:
+> **Important Note**: This must be done in all your entry point files (e.g. celery_app.py, test_app.py, etc.) 
+```python
+if IS_LOCAL:
+    db_descriptor: DbDescriptor = DbDescriptor(
+        db_uri="db:5432/testdb",
+        engine_type=DbEngineTypes.POSTGRES,
+        username="postgres",
+        password="password",
+    )
+...
+```
+3) 
+
+### DB Manager:
+1) DB manager instances should now be entered and exited:
+```python
+with self.dbm as dbm:
+    session: Session = dbm.get_session()
+    ... # all code that uses session.
+```
+
+### Services
+1) All services **can** take a session as an optional parameter to use for all DB operations:
+```python
+with self.dbm as dbm:
+    session: Session = dbm.get_session()
+    my_models = self.service.get_all(session)
+```
+if no session is provided, it will get the session for the DB Manager instance
+
+### ComponentsWithInternalCallback
+1) Should now be defined as instance variables and passed to raw_render functions
+instead of being instantiated within raw render files
+2) 
+
+### Job Definitions
+1) Previously, Job Definitions could be setup to have parameters that take in an instance of a selectable.
+These parameters would be shown in the job card as individual dropdowns. 
+Now, you can set the job definition to be a "Single Selectable" job definition. 
+This means it requires only one selectable as a parameter. With this change, instead of showing the selectables
+in a drop down, the Job Card will now show a run button and progress bar for each selectable. In order to use this
+you have to setup a few  additional functions:
+   1) Add the following methods:
+```python
+class TestJobDef(JobDefinition):
+
+    @classmethod
+    def get_selectable_type(cls) -> Optional[Type[Selectable]]:
+        return MySelectableModel
+
+    @classmethod
+    def single_selectable_param_name(cls) -> Optional[str]:
+        return "param_4"
+
+    @classmethod
+    def get_latest_exec_for_selectable(cls, selectable: Selectable, session: Session) -> Optional[JobInstance]:
+        param_substring = f"\"{cls.single_selectable_param_name()}\": {selectable.get_value()}"
+
+        instance: JobInstance = (
+            session.query(JobInstance)
+            .filter(JobInstance.job_definition_id == cls.id)
+            .filter(JobInstance.start_time.isnot(None))
+            .filter(or_(
+                JobInstance.parameters.like(f"%, {param_substring},%"),
+                JobInstance.parameters.like("{" + f"{param_substring}" + "}%")
+            ))
+            .order_by(JobInstance.start_time.desc())
+            .first()
+        )
+
+        return instance
+
+    @classmethod
+    def get_selectables_by_param_name(
+            cls, variable_name, session: Session
+    ) -> List[CachedSelectable]:
+        if variable_name == "param_4":
+            return session.query(MySelectableModel).all()
+            
+
+    
+    """ the rest of your code """
+```
+
+3) Use `prog_container.set_progress(progress)` to update the progress and push to redis. 
+Just incrementing progress will only affect the local progress value
+3) 
+
+
+# Troubleshooting
+1) `db_1      | initdb: error: could not create directory "/var/lib/postgresql/data/pg_wal": No space left on device`
+   - This can be due to having multiple docker containers running with the same DB configuration, causing a conflict.
+   - Or because there are too many volumes present. Try running:
+   - `docker-compose down -v` to remove all volumes. This might have to be run in other repos as well.

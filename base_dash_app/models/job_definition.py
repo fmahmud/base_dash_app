@@ -25,6 +25,12 @@ from base_dash_app.virtual_objects.virtual_framework_obj import VirtualFramework
 
 
 class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel, VirtualFrameworkObject):
+    def get_label(self):
+        return self.name
+
+    def get_value(self):
+        return self.id
+
     def get_start_time(self):
         pass
 
@@ -74,7 +80,25 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
         pass
 
     @classmethod
-    def get_selectable_type(cls) -> Optional[Type[BaseModel]]:
+    def get_selectable_by_value(cls, value: Any, session: Session) -> Optional[Selectable]:
+        selectable_type = cls.get_selectable_type()
+        param_name = cls.single_selectable_param_name()
+
+        if selectable_type is None:
+            return None
+
+        if issubclass(selectable_type, BaseModel):
+            return session.query(selectable_type).get(value)
+        else:
+            cached_selectables = cls.get_selectables_by_param_name(param_name, session)
+            for cached_selectable in cached_selectables:
+                if cached_selectable.get_value() == value:
+                    return cached_selectable
+
+        return None
+
+    @classmethod
+    def get_selectable_type(cls) -> Optional[Type[Selectable]]:
         return None
 
     @classmethod
@@ -84,14 +108,14 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
             return None
 
         param_dict = json.loads(instance_params)
-        selectable_type = cls.get_selectable_type()
-        if cls.single_selectable_param_name() not in param_dict:
+        param_name = cls.single_selectable_param_name()
+        if param_name not in param_dict:
             return None
 
-        if selectable_type is None:
-            return None
+        param_value = param_dict[param_name]
+        selectable = cls.get_selectable_by_value(param_value, session)
 
-        return session.query(selectable_type).get(param_dict[cls.single_selectable_param_name()])
+        return selectable
 
     def get_in_progress_instances_by_selectable(self, session: Session) -> List[JobInstance]:
         # check for new in progress instances
@@ -133,7 +157,7 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
 
     @classmethod
     @abc.abstractmethod
-    def get_cached_selectables_by_param_name(
+    def get_selectables_by_param_name(
         cls,
         param_name: str,
         session: Session
@@ -203,7 +227,7 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
 
     def sync_single_selectable_data(self, session: Session):
         if self.single_selectable_param_name is not None:
-            self.cached_selectables = type(self).get_cached_selectables_by_param_name(
+            self.cached_selectables = type(self).get_selectables_by_param_name(
                 self.single_selectable_param_name,
                 session=session
             )

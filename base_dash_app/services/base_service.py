@@ -26,27 +26,27 @@ class BaseService(ABC, Generic[T], VirtualFrameworkObject, metaclass=AbstractSin
         self.__service_name = service_name if service_name is not None else self.__class__.__name__
         self.object_type = object_type
 
-    def get_by_id(self, id: int, session: Session) -> T:
+    def get_by_id(self, id: int, session: Session = None) -> T:
         if session is None:
-            raise Exception("No Session provided.")
+            session: session = self.dbm.get_session()
 
         if self.object_type is None:
             raise Exception(f"Service {self.__service_name} is not a model providing service.")
 
         return session.query(self.object_type).get(id)
 
-    def get_all(self, session: Session) -> List[T]:
+    def get_all(self, session: Session = None) -> List[T]:
         if session is None:
-            raise Exception("No Session provided.")
+            session: session = self.dbm.get_session()
 
         if self.object_type is None:
             raise Exception(f"Service {self.__service_name} is not a model providing service.")
 
         return session.query(self.object_type).all()
 
-    def save(self, target: T, session: Session) -> T:
+    def save(self, target: T, session: Session = None) -> T:
         if session is None:
-            raise Exception("No Session provided.")
+            session: session = self.dbm.get_session()
 
         if self.object_type is None:
             raise Exception(f"Service {self.__service_name} is not a model providing service.")
@@ -61,9 +61,9 @@ class BaseService(ABC, Generic[T], VirtualFrameworkObject, metaclass=AbstractSin
 
         return target
 
-    def save_all(self, targets: List[T], session: Session) -> List[T]:
+    def save_all(self, targets: List[T], session: Session = None) -> List[T]:
         if session is None:
-            raise Exception("No Session provided.")
+            session: session = self.dbm.get_session()
 
         if self.object_type is None:
             raise Exception(f"Service {self.__service_name} is not a model providing service.")

@@ -54,7 +54,8 @@ def process_file(file_path):
                     issue_number = create_issue(
                         filename=file_path,
                         issue_title=issue_title,
-                        surrounding_code=context
+                        surrounding_code=context,
+                        line_number=index + 1
                     )
                     content[index] = line.replace(match.group(1), f"{match.group(1)} (issue: {issue_number}):")
                     issue_numbers_created.append(issue_number)
@@ -67,10 +68,15 @@ def process_file(file_path):
     return issue_numbers_created
 
 
-def create_issue(filename, issue_title, surrounding_code=None):
+def create_issue(filename, issue_title, surrounding_code=None, line_number=None):
     surrounding_code = surrounding_code or ""
 
-    issue_body = f"In file {filename}, {issue_title}.\n Context: \n```\n{surrounding_code}\n```"
+    issue_body = (
+        f"In file {filename}"
+        f"{(' at line number ' + str(line_number)) if line_number is not None else ''}."
+        f"\n\nContext: \n```\n{surrounding_code}\n```"
+    )
+
     issue = {
         'title': f'{issue_title}',
         'body': issue_body,
@@ -129,4 +135,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    exit(0)
+

@@ -3,31 +3,22 @@ import gc
 import json
 import logging
 import os
-import pprint
 import threading
-import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
-from operator import or_
-from typing import Type, List, Dict, Any, Tuple, FrozenSet, TypeVar, Optional, Union
+from typing import Type, Dict, Any, TypeVar
 
 from celery import shared_task
-from celery.signals import task_prerun, task_postrun
-from flask import has_app_context
-from redis import Redis, StrictRedis
-from sqlalchemy.exc import InvalidRequestError
 from sqlalchemy.orm import Session
-from sqlalchemy.orm.scoping import ScopedSession
 
-from base_dash_app.application.celery_decleration import CelerySingleton
 from base_dash_app.enums.log_levels import LogLevelsEnum, LogLevel
 from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.models.job_definition import JobDefinition
 from base_dash_app.models.job_instance import JobInstance
 from base_dash_app.services.base_service import BaseService
 from base_dash_app.utils.db_utils import DbManager
-from base_dash_app.virtual_objects.interfaces.selectable import Selectable, CachedSelectable
-from base_dash_app.virtual_objects.job_progress_container import VirtualJobProgressContainer, ContainerNotFoundError
+from base_dash_app.virtual_objects.interfaces.selectable import Selectable
+from base_dash_app.virtual_objects.job_progress_container import VirtualJobProgressContainer
 from base_dash_app.virtual_objects.result import Result
 
 passing_statuses = [StatusesEnum.WARNING, StatusesEnum.SUCCESS]
@@ -52,146 +43,10 @@ class JobDefinitionService(BaseService):
 
         self.threadpool_executor = ThreadPoolExecutor(max_workers=1)
 
-        self.non_selectables_to_container_map: (
-            Dict[int, Optional[VirtualJobProgressContainer]]
-        ) = {}
-
-        self.job_to_selectables_to_container_map: (
-            Dict[int, Dict[Selectable, Optional[VirtualJobProgressContainer]]]
-        ) = {}
-
-    def get_containers_by_job_id(self, job_id: int, by_selectables=False) -> (
-            Union[
-                Dict[Selectable, VirtualJobProgressContainer],
-                Optional[VirtualJobProgressContainer]
-            ]
-    ):
-        if job_id < 1 or job_id is None:
-            raise Exception(f"Invalid job id provided: {job_id}")
-
-        with (self.dbm as dbm):
-            session: Session = dbm.get_session()
-            job_def: JobDefinitionImpl = session.query(JobDefinition).filter_by(id=job_id).first()
-
-            if by_selectables:
-                job_class: Type[JobDefinitionImpl] = type(job_def)
-
-                if job_id not in self.job_to_selectables_to_container_map:
-                    self.__cache_container_by_job_def(self.get_by_id(job_id, session=session))
-
-                in_progress_instances = job_def.get_in_progress_instances_by_selectable(
-                    session=session
-                )
-                # log the in progress instances
-                self.logger.debug(f"Num in progress instances = {len(in_progress_instances)}")
-
-                for in_progress_instance in in_progress_instances:
-                    selectable: Selectable = job_class.get_selectable_for_instance(
-                        instance=in_progress_instance, session=session
-                    )
-
-                    if selectable not in self.job_to_selectables_to_container_map[job_id]:
-                        self.job_to_selectables_to_container_map[job_id][selectable] = None
-
-                    if self.job_to_selectables_to_container_map[job_id][selectable] is not None:
-                        self.logger.debug(f"Found container for selectable {selectable.get_label()}")
-                        new_container_val = (
-                            self.job_to_selectables_to_container_map[job_id][selectable].fetch_all_from_redis()
-                        )
-
-                        if new_container_val is None:
-                            self.logger.debug(f"deleting container for selectable {selectable.get_label()}")
-                            self.job_to_selectables_to_container_map[job_id][selectable].destroy_in_redis()
-
-                        self.job_to_selectables_to_container_map[job_id][selectable] = new_container_val
-                    else:
-                        self.job_to_selectables_to_container_map[job_id][selectable] = (
-                            self.get_latest_container_for_instance(
-                                job_def_id=job_id,
-                                job_instance_id=in_progress_instance.id
-                            )
-                        )
-                        self.job_to_selectables_to_container_map[job_id][selectable].selectable \
-                            = selectable
-
-                # check for containers that are stale (job instances in DB not in progress)
-                for selectable, container in self.job_to_selectables_to_container_map[job_id].items():
-                    if container is not None:
-                        if container.fetch_all_from_redis() is None or (
-                                container.get_status() in StatusesEnum.get_terminal_statuses()
-                        ):
-
-                            self.job_to_selectables_to_container_map[job_id][selectable] = None
-                            container.destroy_in_redis()
-
-                to_return = self.job_to_selectables_to_container_map[job_id]
-                self.logger.debug(f"get_containers_by_job_id: Returning {to_return}")
-
-                return to_return
-            else:
-                if job_id not in self.non_selectables_to_container_map:
-                    self.__cache_container_by_job_def(self.get_by_id(job_id, session=session))
-
-                return self.non_selectables_to_container_map[job_id]
-
-    def __cache_container_by_job_def(self, job_def: JobDefinitionImpl):
-        """
-        This method will cache the container for the job definition. It will be used to check if the job is already
-        :param job_def:
-        :param session:
-        :return:
-        """
-        with self.dbm as dbm:
-            session: Session = dbm.get_session()
-            single_selectable_param_name = type(job_def).single_selectable_param_name()
-            if single_selectable_param_name is not None:
-                if job_def.id not in self.job_to_selectables_to_container_map:
-                    self.job_to_selectables_to_container_map[job_def.id] = {}
-
-                job_def.sync_single_selectable_data(session)
-                self.job_to_selectables_to_container_map[job_def.id] = {
-                    selectable: self.job_to_selectables_to_container_map[job_def.id].get(selectable, None)
-                    for selectable in job_def.cached_selectables
-                }
-            else:
-                if job_def.id not in self.non_selectables_to_container_map:
-                    self.non_selectables_to_container_map[job_def.id] = None
-
-    def get_by_id(self, id: int, session: Session) -> Optional[JobDefinitionImpl]:
-        job_def: JobDefinitionImpl = session.query(JobDefinition).filter_by(id=id).first()
-        if job_def is None:
-            return None
-
-        job_def.set_vars_from_kwargs(**self.produce_kwargs())
-        self.__cache_container_by_job_def(job_def)
-
-        return job_def
-
     def get_by_class(self, clazz):
         session: Session = self.dbm.get_session()
         job_def: JobDefinitionImpl = session.query(clazz).filter_by(job_class=clazz.__name__).first()
-
-        if job_def is None:
-            return None
-        job_def.set_vars_from_kwargs(**self.produce_kwargs())
-        self.__cache_container_by_job_def(job_def)
         return job_def
-
-    def get_latest_container_for_instance(self, job_instance_id: int, job_def_id: int) \
-            -> Optional[VirtualJobProgressContainer]:
-        # construct virtual prog container
-        prog_container: VirtualJobProgressContainer = VirtualJobProgressContainer(
-            job_instance_id=job_instance_id,
-            job_definition_id=job_def_id
-        )
-
-        try:
-            prog_container.use_redis(self.redis_client, prog_container.uuid).hydrate_from_redis()
-            self.logger.debug(f"[glcfi] Found container for job instance {job_instance_id} with uuid {prog_container.uuid}")
-            return prog_container
-        except ContainerNotFoundError as e:
-            self.logger.debug(f"[glcfi] Container not found for job instance {job_instance_id} with uuid {prog_container.uuid}")
-            return None
 
     def run_job(
             self, *args, job_def: JobDefinitionImpl,
@@ -213,7 +68,6 @@ class JobDefinitionService(BaseService):
             job_class: Type[JobDefinitionImpl] = type(job_def)
             single_selectable_param_name = job_class.single_selectable_param_name()
             is_single_selectable = selectable is not None and single_selectable_param_name is not None
-            self.__cache_container_by_job_def(job_def)
 
             if not issubclass(job_class, JobDefinition):
                 raise Exception(f"Provided job definition was not of a valid type. Was of type {job_class}.")
@@ -229,12 +83,8 @@ class JobDefinitionService(BaseService):
                 if latest_exec is not None and latest_exec.end_time is None:
                     raise JobAlreadyRunningException(job_id=job_def.id)
             else:
-                # todo
-                if (
-                        job_def.id in self.non_selectables_to_container_map
-                        and self.non_selectables_to_container_map[job_def.id] is not None
-                ):
-                    raise JobAlreadyRunningException(job_id=job_def.id)
+                # issue: (issue: 183): Handle checking for running job instance for non-SSP jobs
+                pass
 
             current_instance = JobInstance()
             current_instance.job_definition_id = job_def.id
@@ -258,24 +108,9 @@ class JobDefinitionService(BaseService):
             job_progress_container.use_redis(self.redis_client, job_progress_container.uuid)
             job_progress_container.set_pending()
 
-            if is_single_selectable:
-                self.job_to_selectables_to_container_map[job_def.id][selectable] = job_progress_container
-                job_progress_container.selectable = selectable
-            else:
-                self.non_selectables_to_container_map[job_def.id] = job_progress_container
-
             job_progress_container.start_time = current_instance.start_time
             job_progress_container.log_level = log_level
             job_progress_container.push_to_redis()
-
-            self.redis_client: StrictRedis
-            x = self.redis_client.exists(job_progress_container.uuid)
-            if x == 0:
-                self.logger.error(f"Could not find {job_progress_container.uuid} in redis")
-            else:
-                self.logger.debug(f"Found {job_progress_container.uuid} in redis")
-                redis_data = pprint.pformat(self.redis_client.hgetall(job_progress_container.uuid))
-                self.logger.debug(f"Redis data = {redis_data}")
 
             kwargs["prog_container_uuid"] = job_progress_container.uuid
             kwargs["parameter_values"] = parameter_values
@@ -295,74 +130,6 @@ class JobDefinitionService(BaseService):
             except Exception as e:
                 raise e
 
-    def get_status(self, job_instance: JobInstance):
-        prereq_status = StatusesEnum.get_by_id(job_instance.prerequisites_status_id)
-        execution_status = StatusesEnum.get_by_id(job_instance.execution_status_id)
-        completion_criteria_status = StatusesEnum.get_by_id(job_instance.completion_criteria_status_id)
-
-        if prereq_status in passing_statuses:
-            if execution_status in passing_statuses:
-                return completion_criteria_status
-            else:
-                return execution_status
-        else:
-            return prereq_status
-
-    def __do_execution(
-            self, *args, job_def: JobDefinition,
-            prog_container: VirtualJobProgressContainer,
-            parameter_values: Dict,
-            **kwargs
-    ):
-        try:
-            with self.dbm.app.app_context():
-                session: Session = self.dbm.get_session()
-                self.logger.debug("checking prerequisites...")
-
-                prerequisites_status: StatusesEnum = job_def.check_prerequisites(
-                    *args, session=session, prog_container=prog_container,
-                    parameter_values=parameter_values,
-                    **kwargs
-                )
-
-                prog_container.prerequisites_status = prerequisites_status
-                prog_container.last_status_updated_at = datetime.datetime.now()
-                self.logger.debug(f"prerequisite status was {prerequisites_status}")
-
-                if prerequisites_status in [StatusesEnum.WARNING, StatusesEnum.SUCCESS]:
-                    self.logger.debug(f"executing job...")
-                    execution_status: StatusesEnum = job_def.start(
-                        *args, session=session, prog_container=prog_container,
-                        parameter_values=parameter_values,
-                        **kwargs
-                    )
-
-                    prog_container.execution_status = execution_status
-                    prog_container.last_status_updated_at = datetime.datetime.now()
-                    self.logger.debug(f"execution status was {execution_status}")
-
-                    self.logger.debug(f"checking completion criteria...")
-
-                    completion_criteria_status = job_def.check_completion_criteria(
-                        *args, session=session, prog_container=prog_container,
-                        parameter_values=parameter_values,
-                        **kwargs
-                    )
-
-                    prog_container.completion_criteria_status = completion_criteria_status
-                    prog_container.last_status_updated_at = datetime.datetime.now()
-
-                    self.logger.debug(f"completion status was {completion_criteria_status}")
-        except Exception as e:
-            stacktrace = traceback.format_exc()
-            prog_container.end_reason = str(e)
-            prog_container.completion_criteria_status = StatusesEnum.FAILURE
-            self.logger.error(f"Exception occurred: {stacktrace}")
-
-        prog_container.end_time = datetime.datetime.now()
-        prog_container.completed = True
-        return prog_container
-
 
 @shared_task
 def run_job(
@@ -379,7 +146,7 @@ def run_job(
     logger.debug(f"Process id = {os.getpid()}")
 
     from base_dash_app.application.runtime_application import RuntimeApplication
-    dbm: DbManager = RuntimeApplication.get_instance().construct_dbm()
+    dbm: DbManager = RuntimeApplication.get_instance().get_dbm()
     redis_client = RuntimeApplication.get_instance().redis_client
     prog_container: VirtualJobProgressContainer = VirtualJobProgressContainer.get_from_redis_by_uuid(
         redis_client=redis_client,

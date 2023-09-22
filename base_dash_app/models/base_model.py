@@ -12,7 +12,7 @@ class CombinedMeta(abc.ABCMeta, DefaultMeta):
     pass
 
 
-class BaseModel(db.Model, Selectable, metaclass=CombinedMeta):
+class BaseModel(db.Model, metaclass=CombinedMeta):
     __abstract__ = True
 
     @abstractmethod

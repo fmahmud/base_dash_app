@@ -64,3 +64,12 @@ class CachedSelectable(Selectable):
 
     def get_value(self):
         return self.value
+
+    def set_label(self, label):
+        self.label = label
+
+    def set_value(self, value):
+        self.value = value
+
+    def set_label_div(self, label_div):
+        self.label_div = label_div

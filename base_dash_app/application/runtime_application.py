@@ -21,7 +21,6 @@ from dash.exceptions import PreventUpdate
 from pympler import tracker
 from redis import Redis
 from sqlalchemy.orm import Session
-from typing_extensions import deprecated
 
 from base_dash_app.apis.api import API
 from base_dash_app.application.app_descriptor import AppDescriptor
@@ -64,18 +63,19 @@ class RuntimeApplication:
     _instance = None
 
     @classmethod
-    def get_instance(cls):
+    def get_instance(cls) -> "RuntimeApplication":
         if cls._instance is None:
             raise Exception("RuntimeApplication is not initialized.")
         return cls._instance
 
-    def construct_dbm(self):
-        if self.app_descriptor.db_descriptor is not None:
-            return DbManager(
+    def get_dbm(self) -> DbManager:
+        if self.dbm is None and self.app_descriptor.db_descriptor is not None:
+            self.dbm = DbManager(
                 self.app_descriptor.db_descriptor,
                 app=self.app.server,
-                db=db
             )
+
+        return self.dbm
 
     def __init__(self, app_descriptor: AppDescriptor):
         # will not be used if running in gunicorn or celery
@@ -168,14 +168,14 @@ class RuntimeApplication:
         def get_view_by_type(view_class: Type) -> BaseView:
             return self.views.get(view_class)
 
-        with self.app.server.app_context():
-            if app_descriptor.db_descriptor is not None:
-                self.dbm = DbManager(
-                    app_descriptor.db_descriptor,
-                    app=self.app.server,
-                    db=db
-                )
+        # with self.app.server.app_context():
+        if app_descriptor.db_descriptor is not None:
+            self.dbm = DbManager(
+                app_descriptor.db_descriptor,
+                app=self.app.server,
+            )
 
+        with self.dbm as dbm:
             if self.dbm is not None and app_descriptor.upgrade_db:
                 self.dbm.upgrade_db(drop_first=app_descriptor.drop_tables)
 
@@ -341,6 +341,7 @@ class RuntimeApplication:
 
     def track_memory_usage(self):
         self.app.logger.info("Capturing memory usage")
+        self.last_mem_check = datetime.datetime.now()
 
         mem = tracker.SummaryTracker()
         memory_usages = list(sorted(mem.create_summary(), reverse=True, key=itemgetter(2)))
@@ -357,7 +358,7 @@ class RuntimeApplication:
                 value=psutil.cpu_percent()
             )
         )
-        self.last_mem_check = datetime.datetime.now()
+
 
     def check_for_scheduled_jobs(self):
         self.app.logger.debug("Checking for scheduled jobs")
@@ -449,7 +450,6 @@ class RuntimeApplication:
             finally:
                 session.close()
 
-    @deprecated
     def run_server(self, **kwargs):
         """
         this no longer does anything - deprecated

@@ -8,7 +8,7 @@ from typing import List, Dict, Optional, Any, Type
 import dash_bootstrap_components as dbc
 from dash import html
 from dash.dash_table.Format import Format, Scheme
-from sqlalchemy import Column, Integer, Sequence, String, or_
+from sqlalchemy import Column, Integer, Sequence, String, or_, orm
 from sqlalchemy.orm import Session
 
 from base_dash_app.components.alerts import Alert
@@ -58,7 +58,13 @@ SEARCH_RESULT_DIV_ID = "search-result-div-id"
 TEST_ALERT_BTN_ID = "test-alert-btn-id"
 
 
-class MySelectableModel(BaseModel):
+class MySelectableModel(BaseModel, Selectable):
+    def get_label(self):
+        return self.name
+
+    def get_value(self):
+        return self.id
+
     def __lt__(self, other):
         if type(other) != type(self):
             return False
@@ -69,12 +75,6 @@ class MySelectableModel(BaseModel):
 
     id = Column(Integer, Sequence("my_selectables_id_seq"), primary_key=True)
     name = Column(String)
-
-    def get_label(self):
-        return self.name
-
-    def get_value(self):
-        return self.id
 
     def __str__(self):
         return Selectable.__str__(self)
@@ -136,16 +136,17 @@ class TestJobDef(JobDefinition):
     }
 
     @classmethod
-    def get_cached_selectables_by_param_name(
+    def get_selectables_by_param_name(
             cls, variable_name, session: Session
-    ) -> List[CachedSelectable]:
+    ) -> List[Selectable]:
         if variable_name == "param_4":
             all_selectables = session.query(MySelectableModel).all()
-            return [
-                CachedSelectable(
-                    s.get_label(), s.get_value(), s.get_label_div()
-                ) for s in all_selectables
-            ]
+            # return [
+            #     CachedSelectable(
+            #         s.get_label(), s.get_value(), s.get_label_div()
+            #     ) for s in all_selectables
+            # ]
+            return all_selectables
 
     @classmethod
     def force_update(cls):
@@ -251,7 +252,26 @@ class TestJobDef(JobDefinition):
             # .filter_by(id=int(parameter_values["param_4"])).first()
             prog_container.info_log(my_selectable.get_label())
 
+            # test creating a new model and saving it to the DB to see job card updates
+            new_selectable = MySelectableModel()
+            session.add(new_selectable)
+            try:
+                session.commit()
+            except Exception as ex:
+                session.rollback()
+                raise ex
+
+            new_selectable.name = f"MySelectableModel{new_selectable.id}"
+            try:
+                session.commit()
+            except Exception as ex:
+                session.rollback()
+                raise ex
+
         time.sleep(1)
+
+
+
 
         ran = random.random()
         if ran < 0.5:
@@ -595,7 +615,7 @@ class DemoView(BaseView):
             if len(current_selectables) == 0:
                 for i in range(10):
                     new_selectable_model: MySelectableModel = MySelectableModel()
-                    new_selectable_model.name = f"MySelectableModel{i}"
+                    new_selectable_model.name = f"MySelectableModel{i + 1}"
                     session.add(new_selectable_model)
 
                 try:

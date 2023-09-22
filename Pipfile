@@ -74,6 +74,7 @@ flask-sqlalchemy = "*"
 gunicorn = "*"
 celery = {extras = ["redis"], version = "*"}
 redis = "*"
+base-dash-app = {path = "./base_dash_app-0.10.0.6-py3-none-any.whl"}
 
 [dev-packages]
 pre-commit = "*"

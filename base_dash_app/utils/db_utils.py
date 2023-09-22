@@ -5,6 +5,8 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import event
 
+from base_dash_app.application.db_declaration import db
+
 
 class DbEngineTypes(Enum):
     POSTGRES = 'postgresql://'
@@ -47,7 +49,7 @@ class DbManager:
     #         cls._instance.__init__(db_descriptor, app, db)
     #     return cls._instance
 
-    def __init__(self, db_descriptor: DbDescriptor, app: Flask, db: SQLAlchemy):
+    def __init__(self, db_descriptor: DbDescriptor, app: Flask):
         self.db_descriptor: DbDescriptor = db_descriptor
         self.connection_args = {}
 
@@ -89,6 +91,17 @@ class DbManager:
 
             event.listen(self.db.engine, 'connect', set_sqlite_pragma)
 
+        @self.app.before_request
+        def before_request():
+            self.__enter__()
+
+        @self.app.teardown_request
+        def teardown_request(exception: Exception = None):
+            if exception is None:
+                self.__exit__(None, None, None)
+            else:
+                self.__exit__(exception.__class__, exception, exception.__traceback__)
+
     def upgrade_db(self, drop_first: bool = False):
         if drop_first:
             self.db.drop_all()
@@ -96,10 +109,18 @@ class DbManager:
         self.db.create_all()
 
     def get_session(self):
+        self._ensure_app_context()  # ensure the app context is set up
         return self.db.session
 
     def new_session(self):
+        self._ensure_app_context()  # ensure the app context is set up
         return self.db.create_scoped_session()
+
+    def _ensure_app_context(self):
+        # If app context for this thread doesn't exist, create and push it.
+        if not hasattr(self._thread_local_data, 'app_context'):
+            self._thread_local_data.app_context = self.app.app_context()
+            self._thread_local_data.app_context.push()
 
     def __enter__(self):
         # Create a new app context for this thread if it doesn't exist yet.
