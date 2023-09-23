@@ -61,6 +61,7 @@ ALERTS_WRAPPER_DIV_ID = "alerts-wrapper-div-id"
 
 class RuntimeApplication:
     _instance = None
+    _pid_to_dbm_map: Dict[int, DbManager] = {}
 
     @classmethod
     def get_instance(cls) -> "RuntimeApplication":
@@ -68,14 +69,12 @@ class RuntimeApplication:
             raise Exception("RuntimeApplication is not initialized.")
         return cls._instance
 
-    def get_dbm(self) -> DbManager:
-        if self.dbm is None and self.app_descriptor.db_descriptor is not None:
-            self.dbm = DbManager(
-                self.app_descriptor.db_descriptor,
-                app=self.app.server,
-            )
+    def get_dbm_by_pid(self) -> DbManager:
+        pid = os.getpid()
+        if pid not in RuntimeApplication._pid_to_dbm_map:
+            RuntimeApplication._pid_to_dbm_map[pid] = DbManager(self.app_descriptor.db_descriptor, self.server)
 
-        return self.dbm
+        return RuntimeApplication._pid_to_dbm_map[pid]
 
     def __init__(self, app_descriptor: AppDescriptor):
         # will not be used if running in gunicorn or celery
@@ -102,6 +101,10 @@ class RuntimeApplication:
             assets_folder=app_descriptor.assets_folder_path or "assets",
             update_title=None
         )
+
+        @self.app.server.route('/health', methods=['GET'])
+        def health():
+            return "OK", 200
 
         self.app.logger.handlers.clear()
         self.app.logger.setLevel(app_descriptor.log_level or logging.INFO)
@@ -359,7 +362,6 @@ class RuntimeApplication:
             )
         )
 
-
     def check_for_scheduled_jobs(self):
         self.app.logger.debug("Checking for scheduled jobs")
         self.last_job_check = datetime.datetime.now()
@@ -377,10 +379,13 @@ class RuntimeApplication:
                     self.app.logger.debug(f"Checking job {job.name}")
 
                     job: JobDefinition
+                    job_class = type(job)
                     job.set_vars_from_kwargs(**self.base_service_args)
-                    job.sync_single_selectable_data(session=session)
                     selectable_param_name = job.single_selectable_param_name
-                    selectables: List[Selectable] = job.cached_selectables
+                    selectables: List[Selectable] = job_class.get_selectables_by_param_name(
+                        job_class.single_selectable_param_name(),
+                        session=session
+                    )
                     for selectable in selectables:
                         latest_instance: JobInstance = job.get_latest_exec_for_selectable(selectable, session)
 

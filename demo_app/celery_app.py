@@ -1,3 +1,4 @@
+import os
 import time
 
 time.sleep(10)
@@ -8,7 +9,11 @@ import dash_bootstrap_components as dbc
 from dash_bootstrap_components.icons import FONT_AWESOME
 from dotenv import load_dotenv
 
-load_dotenv()
+secrets_path = os.environ.get("SECRETS_PATH")
+if secrets_path:
+    raise Exception("No env var called SECRETS_PATH found")
+
+load_dotenv(secrets_path)
 
 from base_dash_app.application.runtime_application import RuntimeApplication
 from base_dash_app.application.app_descriptor import AppDescriptor

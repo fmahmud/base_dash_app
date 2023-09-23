@@ -33,3 +33,7 @@ ENV PATH="/.venv/bin:$PATH"
 COPY ./ ./
 
 RUN pip install ./*.whl
+
+# check if env var REPO == 'web' then run gunicorn else run celery
+CMD ./conditional_starter.sh
+

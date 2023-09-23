@@ -8,26 +8,26 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:password@db:5432/testdb
       - CELERY_BROKER_URL=redis://redis:6379/0
-    command: ["gunicorn", "test_app:server", "-b", "0.0.0.0:60000"]
+      - REPO_NAME=web
     depends_on:
       - redis
       - db
   worker:
     build: .
-    command: celery -A celery_app.celery worker --loglevel=info
     environment:
       - DATABASE_URL=postgresql://postgres:password@db:5432/testdb
       - REDIS_URL=redis://redis:6379/0
+      - REPO_NAME=worker
     depends_on:
       - web
       - redis
       - db
   beat:
     build: .
-    command: celery -A celery_app.celery beat --loglevel=info
     environment:
       - DATABASE_URL=postgresql://postgres:password@db:5432/testdb
       - REDIS_URL=redis://redis:6379/0
+      - REPO_NAME=beat
     depends_on:
       - web
       - redis

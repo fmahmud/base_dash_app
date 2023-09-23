@@ -142,7 +142,7 @@ services:
     build: .
     # IMPORTANT:
     # celery_app:celery is <name_of_file>:<name of celery variable>
-    command: celery -A celery_app.celery worker --loglevel=info
+    command: celery -A celery_app.celery worker --loglevel=info --pool threads
     environment:
       - DATABASE_URL=postgresql://postgres:password@db:5432/testdb
       - REDIS_URL=redis://redis:6379/0
