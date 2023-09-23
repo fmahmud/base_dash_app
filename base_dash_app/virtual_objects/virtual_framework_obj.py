@@ -35,14 +35,13 @@ class VirtualFrameworkObject:
         }
 
     def set_vars_from_kwargs(self, **kwargs):
-        # self.dbm: Optional['DbManager'] = kwargs["dbm"] if "dbm" in kwargs else None
-        # self.get_service = kwargs["service_provider"] if "service_provider" in kwargs else None
-        # self.get_api = kwargs["api_provider"] if "api_provider" in kwargs else None
-        # self.all_apis = kwargs["all_apis"] if "all_apis" in kwargs else None
-        # self.register_callback_func = kwargs["register_callback_func"] if "register_callback_func" in kwargs else None
-        # self.push_alert = kwargs["push_alert"] if "push_alert" in kwargs else None
-        # self.remove_alert = kwargs["remove_alert"] if "remove_alert" in kwargs else None
-        # self.env_vars = kwargs["env_vars"] if "env_vars" in kwargs else None
-        # self.get_view = kwargs["view_provider"] if "view_provider" in kwargs else None
-        # self.redis_client = kwargs["redis_client"] if "redis_client" in kwargs else None
-        self.__dict__.update(kwargs)
+        self.dbm: Optional['DbManager'] = kwargs["dbm"] if "dbm" in kwargs else None
+        self.get_service = kwargs["service_provider"] if "service_provider" in kwargs else None
+        self.get_api = kwargs["api_provider"] if "api_provider" in kwargs else None
+        self.all_apis = kwargs["all_apis"] if "all_apis" in kwargs else None
+        self.register_callback_func = kwargs["register_callback_func"] if "register_callback_func" in kwargs else None
+        self.push_alert = kwargs["push_alert"] if "push_alert" in kwargs else None
+        self.remove_alert = kwargs["remove_alert"] if "remove_alert" in kwargs else None
+        self.env_vars = kwargs["env_vars"] if "env_vars" in kwargs else None
+        self.get_view = kwargs["view_provider"] if "view_provider" in kwargs else None
+        self.redis_client = kwargs["redis_client"] if "redis_client" in kwargs else None
