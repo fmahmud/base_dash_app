@@ -3,6 +3,7 @@ import gc
 import json
 import logging
 import os
+import pprint
 import threading
 import traceback
 from concurrent.futures import ThreadPoolExecutor
@@ -146,18 +147,23 @@ def run_job(
     logger.debug(f"Process id = {os.getpid()}")
 
     from base_dash_app.application.runtime_application import RuntimeApplication
-    dbm: DbManager = RuntimeApplication.get_instance().get_dbm()
-    redis_client = RuntimeApplication.get_instance().redis_client
+    dbm: DbManager = RuntimeApplication.get_instance().get_dbm_by_pid()
+    rta: RuntimeApplication = RuntimeApplication.get_instance()
+    redis_client = rta.redis_client
     prog_container: VirtualJobProgressContainer = VirtualJobProgressContainer.get_from_redis_by_uuid(
         redis_client=redis_client,
         uuid=prog_container_uuid
     )
 
     with dbm as dbm:
-        session: Session = dbm.new_session()
+        session: Session = dbm.get_session()
         session.expire_on_commit = False
 
-        job_def = session.query(JobDefinition).filter_by(id=job_def_id).first()
+        job_def: JobDefinitionImpl = session.query(JobDefinition).filter_by(id=job_def_id).first()
+        job_def.set_vars_from_kwargs(**rta.base_service_args)
+
+        logger.debug(pprint.pformat(job_def.produce_kwargs()))
+
         job_instance: JobInstance = session.query(JobInstance).filter_by(id=prog_container.job_instance_id).first()
         job_instance.set_status(StatusesEnum.IN_PROGRESS)
         session.commit()
