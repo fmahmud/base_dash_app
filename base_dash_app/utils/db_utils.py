@@ -80,7 +80,8 @@ class DbManager:
         app.config['SQLALCHEMY_POOL_SIZE'] = self.db_descriptor.pool_size
 
         self.db: SQLAlchemy = db
-        self.db.init_app(app)
+        if "sqlalchemy" not in app.extensions:
+            self.db.init_app(app)
         self.app = app
 
         if self.db_descriptor.engine_type == DbEngineTypes.SQLITE:
@@ -102,6 +103,10 @@ class DbManager:
             else:
                 self.__exit__(exception.__class__, exception, exception.__traceback__)
 
+        @self.app.teardown_appcontext
+        def shutdown_session(exception=None):
+            self.db.session.remove()
+
     def upgrade_db(self, drop_first: bool = False):
         if drop_first:
             self.db.drop_all()
@@ -109,18 +114,10 @@ class DbManager:
         self.db.create_all()
 
     def get_session(self):
-        self._ensure_app_context()  # ensure the app context is set up
         return self.db.session
 
     def new_session(self):
-        self._ensure_app_context()  # ensure the app context is set up
         return self.db.create_scoped_session()
-
-    def _ensure_app_context(self):
-        # If app context for this thread doesn't exist, create and push it.
-        if not hasattr(self._thread_local_data, 'app_context'):
-            self._thread_local_data.app_context = self.app.app_context()
-            self._thread_local_data.app_context.push()
 
     def __enter__(self):
         # Create a new app context for this thread if it doesn't exist yet.
