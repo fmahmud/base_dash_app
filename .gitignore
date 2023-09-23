@@ -136,3 +136,4 @@ dmypy.json
 *.env
 
 .DS_Store
+*.whl

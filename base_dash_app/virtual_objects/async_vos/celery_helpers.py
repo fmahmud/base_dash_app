@@ -6,7 +6,17 @@ from redis import StrictRedis
 
 from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.utils import redis_utils
+from base_dash_app.virtual_objects.async_vos.celery_task import CeleryTask
 from base_dash_app.virtual_objects.async_vos.work_containers import WorkContainerGroup
+
+
+def get_celery_state(prog_container_uuid: str):
+    from base_dash_app.application.runtime_application import RuntimeApplication
+    rta: RuntimeApplication = RuntimeApplication.get_instance()
+    redis_client: StrictRedis = rta.redis_client
+    prog_container = CeleryTask().use_redis(redis_client, prog_container_uuid).hydrate_from_redis()
+
+    return prog_container, rta, redis_client
 
 
 @shared_task
