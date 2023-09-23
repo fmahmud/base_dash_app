@@ -11,15 +11,14 @@ from redis import StrictRedis
 
 from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.services.async_handler_service import AsyncWorkProgressContainer
+from base_dash_app.virtual_objects.async_vos import celery_helpers
 from base_dash_app.virtual_objects.async_vos.celery_task import CeleryTask
 from base_dash_app.virtual_objects.timeseries.time_series_data_point import TimeSeriesDataPoint
 
 
 @shared_task
 def gen_graph_data(*args, prog_container_uuid: str, prev_result_uuids: List[str], **kwargs):
-    from base_dash_app.application.runtime_application import RuntimeApplication
-    redis_client: StrictRedis = RuntimeApplication.get_instance().redis_client
-    prog_container = CeleryTask().use_redis(redis_client, prog_container_uuid).hydrate_from_redis()
+    prog_container, rta, redis_client = celery_helpers.get_celery_state(prog_container_uuid)
     prog_container.set_status(StatusesEnum.IN_PROGRESS)
 
     logger = logging.getLogger(f"{prog_container.name} - {prog_container.uuid}")
