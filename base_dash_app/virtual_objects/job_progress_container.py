@@ -29,24 +29,7 @@ class VirtualJobProgressContainer(AbstractRedisDto):
 
     @staticmethod
     def get_from_redis_by_instance_id(redis_client: StrictRedis, ji_id: int):
-
-        return VirtualJobProgressContainer.get_from_redis_by_uuid(redis_client, f"{BASE_KEY}_{ji_id}")
-
-    @staticmethod
-    def get_from_redis_by_uuid(redis_client: StrictRedis, uuid: str) -> Optional["VirtualJobProgressContainer"]:
-        if not redis_client:
-            raise ValueError("Redis client is None")
-
-        if not uuid or uuid == "":
-            raise ValueError("UUID is required")
-
-        exists_in_redis = redis_client.exists(uuid)
-        if exists_in_redis == 0:
-            return None
-
-        container = VirtualJobProgressContainer(job_instance_id=-2, job_definition_id=-2)
-        container.use_redis(redis_client, uuid).hydrate_from_redis()
-        return container
+        return VirtualJobProgressContainer.from_redis(redis_client=redis_client, uuid=f"{BASE_KEY}_{ji_id}")
 
     def to_dict(self) -> dict:
         return {

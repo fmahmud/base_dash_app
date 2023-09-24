@@ -15,6 +15,20 @@ class AbstractRedisDto(abc.ABC):
         self.uuid: str = uuid.uuid4().hex
         self.read_only: bool = False
 
+    @classmethod
+    def from_redis(cls, *args, redis_client: StrictRedis, uuid: str, **kwargs):
+        if not redis_client:
+            raise ValueError("Redis client is None")
+
+        if not uuid or uuid == "":
+            raise ValueError("UUID is required")
+
+        exists_in_redis = redis_client.exists(uuid)
+        if exists_in_redis == 0:
+            return None
+
+        return cls(*args, **kwargs).use_redis(redis_client, uuid).hydrate_from_redis()
+
     def hydrate_from_redis(self):
         previous_read_only = self.read_only
         self.set_read_only()

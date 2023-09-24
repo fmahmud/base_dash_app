@@ -8,10 +8,10 @@ from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.utils import redis_utils
 from base_dash_app.virtual_objects.async_vos.celery_task import CeleryTask
 from base_dash_app.virtual_objects.async_vos.work_containers import WorkContainerGroup
+from base_dash_app.application.runtime_application import RuntimeApplication
 
 
-def get_celery_state(prog_container_uuid: str):
-    from base_dash_app.application.runtime_application import RuntimeApplication
+def get_celery_state(prog_container_uuid: str) -> (CeleryTask, RuntimeApplication, StrictRedis):
     rta: RuntimeApplication = RuntimeApplication.get_instance()
     redis_client: StrictRedis = rta.redis_client
     prog_container = CeleryTask().use_redis(redis_client, prog_container_uuid).hydrate_from_redis()

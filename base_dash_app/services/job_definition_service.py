@@ -150,7 +150,7 @@ def run_job(
     dbm: DbManager = RuntimeApplication.get_instance().get_dbm_by_pid()
     rta: RuntimeApplication = RuntimeApplication.get_instance()
     redis_client = rta.redis_client
-    prog_container: VirtualJobProgressContainer = VirtualJobProgressContainer.get_from_redis_by_uuid(
+    prog_container: VirtualJobProgressContainer = VirtualJobProgressContainer.from_redis(
         redis_client=redis_client,
         uuid=prog_container_uuid
     )
