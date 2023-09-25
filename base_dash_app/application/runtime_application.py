@@ -329,8 +329,12 @@ class RuntimeApplication:
                 self.active_alerts.remove(alert)
 
         if self.last_mem_check < datetime.datetime.now() - datetime.timedelta(seconds=60):
-            self.track_memory_usage()
+            if self.app_descriptor.disable_memory_capture:
+                pass
+            else:
+                self.track_memory_usage()
 
+        # issue: (issue: 187): Store memory and CPU usage timeseries in redis with PIDs as keys
         latest_memory = self.memory_history_timeseries[-1].value if len(self.memory_history_timeseries) > 0 else 0
         latest_cpu = self.cpu_history_timeseries[-1].value if len(self.cpu_history_timeseries) > 0 else 0
 
