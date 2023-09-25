@@ -151,7 +151,6 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
     def set_result(self, result: Any):
         self.result = result
         dumped_string = json.dumps(result)
-        print(f"{self.name}: result size = {len(result)}")
         self.set_value_in_redis("result", dumped_string)
 
     def set_stacktrace(self, stacktrace: str):
@@ -178,6 +177,14 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
             self.set_result(result=result)
 
     def get_start_time(self, with_refresh=False):
+        if with_refresh:
+            str_val = self.get_value_from_redis("start_time")
+            if str_val == "" or str_val is None:
+                self.start_time = None
+            else:
+                self.start_time = datetime.datetime.strptime(
+                    str_val, date_utils.STANDARD_DATETIME_FORMAT
+                )
         return self.start_time
 
     def get_end_time(self):
@@ -388,14 +395,19 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto
             container.get_status_message() for container in self.work_containers if not container.is_hidden
         ]
 
-    def get_start_time(self):
+    def get_start_time(self, with_refresh=False):
         if len(self.work_containers) == self.get_num_pending():
             return None
         else:
             start_times = [
-                container.get_start_time() for container in self.work_containers
-                if container.get_start_time() is not None
+                WorkContainerGroup.get_start_time(self=container, with_refresh=with_refresh)
+                if isinstance(container, WorkContainerGroup) else
+                container.get_start_time(with_refresh=with_refresh)
+                for container in self.work_containers
             ]
+
+            # filter Nones
+            start_times = [start_time for start_time in start_times if start_time is not None]
 
             if len(start_times) == 0:
                 return None

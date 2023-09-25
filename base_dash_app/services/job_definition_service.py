@@ -152,7 +152,7 @@ def run_job(
     redis_client = rta.redis_client
     prog_container: VirtualJobProgressContainer = VirtualJobProgressContainer.from_redis(
         redis_client=redis_client,
-        uuid=prog_container_uuid
+        uuid=prog_container_uuid,
     )
 
     with dbm as dbm:

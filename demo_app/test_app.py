@@ -1,8 +1,11 @@
 import logging
 
 import dash_bootstrap_components as dbc
+from celery import Celery
 from dash_bootstrap_components.icons import FONT_AWESOME
 from dotenv import load_dotenv
+
+
 load_dotenv()
 
 from base_dash_app.application.runtime_application import RuntimeApplication
@@ -50,6 +53,10 @@ my_app_descriptor = AppDescriptor(
     use_scoped_session=True,
 )
 
+
+from base_dash_app.application.celery_decleration import CelerySingleton
+celery_singleton: CelerySingleton = CelerySingleton.get_instance()
+celery = celery_singleton.get_celery()
 
 rta = RuntimeApplication(my_app_descriptor)
 app = rta.app

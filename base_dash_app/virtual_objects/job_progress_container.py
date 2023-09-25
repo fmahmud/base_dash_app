@@ -28,8 +28,8 @@ class VirtualJobProgressContainer(AbstractRedisDto):
     """
 
     @staticmethod
-    def get_from_redis_by_instance_id(redis_client: StrictRedis, ji_id: int):
-        return VirtualJobProgressContainer.from_redis(redis_client=redis_client, uuid=f"{BASE_KEY}_{ji_id}")
+    def get_from_redis_by_instance_id(redis_client: StrictRedis, ji_id: int, **kwargs):
+        return VirtualJobProgressContainer.from_redis(redis_client=redis_client, uuid=f"{BASE_KEY}_{ji_id}", **kwargs)
 
     def to_dict(self) -> dict:
         return {
@@ -65,9 +65,18 @@ class VirtualJobProgressContainer(AbstractRedisDto):
             )
         return self
 
-    def __init__(self, job_instance_id: int, job_definition_id: int, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def set_job_instance_id(self, job_instance_id: int):
+        self.job_instance_id = job_instance_id
         self.uuid = f"{BASE_KEY}_{job_instance_id}"
+        return self
+
+    def set_job_definition_id(self, job_definition_id: int):
+        self.job_definition_id = job_definition_id
+        return self
+
+    def __init__(self, *args, job_instance_id: int = None, job_definition_id: int = None,  **kwargs):
+        super().__init__(*args, **kwargs)
+        self.uuid = f"{BASE_KEY}_{job_instance_id}" if job_instance_id else None
         self.job_instance_id: int = job_instance_id
         self.job_definition_id: int = job_definition_id
         self.execution_status: Optional[StatusesEnum] = StatusesEnum.PENDING

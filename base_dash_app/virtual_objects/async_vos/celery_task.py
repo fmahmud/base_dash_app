@@ -1,9 +1,10 @@
+import json
+import pprint
 from typing import Dict, Any, List, Optional
 
 from celery import Task, chain, group, chord
 
 from base_dash_app.enums.status_colors import StatusesEnum
-from base_dash_app.virtual_objects.async_vos import celery_helpers
 from base_dash_app.virtual_objects.async_vos.work_containers import WorkContainer, WorkContainerGroup
 
 
@@ -111,20 +112,20 @@ class CeleryOrderedTaskGroup(WorkContainerGroup, CeleryTask):
         elif isinstance(last_task, CeleryUnorderedTaskGroup):
             result = CeleryUnorderedTaskGroup.get_result(last_task)
         else:
-            print(f"{self.name}|{self.uuid}: {last_task.to_dict()}")
+            # print(f"{self.name}|{self.uuid}: {last_task.to_dict()}")
             result = last_task.get_result()
             if result is None:
-                print(f"{self.name}|{self.uuid}: result is None")
+                # print(f"{self.name}|{self.uuid}: result is None")
                 result = []
 
-        print(f"{self.name}: Group result size: {len(result)}")
+        # print(f"{self.name}: Group result size: {len(result)}")
         return result
 
 
 class CeleryUnorderedTaskGroup(WorkContainerGroup, CeleryTask):
     def __init__(
             self,
-            name: str, color: str = None, icon: str = None, is_hidden: bool = False,
+            name: str = None, color: str = None, icon: str = None, is_hidden: bool = False,
             tasks: List[CeleryTask] = None,
             reducer_task: Task = None,
             require_all_success: bool = True,
@@ -138,8 +139,13 @@ class CeleryUnorderedTaskGroup(WorkContainerGroup, CeleryTask):
             is_hidden=is_hidden,
             **kwargs
         )
+        from base_dash_app.virtual_objects.async_vos import celery_helpers
         self.tasks: List[CeleryTask] = tasks or []
-        self.reducer_task = (reducer_task or celery_helpers.store_uuids).s(
+        self.reducer_task = celery_helpers.store_uuids.s(
+            target_uuid=self.uuid,
+            hash_key="result",
+            prev_result_uuids=[]
+        ) if reducer_task is None else reducer_task.s(
             target_uuid=self.uuid,
             hash_key="result",
             prev_result_uuids=[]
@@ -156,20 +162,16 @@ class CeleryUnorderedTaskGroup(WorkContainerGroup, CeleryTask):
         if len(self.work_containers) == 0:
             return None
 
-        last_task = self.work_containers[-1]
-        if isinstance(last_task, CeleryOrderedTaskGroup):
-            result = CeleryOrderedTaskGroup.get_result(last_task)
-        elif isinstance(last_task, CeleryUnorderedTaskGroup):
-            result = CeleryUnorderedTaskGroup.get_result(last_task)
-        else:
-            result = last_task.get_result() or []
-
-        return result
+        # return own result
+        # todo: should parse? add function to help get results?
+        #   should reducer function be processed here?
+        return json.loads(self.redis_client.hget(self.uuid, "result"))
 
     def add_task(self, task: CeleryTask):
         self.tasks.append(task)
 
     def signature(self, *args, prev_result_uuids: List[str], **kwargs):
+        from base_dash_app.virtual_objects.async_vos import celery_helpers
         if self.require_all_success:
             task_list = [
                 chain(

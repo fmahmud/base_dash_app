@@ -1,10 +1,13 @@
 import datetime
+import json
+import pprint
 import random
 import re
 import time
-from typing import List
+from typing import List, Any, Dict
 
 import dash_bootstrap_components as dbc
+from celery import shared_task
 from dash import html, dcc
 
 from base_dash_app.components.async_task_controls import AsyncTaskControls
@@ -89,14 +92,23 @@ class AsyncDemoView(BaseView):
                                     work_func=celery_tasks.gen_graph_data
                                 ),
                                 CeleryTask(
-                                    name="Long Sleep Task",
-                                    work_func=celery_tasks.long_sleep_task
+                                    name="Task 5",
+                                    work_func=celery_tasks.gen_graph_data
                                 ),
                                 CeleryTask(
-                                    name="Failure Task",
-                                    work_func=celery_tasks.throw_exception_func
+                                    name="Task 5",
+                                    work_func=celery_tasks.gen_graph_data
                                 ),
+                                # CeleryTask(
+                                #     name="Long Sleep Task",
+                                #     work_func=celery_tasks.long_sleep_task
+                                # ),
+                                # CeleryTask(
+                                #     name="Failure Task",
+                                #     work_func=celery_tasks.throw_exception_func
+                                # ),
                             ],
+                            reducer_task=combine_series
                         )
                     ]
                 )
@@ -109,7 +121,9 @@ class AsyncDemoView(BaseView):
                         **self.produce_kwargs(),
                         celery_task=cg,
                         show_download_button=True,
-                        download_formatter_func=tsdp_utils.tsdp_array_to_csv,
+                        download_formatter_func=lambda x: tsdp_utils.tsdp_array_to_csv(
+                            tsdp_array=tsdp_utils.deserialize_tsdp_array(x)
+                        ),
                         download_file_format="csv",
                     )
                     self.task_controls.append(ctc.render(override_style={"width": "560px"}))
@@ -169,3 +183,25 @@ class AsyncDemoView(BaseView):
             id=self.wrapper_div_id,
             children=AsyncDemoView.raw_render(self.celery_groups, self.task_controls)
         )
+
+
+@shared_task()
+def combine_series(*args, target_uuid: str, prev_result_uuids: List[str], hash_key: str, **kwargs):
+    from base_dash_app.application.runtime_application import RuntimeApplication
+    redis_client = RuntimeApplication.get_instance().redis_client
+
+    cutg: CeleryUnorderedTaskGroup = CeleryUnorderedTaskGroup.from_redis(redis_client=redis_client, uuid=target_uuid)
+    series: Dict[datetime.datetime, TimeSeriesDataPoint] = {}
+    for wc in cutg.work_containers:
+        redis_content = redis_client.hget(wc.uuid, hash_key) or "[]"
+        data_array: List[Dict[str, Any]] = json.loads(redis_content)
+        tsdp_array: List[TimeSeriesDataPoint] = tsdp_utils.deserialize_tsdp_array(data_array)
+
+        for tsdp in tsdp_array:
+            if tsdp.date in series:
+                series[tsdp.date].value += tsdp.value
+            else:
+                series[tsdp.date] = tsdp
+
+    cutg.set_result(tsdp_utils.serialize_tsdp_array(list(series.values())))
+

@@ -1,4 +1,5 @@
 import json
+import pprint
 from typing import Optional
 
 from dash import html, dcc
@@ -54,9 +55,12 @@ class CeleryTaskControls(ComponentWithInternalCallback):
         self.collapsed = True
         self.interval_duration = interval_duration
         self.render_interval = render_interval
+
+        # download content is used to store the result of the celery task
         self.download_content = None
         self.download_file_format = download_file_format
 
+        # download string is used to store the dcc.send_string output - this is used to trigger the download
         self.download_string = None
         self.in_progress = False
         self.extra_buttons = extra_buttons or []
@@ -68,26 +72,34 @@ class CeleryTaskControls(ComponentWithInternalCallback):
     def handle_any_input(cls, *args, triggering_id, instance):
         instance: CeleryTaskControls = instance
         cotg: CeleryOrderedTaskGroup = instance.cotg
+        celery_service: CeleryHandlerService = instance.get_service(CeleryHandlerService)
+        instance.download_string = None
 
         if cotg.redis_client:
             cotg.refresh_all()
-        celery_service: CeleryHandlerService = instance.get_service(CeleryHandlerService)
-        instance.download_string = None
+            if cotg.get_status() == StatusesEnum.SUCCESS:
+                instance.download_content = cotg.get_result()
         if triggering_id.startswith(RELOAD_CELERY_TASK_BTN_ID):
             instance.in_progress = True
             instance.task = celery_service.submit_celery_task(cotg, prev_result_uuids=[])
         elif triggering_id.startswith(CELERY_CONTROLS_EXPAND_BTN_ID):
             instance.collapsed = not instance.collapsed
         elif triggering_id.startswith(CELERY_TASK_DOWNLOAD_BTN_ID):
-            instance.download_string = instance.download_content
+            cotg.refresh_all()
+            result = cotg.get_result()
+
+            # determine point of this:
+            # instance.download_string = instance.download_content
 
             # hydrate celery task, get result, convert to desired format using download_formatter_func
             # then send as dcc.send_string
-            instance.celery_task.fetch_all_from_redis()
-            instance.download_content = dcc.send_string(
-                instance.download_formatter_func(instance.celery_task.result),
-                filename=f"{instance.celery_task.get_start_time()}"
-                         f"_{instance.celery_task.get_name()}"
+
+            instance.download_content = instance.download_formatter_func(result)
+
+            instance.download_string = dcc.send_string(
+                instance.download_content,
+                filename=f"{CeleryOrderedTaskGroup.get_start_time(self=cotg, with_refresh=True)}"
+                         f"_{cotg.get_name()}"
                          f".{instance.download_file_format}",
             )
 

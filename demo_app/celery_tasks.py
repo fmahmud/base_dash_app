@@ -19,16 +19,18 @@ from base_dash_app.virtual_objects.timeseries.time_series_data_point import Time
 @shared_task
 def gen_graph_data(*args, prog_container_uuid: str, prev_result_uuids: List[str], **kwargs):
     prog_container, rta, redis_client = celery_helpers.get_celery_state(prog_container_uuid)
+    prog_container: CeleryTask = prog_container
     prog_container.set_status(StatusesEnum.IN_PROGRESS)
+    prog_container.set_start_time(datetime.datetime.now())
 
     logger = logging.getLogger(f"{prog_container.name} - {prog_container.uuid}")
     logger.info("Starting gen work func")
-    time.sleep(random.randint(1, 2))
+    # time.sleep(random.randint(1, 2))
     prog_container.set_progress(25)
     prog_container.set_status_message("Generating Data...")
-    time.sleep(1)
+    # time.sleep(1)
     prog_container.set_progress(50)
-    time.sleep(random.randint(1, 2))
+    # time.sleep(random.randint(1, 2))
     prog_container.set_progress(75)
     # hydrate prev_result from uuid
     prev_result = []

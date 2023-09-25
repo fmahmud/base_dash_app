@@ -1,6 +1,6 @@
 import datetime
 import json
-from typing import List, Union
+from typing import List, Union, Dict
 
 from dateutil.relativedelta import relativedelta
 
@@ -72,3 +72,20 @@ def tsdp_array_to_csv(tsdp_array: List[TimeSeriesDataPoint]):
         data_to_write=serialize_tsdp_array(tsdp_array),
         keys=["date", "value"],
     )
+
+
+def deserialize_tsdp(tsdp_dict: dict):
+    return TimeSeriesDataPoint().from_dict(tsdp_dict)
+
+
+def deserialize_tsdp_array(tsdp_array: List[dict]) -> List[TimeSeriesDataPoint]:
+    """
+    Convert {"date": "2020-01-01", "value": 1} to TimeSeriesDataPoint for each dict in tsdp_array
+    :param tsdp_array:
+    :return:
+    """
+    return [deserialize_tsdp(tsdp_dict) for tsdp_dict in tsdp_array]
+
+
+def deserialize_tsdp_array_from_json(tsdp_array_json: str):
+    return deserialize_tsdp_array(json.loads(tsdp_array_json))

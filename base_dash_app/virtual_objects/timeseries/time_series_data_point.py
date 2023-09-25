@@ -37,7 +37,7 @@ class TimeSeriesDataPoint(Graphable, Event):
         return f"{self.get_string_date()}: {self.value}"
 
     def __hash__(self):
-        return hash((self.date, self.value))
+        return hash(self.date)
 
     def __eq__(self, other):
         return hash(self) == hash(other)
