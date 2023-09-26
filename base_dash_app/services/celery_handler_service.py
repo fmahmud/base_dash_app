@@ -1,3 +1,4 @@
+from base_dash_app.application.celery_decleration import CelerySingleton
 from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.services.base_service import BaseService
 from base_dash_app.virtual_objects.async_vos.celery_task import CeleryTask
@@ -13,6 +14,9 @@ class CeleryHandlerService(BaseService):
     def submit_celery_task(self, celery_task: CeleryTask, *args, **kwargs):
         celery_task.use_redis(self.redis_client, celery_task.uuid)
         celery_task.reset(destroy_in_redis=True)
+
+        celery_singleton = CelerySingleton.get_instance()
+        celery_singleton.get_celery().backend.ensure_chords_allowed()
 
         # todo: maybe think of pulling push_to_redis out as a separate step outside of signature
         something = celery_task.signature(prev_result_uuids=[]).apply_async()

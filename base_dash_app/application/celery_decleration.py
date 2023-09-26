@@ -35,6 +35,8 @@ class CelerySingleton:
                 task_cls=ContextTask
             )
 
+            self.celery.backend.ensure_chords_allowed()
+
     def get_celery(self):
         return self.celery
 
