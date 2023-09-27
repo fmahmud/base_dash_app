@@ -203,7 +203,8 @@ class CeleryTaskControls(ComponentWithInternalCallback):
                     interval=self.interval_duration,
                     n_intervals=0,
                     disabled=(
-                        not self.render_interval or self.celery_task.get_status() != StatusesEnum.IN_PROGRESS
+                        not self.render_interval
+                        or self.celery_task.get_status() in StatusesEnum.get_terminal_statuses()
                     ) and not self.in_progress,
                 ),
                 html.Div(
@@ -246,8 +247,14 @@ class CeleryTaskControls(ComponentWithInternalCallback):
                                 "type": RELOAD_CELERY_TASK_BTN_ID,
                                 "index": self._instance_id,
                             },
-                            disable_reload_btn=self.in_progress or self.celery_task.get_status() == StatusesEnum.IN_PROGRESS,
-                            reload_in_progress=self.in_progress or self.celery_task.get_status() == StatusesEnum.IN_PROGRESS,
+                            disable_reload_btn=(
+                                self.in_progress
+                                or self.celery_task.get_status() in StatusesEnum.get_non_terminal_statuses()
+                            ),
+                            reload_in_progress=(
+                                self.in_progress
+                                or self.celery_task.get_status() in StatusesEnum.get_non_terminal_statuses()
+                            ),
                             reload_progress=self.celery_task.get_progress(),
                             wrapper_style={
                                 "position": "relative",
@@ -255,7 +262,7 @@ class CeleryTaskControls(ComponentWithInternalCallback):
                                 "margin": "0",
                                 "clear": "left",
                             },
-                            last_load_time=self.celery_task.get_start_time(),
+                            last_load_time=self.celery_task.get_start_time(with_refresh=True),
                             other_buttons=other_buttons + self.extra_buttons,
                             right_align=False,
                         ),
