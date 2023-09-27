@@ -586,8 +586,8 @@ class DemoView(BaseView):
                     style={"marginTop": "40px"}
                 ),
                 ratio_bar.render_from_stc_list([
-                    StatusToCount(state_name="A", count=5, color=StatusesEnum.PENDING),
-                    StatusToCount(state_name="B", count=5, color=StatusesEnum.IN_PROGRESS)
+                    StatusToCount(state_name=f"{e.value.name}", count=5, color=e)
+                    for e in StatusesEnum
                 ]),
                 tabs_div,
             ],

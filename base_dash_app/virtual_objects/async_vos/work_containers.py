@@ -24,7 +24,7 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
         BaseComponent.__init__(self, *args, **kwargs)
         AbstractRedisDto.__init__(self, *args, **kwargs)
 
-        self.execution_status: Optional[StatusesEnum] = StatusesEnum.PENDING
+        self.execution_status: Optional[StatusesEnum] = StatusesEnum.NOT_STARTED
         self.result = None
         self.start_time = None
         self.end_time = None
@@ -36,7 +36,7 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
         self.is_hidden = is_hidden
 
     def reset(self, destroy_in_redis=False):
-        self.execution_status = StatusesEnum.PENDING
+        self.execution_status = StatusesEnum.NOT_STARTED
         self.result = None
         self.start_time = None
         self.end_time = None
@@ -49,7 +49,7 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
     def to_dict(self):
         return {
             "execution_status": (
-                self.execution_status.value.name if self.execution_status else StatusesEnum.PENDING.value.name
+                self.execution_status.value.name if self.execution_status else StatusesEnum.NOT_STARTED.value.name
             ),
             "result": json.dumps(self.result) if self.result else "",
             "start_time":  datetime.datetime.strftime(
@@ -76,7 +76,7 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
 
         self.execution_status = (
             StatusesEnum.get_by_name(
-                d.get("execution_status", StatusesEnum.PENDING.name)
+                d.get("execution_status", StatusesEnum.NOT_STARTED.name)
             )
         )
 
@@ -109,7 +109,7 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
             self.set_value_in_redis("status_message", status_message)
 
     def set_status(self, status: StatusesEnum):
-        self.execution_status = status or StatusesEnum.PENDING
+        self.execution_status = status or StatusesEnum.NOT_STARTED
         self.set_value_in_redis("execution_status", self.execution_status.value.name)
 
     def set_start_time_from_string(self, start_time_str):
@@ -248,8 +248,8 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
                     value=self.get_progress(),
                     label=self.get_progress_label(),
                     color=self.get_status().value.hex_color,
-                    animated=self.get_status() == StatusesEnum.IN_PROGRESS,
-                    striped=self.get_status() == StatusesEnum.IN_PROGRESS,
+                    animated=self.get_status() in StatusesEnum.get_non_terminal_statuses(),
+                    striped=self.get_status() in StatusesEnum.get_non_terminal_statuses(),
                     style={
                         "position": "relative",
                         "float": "right",
@@ -354,8 +354,10 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto
         message = f"{num_success}"
         status = self.get_status()
 
-        if status == StatusesEnum.PENDING:
+        if status == StatusesEnum.NOT_STARTED:
             message += " - Not Started"
+        elif status == StatusesEnum.PENDING:
+            message += " - Queued"
         elif status == StatusesEnum.IN_PROGRESS:
             message += f" - {self.get_latest_status_message() or ''}"
         elif status == StatusesEnum.SUCCESS:
@@ -377,9 +379,13 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto
 
     def get_status(self):
         if len(self.work_containers) == 0:
-            return StatusesEnum.PENDING
+            return StatusesEnum.NOT_STARTED
 
-        if len(self.work_containers) == self.get_num_pending():
+        if self.get_num_not_started() == len(self.work_containers):
+            return StatusesEnum.NOT_STARTED
+
+        if len(self.work_containers) == self.get_num_pending()\
+                or len(self.work_containers) == (self.get_num_pending() + self.get_num_not_started()):
             return StatusesEnum.PENDING
 
         if self.get_num_failed() > 0:
@@ -396,7 +402,7 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto
         ]
 
     def get_start_time(self, with_refresh=False):
-        if len(self.work_containers) == self.get_num_pending():
+        if len(self.work_containers) == self.get_num_not_started():
             return None
         else:
             start_times = [
@@ -445,6 +451,9 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto
             return
 
         self.work_containers.extend(containers)
+
+    def get_num_not_started(self):
+        return self.get_num_by_status(StatusesEnum.NOT_STARTED)
 
     def get_num_pending(self):
         return self.get_num_by_status(StatusesEnum.PENDING)

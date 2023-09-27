@@ -28,7 +28,7 @@ def gen_graph_data(*args, prog_container_uuid: str, prev_result_uuids: List[str]
     # time.sleep(random.randint(1, 2))
     prog_container.set_progress(25)
     prog_container.set_status_message("Generating Data...")
-    # time.sleep(1)
+    time.sleep(1)
     prog_container.set_progress(50)
     # time.sleep(random.randint(1, 2))
     prog_container.set_progress(75)

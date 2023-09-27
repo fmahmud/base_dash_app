@@ -50,6 +50,7 @@ class CeleryTask(WorkContainer):
         return self
 
     def signature(self, *args, prev_result_uuids: List[str], **kwargs):
+        self.execution_status = StatusesEnum.PENDING
         self.push_to_redis()
         return self.work_func.s(
             *args,

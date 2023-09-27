@@ -15,7 +15,8 @@ class StatusesEnum(Enum):
     WARNING = Status(2, "Warning", "#ffc107", "warning")
     FAILURE = Status(3, "Failure", "#dc3545", "danger")
     IN_PROGRESS = Status(4, "In Progress", "#009fff", "info")
-    PENDING = Status(5, "Pending", "#aaaaaa", "secondary")
+    PENDING = Status(5, "Pending", "##91d6ff", "lightblue")
+    NOT_STARTED = Status(6, "Not Started", "#aaaaaa", "grey")
 
     def __str__(self):
         return self.value.name
@@ -46,7 +47,7 @@ class StatusesEnum(Enum):
 
     @staticmethod
     def get_terminal_statuses():
-        return [StatusesEnum.SUCCESS, StatusesEnum.WARNING, StatusesEnum.FAILURE]
+        return [StatusesEnum.SUCCESS, StatusesEnum.WARNING, StatusesEnum.FAILURE, StatusesEnum.NOT_STARTED]
 
     @staticmethod
     def get_non_terminal_statuses():
