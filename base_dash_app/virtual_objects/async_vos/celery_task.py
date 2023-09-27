@@ -170,6 +170,8 @@ class CeleryUnorderedTaskGroup(WorkContainerGroup, CeleryTask):
 
     def add_task(self, task: CeleryTask):
         self.tasks.append(task)
+        super().add_container(task)
+
 
     def signature(self, *args, prev_result_uuids: List[str], **kwargs):
         from base_dash_app.virtual_objects.async_vos import celery_helpers

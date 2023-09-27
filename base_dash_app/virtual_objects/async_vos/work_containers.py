@@ -271,11 +271,12 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto
     def from_dict(self, data: dict):
         self.work_containers = []
         for container_uuid in json.loads(data["work_containers"]):
-            container = (
-                WorkContainer()
-                .use_redis(redis_client=self.redis_client, uuid=container_uuid)
-                .hydrate_from_redis()
-            )
+            if self.redis_client.hexists(container_uuid, "work_containers"):
+                # this is another work container group
+                container = WorkContainerGroup.from_redis(redis_client=self.redis_client,uuid=container_uuid)
+            else:
+                # this is just a work container
+                container = WorkContainer.from_redis(redis_client=self.redis_client, uuid=container_uuid)
 
             self.work_containers.append(container)
 
