@@ -76,7 +76,7 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
 
         self.execution_status = (
             StatusesEnum.get_by_name(
-                d.get("execution_status", StatusesEnum.NOT_STARTED.name)
+                d.get("execution_status", StatusesEnum.NOT_STARTED.value.name)
             )
         )
 

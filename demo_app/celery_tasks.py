@@ -20,8 +20,7 @@ from base_dash_app.virtual_objects.timeseries.time_series_data_point import Time
 def gen_graph_data(*args, prog_container_uuid: str, prev_result_uuids: List[str], **kwargs):
     prog_container, rta, redis_client = celery_helpers.get_celery_state(prog_container_uuid)
     prog_container: CeleryTask = prog_container
-    prog_container.set_status(StatusesEnum.IN_PROGRESS)
-    prog_container.set_start_time(datetime.datetime.now())
+    prog_container.start()
 
     logger = logging.getLogger(f"{prog_container.name} - {prog_container.uuid}")
     logger.info("Starting gen work func")
