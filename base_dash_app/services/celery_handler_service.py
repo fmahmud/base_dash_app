@@ -19,5 +19,8 @@ class CeleryHandlerService(BaseService):
         celery_singleton.get_celery().backend.ensure_chords_allowed()
 
         # todo: maybe think of pulling push_to_redis out as a separate step outside of signature
-        something = celery_task.signature(prev_result_uuids=[]).apply_async()
+        if "prev_result_uuids" not in kwargs:
+            kwargs["prev_result_uuids"] = []
+
+        something = celery_task.signature(**kwargs).apply_async()
         self.logger.info(f"Submitted celery task {celery_task.name} with id {something}")

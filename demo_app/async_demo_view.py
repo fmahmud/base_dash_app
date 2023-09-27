@@ -85,6 +85,7 @@ class AsyncDemoView(BaseView):
                             ]
                         ),
                         CeleryUnorderedTaskGroup(
+                            require_all_success=True,
                             name="Unordered Task Group 2",
                             tasks=[
                                 CeleryTask(

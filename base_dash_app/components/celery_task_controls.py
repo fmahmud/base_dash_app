@@ -1,6 +1,6 @@
 import json
 import pprint
-from typing import Optional
+from typing import Optional, Callable, Dict, Any
 
 from dash import html, dcc
 import dash_bootstrap_components as dbc
@@ -35,6 +35,7 @@ class CeleryTaskControls(ComponentWithInternalCallback):
             download_formatter_func=lambda x: json.dumps(x),
             download_file_format="json",
             extra_buttons=None,
+            get_kwargs_func: Callable[[CeleryOrderedTaskGroup], Dict[str, Any]] = None,
             *args,
             **kwargs
     ):
@@ -49,6 +50,10 @@ class CeleryTaskControls(ComponentWithInternalCallback):
                 name=self.celery_task.get_name(),
                 tasks=[self.celery_task],
             )
+
+        self.get_kwargs_func = get_kwargs_func
+        if not self.get_kwargs_func:
+            self.get_kwargs_func = lambda *_, **__: {}
 
         self.show_download_button = show_download_button
         self.collapsable = collapsable
@@ -81,7 +86,11 @@ class CeleryTaskControls(ComponentWithInternalCallback):
                 instance.download_content = cotg.get_result()
         if triggering_id.startswith(RELOAD_CELERY_TASK_BTN_ID):
             instance.in_progress = True
-            instance.task = celery_service.submit_celery_task(cotg, prev_result_uuids=[])
+            instance.task = celery_service.submit_celery_task(
+                celery_task=cotg,
+                prev_result_uuids=[],
+                **instance.get_kwargs_func(cotg)
+            )
         elif triggering_id.startswith(CELERY_CONTROLS_EXPAND_BTN_ID):
             instance.collapsed = not instance.collapsed
         elif triggering_id.startswith(CELERY_TASK_DOWNLOAD_BTN_ID):
