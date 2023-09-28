@@ -59,6 +59,9 @@ Sure, I'll create a markdown documentation for the `AppDescriptor` class:
 - **`std_out_formatter`** (`logging.Formatter`): Optional - Formatter to use for stdout
 - **`disable_memory_capture`** (`bool`): If set to True, disables memory capture.
 - **`health_endpoint_path`** (`str`): Path to the health endpoint.
+- **`redis_host`** (`str`): Host of the redis instance.
+- **`redis_port`** (`int`): Port of the redis instance.
+- **`redis_db_number`** (`int`): DB of the redis instance.
 
 ## Usage
 
