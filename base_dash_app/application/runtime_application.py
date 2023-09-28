@@ -40,7 +40,6 @@ from base_dash_app.components.navbar import NavBar, NavDefinition, NavGroup
 from base_dash_app.models.job_instance import JobInstance
 from base_dash_app.services.async_handler_service import AsyncHandlerService
 from base_dash_app.services.base_service import BaseService
-from base_dash_app.services.celery_handler_service import CeleryHandlerService
 from base_dash_app.services.global_state_service import GlobalStateService
 from base_dash_app.services.job_definition_service import JobDefinitionService, JobAlreadyRunningException
 from base_dash_app.utils.db_utils import DbManager
@@ -240,6 +239,8 @@ class RuntimeApplication:
                 **base_service_args,
                 max_workers=app_descriptor.max_num_threads
             )
+
+            from base_dash_app.services.celery_handler_service import CeleryHandlerService
             self.services[CeleryHandlerService] = CeleryHandlerService(**base_service_args)
 
             base_view_args = base_service_args

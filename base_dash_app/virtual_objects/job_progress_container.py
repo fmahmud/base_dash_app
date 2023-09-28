@@ -38,7 +38,7 @@ class VirtualJobProgressContainer(AbstractRedisDto):
             "execution_status": self.execution_status.value.name,
             "prerequisites_status": self.prerequisites_status.value.name,
             "completion_status": self.completion_criteria_status.value.name,
-            "progress": self.progress if self.progress is not "" else 0.0,
+            "progress": self.progress if self.progress != "" else 0.0,
             "logs": json.dumps(self.logs or []),
             "completed": "True" if self.completed else "False",
             "start_time": datetime.datetime.strftime(

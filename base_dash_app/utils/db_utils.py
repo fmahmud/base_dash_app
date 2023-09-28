@@ -43,12 +43,6 @@ class DbDescriptor:
 class DbManager:
     _thread_local_data = local()
 
-    # def __new__(cls, db_descriptor: DbDescriptor, app: Flask, db: SQLAlchemy):
-    #     if cls._instance is None:
-    #         cls._instance = super(DbManager, cls).__new__(cls)
-    #         cls._instance.__init__(db_descriptor, app, db)
-    #     return cls._instance
-
     def __init__(self, db_descriptor: DbDescriptor, app: Flask):
         self.db_descriptor: DbDescriptor = db_descriptor
         self.connection_args = {}

@@ -9,7 +9,6 @@ from base_dash_app.components.base_component import ComponentWithInternalCallbac
 from base_dash_app.components.callback_utils.mappers import InputToState, InputMapping, StateMapping
 from base_dash_app.components.datatable.download_and_reload_bg import construct_down_ref_btgrp
 from base_dash_app.enums.status_colors import StatusesEnum
-from base_dash_app.services.celery_handler_service import CeleryHandlerService
 from base_dash_app.virtual_objects.async_vos.celery_task import CeleryTask, CeleryOrderedTaskGroup
 
 CELERY_CONTROLS_EXPAND_BTN_ID = "CELERY_CONTROLS_EXPAND_BTN_ID"
@@ -77,6 +76,7 @@ class CeleryTaskControls(ComponentWithInternalCallback):
     def handle_any_input(cls, *args, triggering_id, instance):
         instance: CeleryTaskControls = instance
         cotg: CeleryOrderedTaskGroup = instance.cotg
+        from base_dash_app.services.celery_handler_service import CeleryHandlerService
         celery_service: CeleryHandlerService = instance.get_service(CeleryHandlerService)
         instance.download_string = None
 
