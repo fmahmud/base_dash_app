@@ -1,4 +1,5 @@
 import logging
+import os
 
 import dash_bootstrap_components as dbc
 from celery import Celery
@@ -51,6 +52,9 @@ my_app_descriptor = AppDescriptor(
         )
     ],
     use_scoped_session=True,
+    redis_host=os.getenv("REDIS_HOST", "redis"),
+    redis_port=int(os.getenv("REDIS_PORT", "6379")),
+    redis_db_number=int(os.getenv("REDIS_DB_NUMBER", "0")),
 )
 
 

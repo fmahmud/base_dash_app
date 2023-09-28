@@ -45,6 +45,9 @@ class AppDescriptor:
             std_out_formatter=None,
             disable_memory_capture: bool = True,
             health_endpoint_path: str = "/healthz",
+            redis_host: str = None,
+            redis_port: int = None,
+            redis_db_number: int = None,
     ):
         """
         :param global_inputs: 
@@ -76,6 +79,9 @@ class AppDescriptor:
         :param std_out_formatter: Optional - Formatter to use for stdout
         :param disable_memory_capture: If True, disables memory capture
         :param health_endpoint_path: Path to the health endpoint
+        :param redis_host: Host of the redis server
+        :param redis_port: Port of the redis server
+        :param redis_db_number: DB number of the redis server
         """
 
         self.db_descriptor: DbDescriptor = db_descriptor
@@ -106,3 +112,6 @@ class AppDescriptor:
         self.std_out_formatter = std_out_formatter
         self.disable_memory_capture = disable_memory_capture
         self.health_endpoint_path = health_endpoint_path
+        self.redis_host = redis_host
+        self.redis_port = redis_port
+        self.redis_db_number = redis_db_number

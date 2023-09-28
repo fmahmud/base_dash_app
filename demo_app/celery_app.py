@@ -5,21 +5,15 @@ time.sleep(10)
 
 import logging
 
-import dash_bootstrap_components as dbc
-from dash_bootstrap_components.icons import FONT_AWESOME
 from dotenv import load_dotenv
 
-secrets_path = os.environ.get("SECRETS_PATH")
-if secrets_path:
-    raise Exception("No env var called SECRETS_PATH found")
 
-load_dotenv(secrets_path)
+load_dotenv()
 
 from base_dash_app.application.runtime_application import RuntimeApplication
 from base_dash_app.application.app_descriptor import AppDescriptor
 from base_dash_app.utils.db_utils import DbDescriptor, DbEngineTypes
 from base_dash_app.utils.env_vars.env_var_def import EnvVarDefinition
-from base_dash_app.utils.log_formatters.colored_formatter import ColoredFormatter
 from demo_app.async_demo_view import AsyncDemoView
 from demo_app.demo_view import DemoView, TestJobDef, MySelectablesService
 from demo_app.area_graph_view import AreaGraphView
@@ -50,6 +44,9 @@ my_app_descriptor = AppDescriptor(
         )
     ],
     use_scoped_session=True,
+    redis_host=os.getenv("REDIS_HOST", "redis"),
+    redis_port=int(os.getenv("REDIS_PORT", "6379")),
+    redis_db_number=int(os.getenv("REDIS_DB_NUMBER", "0")),
 )
 
 from base_dash_app.application.celery_decleration import CelerySingleton

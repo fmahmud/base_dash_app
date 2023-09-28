@@ -116,10 +116,14 @@ class RuntimeApplication:
             )
 
         self.server = self.app.server
-        self.redis_client: Redis = redis.StrictRedis(
-            host=os.getenv("REDIS_HOST", "redis"), port=6379, db=1,
-            decode_responses=True
-        )
+        if None in [app_descriptor.redis_host, app_descriptor.redis_port, app_descriptor.redis_db_number]:
+            self.app.logger.warning("Redis host, port or db number not set. Disabling Redis.")
+            self.redis_client = None
+        else:
+            self.redis_client: redis.StrictRedis = redis.StrictRedis(
+                host=app_descriptor.redis_host, port=app_descriptor.redis_port, db=app_descriptor.redis_db_number,
+                decode_responses=True
+            )
 
         try:
             if self.redis_client.ping():
