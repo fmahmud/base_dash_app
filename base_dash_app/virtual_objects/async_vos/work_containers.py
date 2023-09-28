@@ -280,8 +280,9 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto
 
             self.work_containers.append(container)
 
-        self.name = data["name"]
-        self.color = data["color"] or ""
+        self.name = data.get("name", "")
+        self.color = data.get("color", "")
+        self.is_hidden = data.get("is_hidden", "False") == "True"
 
     def to_dict(self) -> dict:
         return {
@@ -290,6 +291,7 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto
             "color": self.color or "",
             "type": "WorkContainerGroup",
             "error": "True" if self.get_status() == StatusesEnum.FAILURE else "False",
+            "is_hidden": str(self.is_hidden),
         }
 
     def get_container_by_uuid(self, uuid: str) -> Optional[WorkContainer]:
@@ -320,6 +322,7 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto
             containers: List[WorkContainer] = None,
             name: str = None,
             color: str = "primary",
+            is_hidden: bool = False,
             **kwargs
     ):
         super().__init__(**kwargs)
@@ -328,6 +331,7 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto
         self.work_containers: List[WorkContainer] = containers or []
         self.name = name
         self.color = color
+        self.is_hidden: bool = is_hidden
 
     def __repr__(self):
         return f"[{self.__class__.__name__}]-{self.name}-{self.id}"
