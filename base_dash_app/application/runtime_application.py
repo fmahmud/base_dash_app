@@ -102,7 +102,8 @@ class RuntimeApplication:
             update_title=None
         )
 
-        @self.app.server.route('/health', methods=['GET'])
+        #issue: (issue: 188): Add validation for health endpoint path provided
+        @self.app.server.route(self.app_descriptor.health_endpoint_path, methods=['GET'])
         def health():
             return "OK", 200
 

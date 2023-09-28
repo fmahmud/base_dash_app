@@ -43,7 +43,8 @@ class AppDescriptor:
             use_scoped_session: bool = False,
             max_num_threads: int = 5,
             std_out_formatter=None,
-            disable_memory_capture: bool = True
+            disable_memory_capture: bool = True,
+            health_endpoint_path: str = "/healthz",
     ):
         """
         :param global_inputs: 
@@ -74,6 +75,7 @@ class AppDescriptor:
         :param max_num_threads: Max number of threads to use for the app
         :param std_out_formatter: Optional - Formatter to use for stdout
         :param disable_memory_capture: If True, disables memory capture
+        :param health_endpoint_path: Path to the health endpoint
         """
 
         self.db_descriptor: DbDescriptor = db_descriptor
@@ -103,3 +105,4 @@ class AppDescriptor:
         self.max_num_threads: int = max_num_threads
         self.std_out_formatter = std_out_formatter
         self.disable_memory_capture = disable_memory_capture
+        self.health_endpoint_path = health_endpoint_path
