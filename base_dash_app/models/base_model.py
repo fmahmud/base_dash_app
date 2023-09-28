@@ -1,16 +1,18 @@
 import abc
-from abc import ABC, abstractmethod
+from abc import abstractmethod
+from typing import TypeVar
 
-from sqlalchemy.ext.declarative import DeclarativeMeta
+from flask_sqlalchemy import DefaultMeta
 
-from base_dash_app.utils.base_definition import get_base_class
+from base_dash_app.application.db_declaration import db
+from base_dash_app.virtual_objects.interfaces.selectable import Selectable
 
 
-class DeclarativeABCMeta(DeclarativeMeta, abc.ABCMeta):
+class CombinedMeta(abc.ABCMeta, DefaultMeta):
     pass
 
 
-class BaseModel(get_base_class(), ABC, metaclass=DeclarativeABCMeta):
+class BaseModel(db.Model, metaclass=CombinedMeta):
     __abstract__ = True
 
     @abstractmethod
@@ -35,3 +37,4 @@ class BaseModel(get_base_class(), ABC, metaclass=DeclarativeABCMeta):
 
     def to_dict(self):
         return vars(self)
+

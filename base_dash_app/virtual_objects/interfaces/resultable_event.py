@@ -41,7 +41,7 @@ class CachedResultableEvent(ResultableEvent):
                 "marginRight": "10px",
                 "marginLeft": "10px",
                 "animation": "blinker_animation 0.6s cubic-bezier(1, 0, 0, 1) infinite alternate"
-                if self.result.status == StatusesEnum.IN_PROGRESS
+                if self.get_status_color() in StatusesEnum.get_non_terminal_statuses()
                 else "none",
                 **style_override
             },

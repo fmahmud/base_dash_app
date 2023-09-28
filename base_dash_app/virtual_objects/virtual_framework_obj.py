@@ -18,6 +18,7 @@ class VirtualFrameworkObject:
         self.env_vars = kwargs["env_vars"] if "env_vars" in kwargs else None
         self.logger = logging.getLogger(kwargs["logger_name"] if "logger_name" in kwargs else self.__class__.__name__)
         self.get_view = kwargs["view_provider"] if "view_provider" in kwargs else None
+        self.redis_client = kwargs["redis_client"] if "redis_client" in kwargs else None
 
     def produce_kwargs(self):
         return {
@@ -30,6 +31,7 @@ class VirtualFrameworkObject:
             "remove_alert": self.remove_alert,
             "env_vars": self.env_vars,
             "view_provider": self.get_view,
+            "redis_client": self.redis_client
         }
 
     def set_vars_from_kwargs(self, **kwargs):
@@ -42,3 +44,4 @@ class VirtualFrameworkObject:
         self.remove_alert = kwargs["remove_alert"] if "remove_alert" in kwargs else None
         self.env_vars = kwargs["env_vars"] if "env_vars" in kwargs else None
         self.get_view = kwargs["view_provider"] if "view_provider" in kwargs else None
+        self.redis_client = kwargs["redis_client"] if "redis_client" in kwargs else None

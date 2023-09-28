@@ -16,7 +16,8 @@ from base_dash_app.virtual_objects.interfaces.detailable import Detailable
 from base_dash_app.virtual_objects.interfaces.nameable import Nameable
 
 import dash_bootstrap_components as dbc
-import dash_core_components as dcc
+from dash import dcc
+
 
 task_id = 0
 

@@ -3,13 +3,14 @@ from dash import html
 from base_dash_app.components.base_component import BaseComponent
 import plotly.graph_objects as go
 from plotly.graph_objs.scatter import Line
-import dash_core_components as dcc
+from dash import dcc
 from typing import List
 from base_dash_app.virtual_objects.interfaces.graphable import Graphable
 
 
 class Sparkline(BaseComponent):
-    def __init__(self, title: str, series: List[Graphable]):
+    def __init__(self, title: str, series: List[Graphable], *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.title: str = title
         self.series: List[Graphable] = series
 

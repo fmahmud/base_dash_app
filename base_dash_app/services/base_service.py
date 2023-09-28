@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, ABCMeta
 from typing import TypeVar, Type, List, Generic
 
 from sqlalchemy.orm import Session
@@ -9,42 +9,51 @@ from base_dash_app.virtual_objects.virtual_framework_obj import VirtualFramework
 T = TypeVar("T", bound=BaseModel)  # Declare type variable
 
 
-class BaseService(ABC, Generic[T], VirtualFrameworkObject):
+class AbstractSingleton(ABCMeta):
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super().__call__(*args, **kwargs)
+
+        return cls._instances[cls]
+
+
+class BaseService(ABC, Generic[T], VirtualFrameworkObject, metaclass=AbstractSingleton):
+
     def __init__(self, service_name: str = None, object_type: Type[T] = None, **kwargs):
         super().__init__(**kwargs)
         self.__service_name = service_name if service_name is not None else self.__class__.__name__
         self.object_type = object_type
 
-    def get_by_id(self, id: int) -> T:
-        if self.dbm is None:
-            raise Exception("No DB configured.")
+    def get_by_id(self, id: int, session: Session = None) -> T:
+        if session is None:
+            session: session = self.dbm.get_session()
 
         if self.object_type is None:
             raise Exception(f"Service {self.__service_name} is not a model providing service.")
 
-        session: Session = self.dbm.get_session()
-        return session.query(self.object_type).filter_by(id=id).first()
+        return session.query(self.object_type).get(id)
 
-    def get_all(self) -> List[T]:
-        if self.dbm is None:
-            raise Exception("No DB configured.")
+    def get_all(self, session: Session = None) -> List[T]:
+        if session is None:
+            session: session = self.dbm.get_session()
 
         if self.object_type is None:
             raise Exception(f"Service {self.__service_name} is not a model providing service.")
 
-        session: Session = self.dbm.get_session()
         return session.query(self.object_type).all()
 
-    def save(self, target: T) -> T:
-        if self.dbm is None:
-            raise Exception("No DB configured.")
+    def save(self, target: T, session: Session = None) -> T:
+        if session is None:
+            session: session = self.dbm.get_session()
 
         if self.object_type is None:
             raise Exception(f"Service {self.__service_name} is not a model providing service.")
 
-        session: Session = self.dbm.get_session()
-        session.add(target)
         try:
+            session.add(target)
+            session.expire_on_commit = False
             session.commit()
         except Exception as e:
             session.rollback()
@@ -52,16 +61,16 @@ class BaseService(ABC, Generic[T], VirtualFrameworkObject):
 
         return target
 
-    def save_all(self, targets: List[T]) -> List[T]:
-        if self.dbm is None:
-            raise Exception("No DB configured.")
+    def save_all(self, targets: List[T], session: Session = None) -> List[T]:
+        if session is None:
+            session: session = self.dbm.get_session()
 
         if self.object_type is None:
             raise Exception(f"Service {self.__service_name} is not a model providing service.")
 
-        session: Session = self.dbm.get_session()
-        session.add_all(targets)
         try:
+            session.add_all(targets)
+            session.expire_on_commit = False
             session.commit()
         except Exception as e:
             session.rollback()

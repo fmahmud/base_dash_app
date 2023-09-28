@@ -33,7 +33,7 @@ class AppDescriptor:
             upgrade_db=False,
             env_vars: List[EnvVarDefinition] = None,
             env_file_location: str = None,
-            drop_tables: bool = None,
+            drop_tables: bool = False,
             use_auth: bool = None,
             valid_user_pairs: Dict[str, str] = None,
             silence_routes_logging: bool = True,
@@ -42,8 +42,9 @@ class AppDescriptor:
             components_with_internal_callbacks: List[Type['ComponentWithInternalCallback']] = None,
             use_scoped_session: bool = False,
             max_num_threads: int = 5,
-            scheduler_interval_seconds: int = 60,
             std_out_formatter=None,
+            disable_memory_capture: bool = True,
+            health_endpoint_path: str = "/healthz",
     ):
         """
         :param global_inputs: 
@@ -72,8 +73,9 @@ class AppDescriptor:
         :param components_with_internal_callbacks: List of components that have internal callbacks
         :param use_scoped_session: If True, uses a scoped session for the db
         :param max_num_threads: Max number of threads to use for the app
-        :param scheduler_interval_seconds: How often the scheduler runs in seconds (<=0 means never)
         :param std_out_formatter: Optional - Formatter to use for stdout
+        :param disable_memory_capture: If True, disables memory capture
+        :param health_endpoint_path: Path to the health endpoint
         """
 
         self.db_descriptor: DbDescriptor = db_descriptor
@@ -101,5 +103,6 @@ class AppDescriptor:
         self.components_with_internal_callbacks = components_with_internal_callbacks or []
         self.use_scoped_session: bool = use_scoped_session
         self.max_num_threads: int = max_num_threads
-        self.scheduler_interval_seconds: int = scheduler_interval_seconds
         self.std_out_formatter = std_out_formatter
+        self.disable_memory_capture = disable_memory_capture
+        self.health_endpoint_path = health_endpoint_path

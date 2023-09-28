@@ -1,8 +1,7 @@
 import datetime
 
 import dash_bootstrap_components as dbc
-import dash_core_components as dcc
-from dash import html
+from dash import html, dcc
 
 from base_dash_app.utils import date_utils
 

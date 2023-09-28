@@ -1,0 +1,206 @@
+.DateInput {
+    height: 26px !important;
+    vertical-align: top;
+}
+
+.SingleDatePicker, .SingleDatePickerInput {
+    height: 38px !important;
+}
+
+.DateInput_input, .DateInput_input_1 {
+    color: inherit !important;
+    text-align: center;
+    font-size: 16px ! important;
+    height: 26px !important;
+    line-height: 16px !important;
+    width: inherit !important;
+    padding: 5px !important;
+}
+
+.display_on_parent_hover_only {
+    visibility: hidden;
+}
+
+.display_child_on_hover_only:hover .display_on_parent_hover_only {
+    visibility: visible;
+}
+
+.live_animation {
+  animation: blinker_animation 0.6s cubic-bezier(1, 0, 0, 1) infinite alternate;
+}
+
+@keyframes blinker_animation { to { opacity: 0; } }
+
+@font-face {
+    font-family: "FS Me";
+    src: url("FS_Me/FS Me-Regular.otf") format("opentype");
+}
+
+:root {
+    --bs-blue: #0d6efd;
+    --bs-indigo: #6610f2;
+    --bs-purple: #6f42c1;
+    --bs-pink: #d63384;
+    --bs-red: #dc3545;
+    --bs-orange: #fd7e14;
+    --bs-yellow: #ffc107;
+    --bs-green: #198754;
+    --bs-teal: #20c997;
+    --bs-cyan: #0dcaf0;
+    --bs-white: #fff;
+    --bs-gray: #6c757d;
+    --bs-gray-dark: #343a40;
+    --bs-gray-100: #f8f9fa;
+    --bs-gray-200: #e9ecef;
+    --bs-gray-300: #dee2e6;
+    --bs-gray-400: #ced4da;
+    --bs-gray-500: #adb5bd;
+    --bs-gray-600: #6c757d;
+    --bs-gray-700: #495057;
+    --bs-gray-800: #343a40;
+    --bs-gray-900: #212529;
+    --bs-primary: #0d6efd;
+    --bs-secondary: #6c757d;
+    --bs-success: #198754;
+    --bs-info: #0dcaf0;
+    --bs-warning: #ffc107;
+    --bs-danger: #dc3545;
+    --bs-light: #f8f9fa;
+    --bs-dark: #212529;
+    --bs-primary-rgb: 40, 40, 40;
+    --bs-secondary-rgb: 108, 117, 125;
+    --bs-success-rgb: 25, 135, 84;
+    --bs-info-rgb: 13, 202, 240;
+    --bs-warning-rgb: 255, 193, 7;
+    --bs-danger-rgb: 220, 53, 69;
+    --bs-light-rgb: 248, 249, 250;
+    --bs-dark-rgb: 33, 37, 41;
+    --bs-white-rgb: 255, 255, 255;
+}
+
+@font-face {
+    font-family: "FS Me";
+    font-weight: 800;
+    src: url("FS_Me/FS Me-Heavy.otf") format("opentype");
+}
+
+@font-face {
+    font-family: "FS Me";
+    font-weight: bold;
+    src: url("FS_Me/FS Me-Bold.otf") format("opentype");
+}
+
+html, div {
+    font-family: "FS Me", sans-serif;
+}
+
+.card {
+    border-radius: 25px;
+    padding: 10px;
+    border: none;
+    filter: drop-shadow(3px 3px 5px rgba(0,0,0,0.12));
+    font-family: "FS Me", sans-serif;
+}
+
+.card .card {
+    filter: none;
+}
+
+.card-header, .card-footer {
+    background: none;
+}
+
+h1, h2, h3 {
+    font-family: "FS Me", sans-serif;
+    font-weight: 800;
+}
+
+h4, h5 {
+    font-family: "FS Me", sans-serif;
+    font-weight: bold;
+}
+
+.btn {
+    border-radius: 10px;
+    padding: 8px;
+    filter: drop-shadow(3px 3px 5px rgba(0,0,0,0.12));
+    font-family: "FS Me", sans-serif;
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.btn:not(.btn-outline-success, .btn-outline-dark, .btn-outline-danger, .btn-outline-warning) {
+    border: none;
+}
+
+.btn-primary {
+    /*color: #343a40;*/
+
+}
+
+.navbar, .navbar-brand {
+    /*color: #343a40 !important;*/
+    font-weight: 800;
+    font-size: 30px;
+}
+
+.navbar-nav > .nav-item > a {
+    font-size: 16px;
+    font-weight: bold;
+    color: #FFFFFF !important;
+}
+
+.dropdown-item > .nav-item > a {
+    font-size: 16px;
+    font-weight: bold;
+    color: #000000 !important;
+}
+
+a:hover, .nav-item > a:hover {
+    color: #888888 !important;
+}
+
+.form-select {
+    border-radius: 10px;
+    padding: 10px;
+    border: 1px solid rgba(0,0,0,0.5);
+    font-family: "FS Me", sans-serif;
+    font-weight: bold;
+}
+
+.dash-spreadsheet-container {
+    position: relative;
+    float: left;
+    clear: left;
+}
+
+.previous-next-container {
+    position: relative;
+    float: right;
+    clear: right;
+}
+
+label, .form-label {
+    font-weight: bold;
+}
+
+@keyframes spin {
+    from {
+        transform:rotate(0deg);
+    }
+    to {
+        transform:rotate(360deg);
+    }
+}
+
+.display-on-hover {
+    visibility: hidden;
+}
+
+.display-on-hover:hover {
+    visibility: visible;
+}
+
+.pointer {
+    cursor: pointer;
+}

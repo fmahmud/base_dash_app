@@ -11,6 +11,12 @@ FALSES = ["False", "false"]
 
 
 class JobDefinitionParameter(BaseModel):
+    def get_label(self):
+        return self.user_facing_param_name
+
+    def get_value(self):
+        return self.id
+
     __tablename__ = "job_definition_parameters"
 
     id = Column(Integer, Sequence("job_definition_parameter_id_seq"), primary_key=True)

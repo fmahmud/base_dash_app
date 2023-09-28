@@ -1,10 +1,13 @@
 import datetime
-from typing import List, Type, Dict, Optional, FrozenSet, Tuple, Any, Union
+import pprint
+import time
+from typing import List, Dict, Optional, Tuple, Union, Type
 
 import dash
 import dash_bootstrap_components as dbc
 from dash import html, dcc, ALL, MATCH
 from dash.exceptions import PreventUpdate
+from sqlalchemy.exc import InvalidRequestError
 from sqlalchemy.orm import Session
 
 from base_dash_app.components.base_component import ComponentWithInternalCallback
@@ -15,9 +18,10 @@ from base_dash_app.components.historicals import historical_dots
 from base_dash_app.components.inputs.simple_labelled_input import SimpleLabelledInput
 from base_dash_app.enums.log_levels import LogLevelsEnum, LogLevel
 from base_dash_app.enums.status_colors import StatusesEnum
+from base_dash_app.models.base_model import BaseModel
 from base_dash_app.models.job_definition import JobDefinition
 from base_dash_app.models.job_definition_parameter import JobDefinitionParameter
-from base_dash_app.services.job_definition_service import JobDefinitionService
+from base_dash_app.services.job_definition_service import JobDefinitionService, JobDefinitionImpl
 from base_dash_app.utils import date_utils
 from base_dash_app.virtual_objects.interfaces.selectable import Selectable, CachedSelectable
 from base_dash_app.virtual_objects.job_progress_container import VirtualJobProgressContainer
@@ -52,8 +56,9 @@ class JobCard(ComponentWithInternalCallback):
             hide_log_div=False,
             *args, **kwargs
     ):
-        super().__init__()
+        super().__init__(*args, **kwargs)
         self.job_definition: JobDefinition = job_definition
+        self.job_definition_id: int = job_definition.id
         self.job_def_service: JobDefinitionService = job_def_service
         self.footer = footer or []
         self.log_level: LogLevel = LogLevelsEnum.INFO.value
@@ -64,49 +69,80 @@ class JobCard(ComponentWithInternalCallback):
         # used for each of the param combo tabs
         # used only for the custom params tab
         self.custom_prog_container: Optional[VirtualJobProgressContainer] = None
+        self.any_in_progress = False
 
         self.selectable_param = None
         self.selectable_to_prog_containers: Dict[Selectable, Optional[VirtualJobProgressContainer]] = {}
         self.selectable_id_to_selectable: Dict[int, Selectable] = {}
+        self.last_updated_at = (datetime.datetime.now() + datetime.timedelta(seconds=10)).timestamp()
 
     def refresh_selectables_info(self):
+        """
+        Refreshes the selectable_to_prog_containers dict and the selectable_id_to_selectable dict
+        :return:
+        """
+        session: Session = self.dbm.get_session()
+        in_progress_instances = self.job_definition.get_in_progress_instances_by_selectable(
+            session=session,
+        )
+        job_class: Type[JobDefinitionImpl] = type(self.job_definition)
         self.selectable_param = self.selectable_param or type(self.job_definition).single_selectable_param_name()
-        if self.selectable_param is None:
-            return
 
-        self.logger.debug(f"refresh_selectables_info - selectable_param: {self.selectable_param}")
+        self.selectable_to_prog_containers = {
+            selectable: None
+            for selectable in job_class.get_selectables_by_param_name(self.selectable_param, session=session)
+        }
 
-        # get container from job def service - job def service contains the latest info
-        latest_containers = self.job_def_service.get_containers_by_job_id(self.job_definition.id, by_selectables=True)
-        for selectable, new_container in latest_containers.items():
-            if selectable not in self.selectable_to_prog_containers:
-                # if we don't have the container in our dict, add it
-                self.selectable_to_prog_containers[selectable] = new_container
-            else:
-                # if we do have the container, check if it's the same as the new one, update it if not
-                if new_container != self.selectable_to_prog_containers[selectable]:
-                    self.selectable_to_prog_containers[selectable] = new_container
-
-        self.logger.debug(f"refresh_selectables_info - selectables: {self.selectable_to_prog_containers.keys()}")
+        for ji in in_progress_instances:
+            selectable: Selectable = job_class.get_selectable_for_instance(ji, session=session)
+            self.selectable_to_prog_containers[selectable] = VirtualJobProgressContainer.get_from_redis_by_instance_id(
+                redis_client=self.redis_client,
+                ji_id=ji.id
+            )
 
         self.selectable_id_to_selectable = {
             selectable.get_value(): selectable
             for selectable in self.selectable_to_prog_containers.keys()
         }
 
+    @staticmethod
+    def refresh_job_definition(instance: 'JobCard'):
+        start_time = time.time()
+        some_change = False
+
+        if instance.last_updated_at is not None:
+            for selectable, prog_container in instance.selectable_to_prog_containers.items():
+                if prog_container is None or prog_container.last_status_updated_at is None:
+                    continue
+
+                if instance.last_updated_at <= prog_container.last_status_updated_at.timestamp():
+                    some_change = True
+                    break
+        else:
+            some_change = True
+
+        if not some_change:
+            instance.logger.debug(f"early exit Execution time: {time.time() - start_time} seconds")
+            return
+
+        instance.last_updated_at = time.time()
+        instance.logger.debug(f"full refresh Execution time: {instance.last_updated_at - start_time} seconds")
+
     @classmethod
     def handle_any_input(cls, *args, triggering_id, instance):
         # todo: parameters for job execution - look at DeployedContractView in ContractsDashboard
 
         instance: JobCard
+        session: Session = instance.dbm.get_session()
+        instance.job_definition = session.query(JobDefinition).get(instance.job_definition_id)
         job_def: JobDefinition = instance.job_definition
-        session: Session = Session.object_session(job_def)
-        session.refresh(job_def)
 
         instance.refresh_selectables_info()
-        instance.logger.debug(
-            f"num containers in progress: {len([i for i in instance.selectable_to_prog_containers.values() if i is not None])}"
-        )
+        in_progress_containers = [i for i in instance.selectable_to_prog_containers.values() if i is not None]
+        instance.logger.debug(f"num containers in progress: {len(in_progress_containers)}")
+
+        if len(in_progress_containers) > 0:
+            instance.logger.debug(f"in progress container: {pprint.pformat(in_progress_containers)}")
 
         callback_context = dash.callback_context
         error_messages = {}
@@ -114,7 +150,7 @@ class JobCard(ComponentWithInternalCallback):
             state_mapping = instance.get_callback_state(JOB_CARD_TABS_ID, args)
             instance.current_tab = state_mapping[JOB_CARD_TABS_ID]
         elif triggering_id.startswith(JOB_SELECTABLE_RUNNER_BTN_ID):
-            instance.logger.info(f"Running job {job_def.name} with selectable {instance.selectable_param}")
+            instance.logger.debug(f"Running job {job_def.name} with selectable {instance.selectable_param}")
             # don't need to worry about getting parameters from different input boxes,
             # convert frozen set of tuples to dict
             if SELECTABLE_ADDITIONAL_ID not in callback_context.triggered_id:
@@ -137,11 +173,23 @@ class JobCard(ComponentWithInternalCallback):
                     job_def=instance.job_definition,
                     selectable=selectable,
                     parameter_values={instance.selectable_param: selectable_id},
-                    log_level=instance.log_level # todo: fix
+                    log_level=instance.log_level  # todo: fix
                 )
             )
 
-            instance.job_definition.rehydrate_events_from_db(session)
+            # instance.job_definition.rehydrate_events_from_db()
+            from base_dash_app.models.job_instance import JobInstance
+            job_instances = (
+                session.query(JobInstance)
+                .filter(JobInstance.job_definition_id == instance.job_definition_id)
+                .order_by(JobInstance.start_time.desc())
+                .limit(30)
+                .all()
+            )
+
+            instance.job_definition.clear_all()
+            for job_instance in job_instances:
+                instance.job_definition.process_result(job_instance.get_result(), job_instance)
 
         elif triggering_id.startswith(JOB_RUNNER_BTN_ID):
             """
@@ -217,28 +265,34 @@ class JobCard(ComponentWithInternalCallback):
                     log_level=log_level
                 )
 
-                instance.job_definition.rehydrate_events_from_db(session)
+                instance.job_definition.rehydrate_events_from_db()
         elif triggering_id.startswith(JOB_CARD_INTERVAL_ID):
             # session.refresh(job_def)
             pass
 
-        return [instance.__render_job_card(form_messages=error_messages, footer=instance.footer)]
+        return [
+            instance.__render_job_card(
+                form_messages=error_messages,
+                footer=instance.footer,
+                dbm=instance.dbm
+            )
+        ]
 
     def render(self, wrapper_style_override=None):
         if wrapper_style_override is None:
             wrapper_style_override = {}
 
-        session: Session = Session.object_session(self.job_definition)
-        session.refresh(self.job_definition)
-
+        session: Session = self.dbm.get_session()
+        self.job_definition = session.query(JobDefinition).get(self.job_definition_id)
         self.refresh_selectables_info()
-
-        # self.logger.debug(f"render - selectables:"
-        #                  f" {', '.join(key.get_label() for key in self.selectable_to_prog_containers.keys())}")
 
         return html.Div(
             children=[
-                self.__render_job_card(footer=self.footer)
+                self.__render_job_card(
+                    footer=self.footer,
+                    form_messages={},
+                    dbm=self.dbm
+                )
             ],
             style={
                 "width": "660px", "position": "relative", "float": "left", "margin": "20px",
@@ -376,6 +430,7 @@ class JobCard(ComponentWithInternalCallback):
 
     def __render_job_card(
             self,
+            dbm,
             form_messages: Dict[JobDefinitionParameter, Optional[str]] = None,
             footer=None,
     ):
@@ -386,6 +441,8 @@ class JobCard(ComponentWithInternalCallback):
             footer = []
 
         job = self.job_definition
+        session: Session = dbm.get_session()
+        session.add(job)
         selectable_in_progress, custom_in_progress = self.__any_in_progress()
 
         last_run_error_message = None
@@ -405,19 +462,33 @@ class JobCard(ComponentWithInternalCallback):
                     style={"marginTop": "20px", "width": "100%", "float": "left"}
                 )
 
-        num_historical_dots = 45
-        margin_right = 4
+        num_historical_dots = 50
+        margin_right = 2
         #
         # self.logger.debug(f"__render_job_card - selectables:"
         #                  f" {', '.join(key.get_label() for key in self.selectable_to_prog_containers.keys())}")
 
         job_card = SmallCard(
-            title=html.H3(job.name),
+            title=html.H3(
+                children=[
+                    job.name,
+                    # dbc.Progress(
+                    #     id=f"{self._instance_id}-progress",
+                    #     value=0,
+                    #     style={
+                    #         # "display": "none" if self.__any_in_progress() else "block",
+                    #         "height": "10px", "position": "relative", "float": "right",
+                    #         "width": "200px",
+                    #     },
+                    #     color="success"
+                    # )
+                ]
+            ),
             body=html.Div(
                 children=[
                     html.Div(job.description) if job.description is not None else None,
                     html.Div(
-                        f"Last Ran {date_utils.readable_time_since(last_run_date)}"
+                        f"Last Started {date_utils.readable_time_since(last_run_date)}"
                         f"{' ago' if last_run_date is not None else ''}"
                         if not custom_in_progress or selectable_in_progress else "In Progress",
                         style={"marginTop": "5px", "marginBottom": "5px", "fontSize": "18px", "fontWeight": "bold"}
@@ -498,8 +569,16 @@ class JobCard(ComponentWithInternalCallback):
                             ) if self.selectables_as_tabs else
                             html.Div(
                                 children=[
-                                    self.__render_selectable_div(selectable, container)
-                                    for selectable, container in self.selectable_to_prog_containers.items()
+                                    self.__render_selectable_div(selectable, dbm, container)
+                                    for selectable, container in sorted(
+                                        [*self.selectable_to_prog_containers.items()],
+                                        key=lambda s:
+                                            s[1].start_time
+                                            if s[1] is not None
+                                            and s[1].is_in_progress()
+                                            and s[1].start_time is not None
+                                            else datetime.datetime.now()
+                                    )
                                 ] + [
                                     html.Div(
                                         "",
@@ -515,6 +594,7 @@ class JobCard(ComponentWithInternalCallback):
                     html.Div(
                         children=[
                             self.__render_non_selectable_tab(
+                                dbm=dbm,
                                 form_messages=form_messages, container=self.custom_prog_container
                             ),
                             html.Div(
@@ -589,16 +669,29 @@ class JobCard(ComponentWithInternalCallback):
             }
         )
 
-    def __render_selectable_div(self, selectable: Selectable, container: VirtualJobProgressContainer = None):
+    def __render_selectable_div(
+            self, selectable: Selectable, dbm,
+            container: VirtualJobProgressContainer = None
+    ):
         if selectable is None:
             raise ValueError("Selectable cannot be None")
 
-        last_exec_for_selectable = type(self.job_definition).get_latest_exec_for_selectable(
-            selectable, self.job_definition.dbm.get_session()
-        )
+        try:
+            last_exec_for_selectable = type(self.job_definition).get_latest_exec_for_selectable(
+                selectable, dbm.get_session()
+            )
+        except InvalidRequestError as ire:
+            self.logger.error(f"InvalidRequestError: {ire}")
+            last_exec_for_selectable = type(self.job_definition).get_latest_exec_for_selectable(
+                selectable, dbm.get_session()
+            )
+
         last_run_time = last_exec_for_selectable.start_time if last_exec_for_selectable is not None else None
         next_run_time = (datetime.timedelta(seconds=self.job_definition.seconds_between_runs)
                          + last_run_time) if last_run_time is not None else datetime.datetime.now()
+
+        if next_run_time is not None and next_run_time < datetime.datetime.now():
+            next_run_time = datetime.datetime.now()
 
         return html.Div(
             children=[
@@ -640,11 +733,14 @@ class JobCard(ComponentWithInternalCallback):
         )
 
     def __render_non_selectable_tab(
-        self, form_messages: Dict[JobDefinitionParameter, str] = None,
-        container: VirtualJobProgressContainer = None
+            self, dbm,
+            form_messages: Dict[JobDefinitionParameter, str] = None,
+            container: VirtualJobProgressContainer = None
     ):
         if form_messages is None:
             form_messages = {}
+
+        session: Session = dbm.get_session()
 
         custom_in_progress = container is not None and container.is_in_progress()
         job: JobDefinition = self.job_definition
@@ -672,9 +768,9 @@ class JobCard(ComponentWithInternalCallback):
                 )
             elif param.param_type in [bool, Selectable]:
                 if param.param_type == Selectable:
-                    selectables = job.get_cached_selectables_by_param_name(
+                    selectables = job.get_selectables_by_param_name(
                         param.variable_name,
-                        session=self.job_def_service.dbm.get_session()
+                        session=session
                     )
                 else:
                     selectables = [

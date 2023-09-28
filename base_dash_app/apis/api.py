@@ -6,7 +6,6 @@ from base_dash_app.apis.endpoint import Endpoint
 from base_dash_app.apis.utils import api_utils
 from base_dash_app.apis.utils.request import Request
 from base_dash_app.enums.http_methods import HttpMethod
-# TODO
 from base_dash_app.virtual_objects.virtual_framework_obj import VirtualFrameworkObject
 
 
@@ -39,7 +38,7 @@ class NoAuthHandler(AuthHandler):
         pass
 
 
-# todo: Allow setting communication type: json (def), xml, etc.
+#issue: (issue: 174): Allow setting communication type: json (def), xml, etc.
 class API(VirtualFrameworkObject, ABC):
     def __init__(
             self, url: str, auth_handler: AuthHandler = None, *,

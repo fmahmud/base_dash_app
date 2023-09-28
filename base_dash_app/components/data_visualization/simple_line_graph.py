@@ -1,9 +1,9 @@
 from enum import Enum
 from typing import List, Dict
-import dash_core_components as dcc
 import plotly.graph_objects as go
 from plotly.graph_objs.scatter import Line
 from plotly.subplots import make_subplots
+from dash import dcc
 
 from base_dash_app.components.base_component import BaseComponent
 from base_dash_app.virtual_objects.interfaces.graphable import Graphable

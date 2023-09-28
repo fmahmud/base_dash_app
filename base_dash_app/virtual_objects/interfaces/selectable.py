@@ -34,7 +34,7 @@ class Selectable(ABC):
         return hash(self.__str__())
 
     def __eq__(self, other):
-        if type(other) != type(self):
+        if not isinstance(other, Selectable):
             return False
 
         return hash(self) == hash(other)
@@ -49,7 +49,9 @@ class CachedSelectable(Selectable):
             label_div=selectable.get_label_div()
         )
 
-    def __init__(self, label, value, label_div=None):
+    def __init__(
+        self, label, value, label_div=None
+    ):
         self.label = label
         self.value = value
         self.label_div = label_div or super().get_label_div()
@@ -62,3 +64,12 @@ class CachedSelectable(Selectable):
 
     def get_value(self):
         return self.value
+
+    def set_label(self, label):
+        self.label = label
+
+    def set_value(self, value):
+        self.value = value
+
+    def set_label_div(self, label_div):
+        self.label_div = label_div

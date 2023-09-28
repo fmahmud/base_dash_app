@@ -1,6 +1,9 @@
 import abc
+import json
 import logging
-from typing import Optional, List, Dict, Any, Tuple, FrozenSet
+from abc import ABC
+from operator import or_
+from typing import Optional, List, Dict, Any, Tuple, FrozenSet, TypeVar, Type
 
 from sqlalchemy import Column, Integer, Sequence, String, orm, Boolean, select, func
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -14,7 +17,7 @@ from base_dash_app.models.job_instance import JobInstance
 from base_dash_app.utils.db_utils import DbManager
 from base_dash_app.virtual_objects.interfaces.resultable_event_series import ResultableEventSeries, \
     CachedResultableEventSeries
-from base_dash_app.virtual_objects.interfaces.selectable import Selectable
+from base_dash_app.virtual_objects.interfaces.selectable import Selectable, CachedSelectable
 from base_dash_app.virtual_objects.interfaces.startable import Startable
 from base_dash_app.virtual_objects.interfaces.stoppable import Stoppable
 from base_dash_app.virtual_objects.job_progress_container import VirtualJobProgressContainer
@@ -22,6 +25,12 @@ from base_dash_app.virtual_objects.virtual_framework_obj import VirtualFramework
 
 
 class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel, VirtualFrameworkObject):
+    def get_label(self):
+        return self.name
+
+    def get_value(self):
+        return self.id
+
     def get_start_time(self):
         pass
 
@@ -70,6 +79,64 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
         # todo
         pass
 
+    @classmethod
+    def get_selectable_by_value(cls, value: Any, session: Session) -> Optional[Selectable]:
+        selectable_type = cls.get_selectable_type()
+        param_name = cls.single_selectable_param_name()
+
+        if selectable_type is None:
+            return None
+
+        if issubclass(selectable_type, BaseModel):
+            return session.query(selectable_type).get(value)
+        else:
+            cached_selectables = cls.get_selectables_by_param_name(param_name, session)
+            for cached_selectable in cached_selectables:
+                if cached_selectable.get_value() == value:
+                    return cached_selectable
+
+        return None
+
+    @classmethod
+    def get_selectable_type(cls) -> Optional[Type[Selectable]]:
+        return None
+
+    @classmethod
+    def get_selectable_for_instance(cls, instance: "JobInstance", session: Session) -> Optional[Selectable]:
+        instance_params = instance.parameters
+        if instance_params is None or instance_params == "" or instance_params == "{}":
+            return None
+
+        param_dict = json.loads(instance_params)
+        param_name = cls.single_selectable_param_name()
+        if param_name not in param_dict:
+            return None
+
+        param_value = param_dict[param_name]
+        selectable = cls.get_selectable_by_value(param_value, session)
+
+        return selectable
+
+    def get_in_progress_instances_by_selectable(self, session: Session) -> List[JobInstance]:
+        # check for new in progress instances
+        param_substring_comma = "%, " + f"\"{type(self).single_selectable_param_name()}\": %"
+        param_substring_brace = "{" + f"\"{type(self).single_selectable_param_name()}\": %"
+
+        in_progress_instances = (
+            session.query(JobInstance)
+            .filter_by(end_time=None)
+            .filter_by(job_definition_id=self.id)
+            .filter(
+                or_(
+                    JobInstance.parameters.like(param_substring_comma),
+                    JobInstance.parameters.like(param_substring_brace)
+                )
+            )
+            .all()
+        )
+
+        return in_progress_instances
+
     @hybrid_property
     def latest_start_time(self):
         # This part works at the instance level.
@@ -78,9 +145,11 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
     @latest_start_time.expression
     def latest_child_timestamp(cls):
         # This part works at the class/query level.
-        return (select([func.max(JobInstance.start_time)]).
-                where(JobInstance.parent_id == cls.id).
-                label('latest_start_time'))
+        return (
+            select([func.max(JobInstance.start_time)])
+            .where(JobInstance.job_definition_id == cls.id)
+            .label('latest_start_time')
+        )
 
     @classmethod
     def get_latest_exec_for_selectable(cls, selectable: Selectable, session: Session) -> Optional[JobInstance]:
@@ -88,7 +157,7 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
 
     @classmethod
     @abc.abstractmethod
-    def get_cached_selectables_by_param_name(
+    def get_selectables_by_param_name(
         cls,
         param_name: str,
         session: Session
@@ -146,18 +215,19 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
         Stoppable.__init__(self)
         VirtualFrameworkObject.__init__(self, **kwargs)
 
-        self.selectables: List[Selectable] = []
+        self.cached_selectables: List[CachedSelectable] = []
         self.single_selectable_param_name: str = type(self).single_selectable_param_name()
 
         if dbm is not None:
-            session: Session = dbm.get_session()
-            self.sync_single_selectable_data(session=session)
+            with dbm as dbm:
+                session: Session = dbm.get_session()
+                self.sync_single_selectable_data(session=session)
 
         self.logger = logging.getLogger(self.name)
 
     def sync_single_selectable_data(self, session: Session):
         if self.single_selectable_param_name is not None:
-            self.selectables = type(self).get_cached_selectables_by_param_name(
+            self.cached_selectables = type(self).get_selectables_by_param_name(
                 self.single_selectable_param_name,
                 session=session
             )
@@ -168,18 +238,11 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
         ResultableEventSeries.__init__(self)
         Startable.__init__(self)
         Stoppable.__init__(self)
-        session: Session = Session.object_session(self)
-        self.sync_single_selectable_data(session=session)
         self.logger = logging.getLogger(self.name)
-        self.rehydrate_events_from_db(session)
+        self.rehydrate_events_from_db()
 
-    def rehydrate_events_from_db(self, session: Session = None):
+    def rehydrate_events_from_db(self):
         self.clear_all()
-        # in_progress_job_instances = [ji for ji in self.job_instances if ji.is_in_progress()]
-        # for ji in in_progress_job_instances:
-        #     session.expunge(ji)
-
-        session.refresh(self)
 
         for ji in self.job_instances:
             ji: JobInstance

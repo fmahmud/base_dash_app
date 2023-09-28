@@ -1,4 +1,4 @@
-FROM python:3.8-slim-buster as base
+FROM python:3.9-slim-bookworm as base
 
 # Setup env
 ENV LANG C.UTF-8
@@ -12,11 +12,11 @@ USER root
 # Install pipenv and compilation dependencies
 RUN pip install --upgrade pip
 RUN pip install pipenv
-RUN apt-get update && apt-get install -y libpq-dev gcc musl-dev
+RUN apt-get update && apt-get install -y libpq5 gcc
 
 # Install python dependencies in /.venv
-COPY Pipfile .
-COPY Pipfile.lock .
+COPY ./Pipfile .
+COPY ./Pipfile.lock .
 RUN PIPENV_VENV_IN_PROJECT=1 pipenv install --deploy
 
 # Create and switch to a new user
@@ -30,8 +30,10 @@ FROM base AS runtime
 COPY --from=python-deps /.venv /.venv
 ENV PATH="/.venv/bin:$PATH"
 
-COPY "./dist/base_dash_app-0.5.0-py3-none-any.whl" ./
+COPY ./ ./
+
 RUN pip install ./*.whl
 
-COPY ./demo_app/* ./
-CMD ["python", "test_app.py"]
+# check if env var REPO == 'web' then run gunicorn else run celery
+CMD ./conditional_starter.sh
+

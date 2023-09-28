@@ -2,16 +2,15 @@ import datetime
 import time
 from typing import Dict, List, Callable, Optional
 
-import dash_bootstrap_components as dbc
-import dash_table
-from dash import html
+from dash import html, dash_table
 from dash.dash_table.Format import Format, Scheme
 from dash.exceptions import PreventUpdate
 
 from base_dash_app.components.base_component import ComponentWithInternalCallback
 from base_dash_app.components.callback_utils.mappers import InputToState, InputMapping, StateMapping
 from base_dash_app.components.datatable.download_and_reload_bg import construct_down_ref_btgrp
-import dash_core_components as dcc
+from dash import dcc
+
 
 from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.services.async_handler_service import AsyncWorkProgressContainer, AsyncHandlerService

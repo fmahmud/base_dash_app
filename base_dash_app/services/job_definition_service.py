@@ -1,10 +1,15 @@
 import datetime
+import gc
 import json
+import logging
+import os
+import pprint
+import threading
 import traceback
 from concurrent.futures import ThreadPoolExecutor
-from typing import Type, List, Dict, Any, Tuple, FrozenSet, TypeVar, Optional, Union
+from typing import Type, Dict, Any, TypeVar
 
-from sqlalchemy.exc import InvalidRequestError
+from celery import shared_task
 from sqlalchemy.orm import Session
 
 from base_dash_app.enums.log_levels import LogLevelsEnum, LogLevel
@@ -12,6 +17,7 @@ from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.models.job_definition import JobDefinition
 from base_dash_app.models.job_instance import JobInstance
 from base_dash_app.services.base_service import BaseService
+from base_dash_app.utils.db_utils import DbManager
 from base_dash_app.virtual_objects.interfaces.selectable import Selectable
 from base_dash_app.virtual_objects.job_progress_container import VirtualJobProgressContainer
 from base_dash_app.virtual_objects.result import Result
@@ -38,243 +44,248 @@ class JobDefinitionService(BaseService):
 
         self.threadpool_executor = ThreadPoolExecutor(max_workers=1)
 
-        self.non_selectables_to_container_map: (
-            Dict[int, Optional[VirtualJobProgressContainer]]
-        ) = {}
-
-        self.job_to_selectables_to_container_map: (
-            Dict[int, Dict[Selectable, Optional[VirtualJobProgressContainer]]]
-        ) = {}
-
-    def get_containers_by_job_id(self, job_id: int, by_selectables=False) -> (
-        Union[
-            Dict[Selectable, VirtualJobProgressContainer],
-            Optional[VirtualJobProgressContainer]
-        ]
-    ):
-        if job_id < 1 or job_id is None:
-            raise Exception(f"Invalid job id provided: {job_id}")
-
-        if by_selectables:
-            if job_id not in self.job_to_selectables_to_container_map:
-                self.__cache_container_by_job_def(self.get_by_id(job_id))
-
-            to_return = self.job_to_selectables_to_container_map[job_id]
-            return to_return
-        else:
-            if job_id not in self.non_selectables_to_container_map:
-                self.__cache_container_by_job_def(self.get_by_id(job_id))
-
-            return self.non_selectables_to_container_map[job_id]
-
-    def __cache_container_by_job_def(self, job_def: JobDefinitionImpl):
-        single_selectable_param_name = type(job_def).single_selectable_param_name()
-        if single_selectable_param_name is not None:
-            if job_def.id not in self.job_to_selectables_to_container_map:
-                self.job_to_selectables_to_container_map[job_def.id] = {}
-
-            job_def.sync_single_selectable_data(self.dbm.get_session())
-            self.job_to_selectables_to_container_map[job_def.id] = {
-                selectable: self.job_to_selectables_to_container_map[job_def.id].get(selectable, None)
-                for selectable in job_def.selectables
-            }
-        else:
-            if job_def.id not in self.non_selectables_to_container_map:
-                self.non_selectables_to_container_map[job_def.id] = None
-
-    def get_by_id(self, id: int) -> Optional[JobDefinitionImpl]:
-        session: Session = self.dbm.get_session()
-        job_def: JobDefinitionImpl = session.query(JobDefinition).filter_by(id=id).first()
-        if job_def is None:
-            return None
-        job_def.set_vars_from_kwargs(**self.produce_kwargs())
-        self.__cache_container_by_job_def(job_def)
-
-        return job_def
-
     def get_by_class(self, clazz):
         session: Session = self.dbm.get_session()
         job_def: JobDefinitionImpl = session.query(clazz).filter_by(job_class=clazz.__name__).first()
-
-        if job_def is None:
-            return None
-        job_def.set_vars_from_kwargs(**self.produce_kwargs())
-        self.__cache_container_by_job_def(job_def)
         return job_def
 
     def run_job(
-        self, *args, job_def: JobDefinitionImpl,
-        parameter_values: Dict[str, Any] = None,
-        selectable: Selectable = None,
-        log_level: LogLevel = LogLevelsEnum.WARNING.value,
-        **kwargs
+            self, *args, job_def: JobDefinitionImpl,
+            parameter_values: Dict[str, Any] = None,
+            selectable: Selectable = None,
+            log_level: LogLevel = LogLevelsEnum.WARNING.value,
+            **kwargs
     ):
         if parameter_values is None:
             parameter_values = {}
 
-        job_class: Type[JobDefinitionImpl] = type(job_def)
-        single_selectable_param_name = job_class.single_selectable_param_name()
-        is_single_selectable = selectable is not None and single_selectable_param_name is not None
-        self.__cache_container_by_job_def(job_def)
+        with self.dbm as dbm:
+            self.logger.debug(
+                f"Running job {job_def.name}"
+                f" with parameters {parameter_values}"
+                f" or selectable {selectable.get_label() if selectable is not None else None}"
+            )
+            session: Session = dbm.get_session()
+            job_class: Type[JobDefinitionImpl] = type(job_def)
+            single_selectable_param_name = job_class.single_selectable_param_name()
+            is_single_selectable = selectable is not None and single_selectable_param_name is not None
 
-        if not issubclass(job_class, JobDefinition):
-            raise Exception(f"Provided job definition was not of a valid type. Was of type {job_class}.")
+            if not issubclass(job_class, JobDefinition):
+                raise Exception(f"Provided job definition was not of a valid type. Was of type {job_class}.")
 
-        if job_class == JobDefinition:
-            raise Exception("Trying to execute a JobDefinition instead of a child class.")
+            if job_class == JobDefinition:
+                raise Exception("Trying to execute a JobDefinition instead of a child class.")
 
-        self.logger.debug("Starting run job")
-        if is_single_selectable:
-            parameter_values[single_selectable_param_name] = selectable.get_value()
-            if (
-                job_def.id in self.job_to_selectables_to_container_map
-                    and selectable in self.job_to_selectables_to_container_map[job_def.id]
-                    and self.job_to_selectables_to_container_map[job_def.id][selectable] is not None
-            ):
-                raise JobAlreadyRunningException(job_id=job_def.id)
-        else:
-            if (
-                job_def.id in self.non_selectables_to_container_map
-                    and self.non_selectables_to_container_map[job_def.id] is not None
-            ):
-                raise JobAlreadyRunningException(job_id=job_def.id)
+            self.logger.debug("Starting run job")
+            if is_single_selectable:
+                parameter_values[single_selectable_param_name] = selectable.get_value()
 
-        session: Session = self.dbm.get_session()
+                latest_exec: JobInstance = job_class.get_latest_exec_for_selectable(selectable, session=session)
+                if latest_exec is not None and latest_exec.end_time is None:
+                    raise JobAlreadyRunningException(job_id=job_def.id)
+            else:
+                # issue: (issue: 183): Handle checking for running job instance for non-SSP jobs
+                pass
 
-        current_instance = JobInstance()
-        current_instance.job_definition_id = job_def.id
-        current_instance.start_time = datetime.datetime.now()
-        current_instance.date = current_instance.start_time
-        current_instance.completion_criteria_status_id = StatusesEnum.IN_PROGRESS.value.id
-        current_instance.set_status(StatusesEnum.IN_PROGRESS)
-        current_instance.parameters = json.dumps(parameter_values)
-        self.save(current_instance)
-        if current_instance in session:
-            session.expunge(current_instance)
+            current_instance = JobInstance()
+            current_instance.job_definition_id = job_def.id
+            current_instance.start_time = datetime.datetime.now()
+            current_instance.date = current_instance.start_time
+            current_instance.execution_status_id = StatusesEnum.PENDING.value.id
+            current_instance.prerequisites_status_id = StatusesEnum.PENDING.value.id
+            current_instance.completion_criteria_status_id = StatusesEnum.PENDING.value.id
+            current_instance.set_status(StatusesEnum.PENDING)
+            current_instance.parameters = json.dumps(parameter_values)
+            self.save(current_instance, session=session)
 
-        # todo: I don't like this flow - improve this
-        current_instance.tooltip_id = current_instance.get_unique_id()
+            # todo: I don't like this flow - improve this
+            current_instance.tooltip_id = current_instance.get_unique_id()
 
-        kwargs["job_instance"] = current_instance
-        kwargs["job_def"] = job_def
+            job_progress_container: VirtualJobProgressContainer = VirtualJobProgressContainer(
+                job_instance_id=current_instance.id,
+                job_definition_id=job_def.id
+            )
 
-        job_progress_container: VirtualJobProgressContainer = VirtualJobProgressContainer(
-            job_instance_id=current_instance.id,
-            job_definition_id=job_def.id
+            job_progress_container.use_redis(self.redis_client, job_progress_container.uuid)
+            job_progress_container.set_pending()
+
+            job_progress_container.start_time = current_instance.start_time
+            job_progress_container.log_level = log_level
+            job_progress_container.push_to_redis()
+
+            kwargs["prog_container_uuid"] = job_progress_container.uuid
+            kwargs["parameter_values"] = parameter_values
+            kwargs["job_def_id"] = job_def.id
+
+            try:
+                if current_instance in session:
+                    # explicitly expunge the instance from the session instead of waiting for the session to close
+                    # todo: do we still need this?
+                    session.expunge(current_instance)
+
+                celery_task_id = run_job.delay(**kwargs)
+                self.logger.debug(f"result of celery execution = {celery_task_id}")
+
+                return job_progress_container
+                # self.__do_execution(*args, **kwargs)
+            except Exception as e:
+                raise e
+
+
+@shared_task
+def run_job(
+        *args,
+        job_def_id: int,
+        prog_container_uuid: str,
+        parameter_values: Dict,
+        **kwargs
+):
+    logger = logging.getLogger("celery-worker")
+    logger.debug("Running job")
+    # print thread and process id
+    logger.debug(f"Thread id = {threading.get_ident()}")
+    logger.debug(f"Process id = {os.getpid()}")
+
+    from base_dash_app.application.runtime_application import RuntimeApplication
+    dbm: DbManager = RuntimeApplication.get_instance().get_dbm_by_pid()
+    rta: RuntimeApplication = RuntimeApplication.get_instance()
+    redis_client = rta.redis_client
+    prog_container: VirtualJobProgressContainer = VirtualJobProgressContainer.from_redis(
+        redis_client=redis_client,
+        uuid=prog_container_uuid,
+    )
+
+    with dbm as dbm:
+        session: Session = dbm.get_session()
+        session.expire_on_commit = False
+
+        job_def: JobDefinitionImpl = session.query(JobDefinition).filter_by(id=job_def_id).first()
+        job_def.set_vars_from_kwargs(**rta.base_service_args)
+
+        logger.debug(pprint.pformat(job_def.produce_kwargs()))
+
+        job_instance: JobInstance = session.query(JobInstance).filter_by(id=prog_container.job_instance_id).first()
+        job_instance.set_status(StatusesEnum.IN_PROGRESS)
+        session.commit()
+
+        prog_container.set_in_progress()
+        prog_container.push_to_redis()
+
+        do_execution(
+            *args,
+            job_def=job_def,
+            session=session,
+            prog_container=prog_container,
+            parameter_values=parameter_values,
+            **kwargs
         )
 
-        if is_single_selectable:
-            self.job_to_selectables_to_container_map[job_def.id][selectable] = job_progress_container
-            job_progress_container.selectable = selectable
-        else:
-            self.non_selectables_to_container_map[job_def.id] = job_progress_container
+        handle_completion(
+            session=session,
+            job_progress_container=prog_container
+        )
 
-        job_progress_container.start_time = current_instance.start_time
-        job_progress_container.log_level = log_level
 
-        kwargs["prog_container"] = job_progress_container
-        kwargs["parameter_values"] = parameter_values
+def handle_completion(
+        session: Session,
+        job_progress_container: VirtualJobProgressContainer
+):
+    inner_session: Session = session
+    job_instance_id = job_progress_container.job_instance_id
 
-        def handle_completion(future):
-            job_instance = session.query(JobInstance).filter_by(id=current_instance.id).first()
-            job_instance.progress = job_progress_container.progress
-            job_instance.end_time = job_progress_container.end_time
-            job_instance.execution_status_id = job_progress_container.execution_status.value.id
-            job_instance.completion_criteria_status_id = job_progress_container.completion_criteria_status.value.id
-            job_instance.prerequisites_status_id = job_progress_container.prerequisites_status.value.id
-            job_instance.end_reason = job_progress_container.end_reason
-            job_instance.resultable_value = job_progress_container.result
-            job_instance.result = Result(
-                job_progress_container.result, job_progress_container.completion_criteria_status
-            )
-            job_instance.extras = json.dumps(job_progress_container.extras)
-            job_instance.logs = json.dumps(job_progress_container.logs)
+    job_instance = (
+        inner_session.query(JobInstance)
+        .filter_by(id=job_instance_id)
+        .first()
+    )
 
-            self.save(job_instance)
-            job_def.rehydrate_events_from_db(session=session)
-            if is_single_selectable:
-                session.refresh(job_progress_container.selectable)
-                self.job_to_selectables_to_container_map[job_def.id][job_progress_container.selectable] = None
-            else:
-                self.non_selectables_to_container_map[job_def.id] = None
-        try:
-            self.threadpool_executor.submit(
-                self.__do_execution, *args, **kwargs
-            ).add_done_callback(handle_completion)
+    job_instance.progress = job_progress_container.progress
+    job_instance.end_time = job_progress_container.end_time
+    job_instance.execution_status_id = job_progress_container.execution_status.value.id
+    job_instance.completion_criteria_status_id = job_progress_container.completion_criteria_status.value.id
+    job_instance.prerequisites_status_id = job_progress_container.prerequisites_status.value.id
+    job_instance.end_reason = job_progress_container.end_reason
+    job_instance.resultable_value = job_progress_container.result
+    job_instance.result = Result(
+        job_progress_container.result, job_progress_container.completion_criteria_status
+    )
+    job_instance.extras = json.dumps(job_progress_container.extras)
+    job_instance.logs = json.dumps(job_progress_container.logs)
 
-            return job_progress_container
-            # self.__do_execution(*args, **kwargs)
-        except Exception as e:
-            raise e
+    try:
+        inner_session.commit()
+    except Exception as e:
+        inner_session.rollback()
+        raise e
 
-    def get_status(self, job_instance: JobInstance):
-        prereq_status = StatusesEnum.get_by_id(job_instance.prerequisites_status_id)
-        execution_status = StatusesEnum.get_by_id(job_instance.execution_status_id)
-        completion_criteria_status = StatusesEnum.get_by_id(job_instance.completion_criteria_status_id)
+    job_progress_container.destroy_in_redis()
 
-        if prereq_status in passing_statuses:
-            if execution_status in passing_statuses:
-                return completion_criteria_status
-            else:
-                return execution_status
-        else:
-            return prereq_status
+    gc.collect()
 
-    def __do_execution(
-            self, *args, job_def: JobDefinition,
-            prog_container: VirtualJobProgressContainer,
-            parameter_values: Dict,
+
+def do_execution(
+        *args,
+        job_def: JobDefinition,
+        prog_container: VirtualJobProgressContainer,
+        session: Session,
+        parameter_values: Dict,
+        **kwargs
+):
+    logger = logging.getLogger(job_def.name or f"job_def_{prog_container.job_definition_id}")
+
+    try:
+        session.merge(job_def)
+
+        logger.debug("checking prerequisites...")
+        prerequisites_status: StatusesEnum = job_def.check_prerequisites(
+            *args, session=session, prog_container=prog_container,
+            parameter_values=parameter_values,
             **kwargs
-    ):
-        session: Session = self.dbm.new_session()
+        )
 
-        try:
-            self.logger.debug(f"Using new session: {session.hash_key}")
+        prog_container.prerequisites_status = prerequisites_status
+        prog_container.last_status_updated_at = datetime.datetime.now()
+        prog_container.push_to_redis()
+        logger.debug(f"prerequisite status was {prerequisites_status}")
 
-            self.logger.debug("checking prerequisites...")
-
-            prerequisites_status: StatusesEnum = job_def.check_prerequisites(
+        if prerequisites_status in [StatusesEnum.WARNING, StatusesEnum.SUCCESS]:
+            logger.debug(f"executing job...")
+            execution_status: StatusesEnum = job_def.start(
                 *args, session=session, prog_container=prog_container,
                 parameter_values=parameter_values,
                 **kwargs
             )
 
-            prog_container.prerequisites_status = prerequisites_status
-            self.logger.debug(f"prerequisite status was {prerequisites_status}")
+            prog_container.execution_status = execution_status
+            prog_container.last_status_updated_at = datetime.datetime.now()
+            prog_container.push_to_redis()
+            logger.debug(f"execution status was {execution_status}")
 
-            if prerequisites_status in [StatusesEnum.WARNING, StatusesEnum.SUCCESS]:
-                self.logger.debug(f"executing job...")
-                execution_status: StatusesEnum = job_def.start(
-                    *args, session=session, prog_container=prog_container,
-                    parameter_values=parameter_values,
-                    **kwargs
-                )
+            logger.debug(f"checking completion criteria...")
 
-                prog_container.execution_status = execution_status
-                self.logger.debug(f"execution status was {execution_status}")
+            completion_criteria_status = job_def.check_completion_criteria(
+                *args, session=session, prog_container=prog_container,
+                parameter_values=parameter_values,
+                **kwargs
+            )
 
-                self.logger.debug(f"checking completion criteria...")
+            prog_container.completion_criteria_status = completion_criteria_status
+            prog_container.last_status_updated_at = datetime.datetime.now()
+            prog_container.push_to_redis()
 
-                completion_criteria_status = job_def.check_completion_criteria(
-                    *args, session=session, prog_container=prog_container,
-                    parameter_values=parameter_values,
-                    **kwargs
-                )
+            logger.debug(f"completion status was {completion_criteria_status}")
+    except Exception as e:
+        stacktrace = traceback.format_exc()
+        prog_container.end_reason = str(e)
+        prog_container.completion_criteria_status = StatusesEnum.FAILURE
+        prog_container.push_to_redis()
+        logger.error(f"Exception occurred: {stacktrace}")
+    finally:
+        prog_container.end_time = datetime.datetime.now()
+        logger.debug(f"end time = {prog_container.end_time}")
 
-                prog_container.completion_criteria_status = completion_criteria_status
+        logger.debug(f"status = {prog_container.get_status()}")
 
-                self.logger.debug(f"completion status was {completion_criteria_status}")
-        except Exception as e:
-            stacktrace = traceback.format_exc()
-            prog_container.end_reason = str(e)
-            prog_container.completion_criteria_status = StatusesEnum.FAILURE
-            self.logger.error(f"Exception occurred: {stacktrace}")
-        finally:
-            prog_container.end_time = datetime.datetime.now()
-            self.logger.debug(f"end time = {prog_container.end_time}")
-
-            self.logger.debug(f"status = {prog_container.get_status()}")
-
-            prog_container.completed = True
-            session.close()
-            return prog_container
+        prog_container.completed = True
+        prog_container.push_to_redis()
+        return prog_container

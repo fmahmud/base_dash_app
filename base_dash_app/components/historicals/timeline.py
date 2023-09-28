@@ -1,6 +1,7 @@
 from typing import List
 
-import dash_core_components as dcc
+from dash import dcc
+
 
 from base_dash_app.components.base_component import BaseComponent
 from base_dash_app.virtual_objects.interfaces.resultable_event import ResultableEvent
