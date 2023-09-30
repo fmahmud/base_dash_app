@@ -62,6 +62,9 @@ Sure, I'll create a markdown documentation for the `AppDescriptor` class:
 - **`redis_host`** (`str`): Host of the redis instance.
 - **`redis_port`** (`int`): Port of the redis instance.
 - **`redis_db_number`** (`int`): DB of the redis instance.
+- **`redis_use_ssl`** (`bool`): If set to True, uses SSL for the redis instance.
+- **`redis_username`** (`str`): Username for the redis instance. Required if `redis_use_ssl` is True. Default is "default"
+- **`redis_password`** (`str`): Password for the redis instance. Required if `redis_use_ssl` is True. Default is "password"
 
 ## Usage
 

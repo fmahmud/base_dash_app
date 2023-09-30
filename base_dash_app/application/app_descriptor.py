@@ -48,6 +48,9 @@ class AppDescriptor:
             redis_host: str = None,
             redis_port: int = None,
             redis_db_number: int = None,
+            redis_use_ssl: bool = False,
+            redis_username: str = "default",
+            redis_password: str = "password",
     ):
         """
         :param global_inputs: 
@@ -82,6 +85,9 @@ class AppDescriptor:
         :param redis_host: Host of the redis server
         :param redis_port: Port of the redis server
         :param redis_db_number: DB number of the redis server
+        :param redis_use_ssl: If True, uses SSL for the redis server
+        :param redis_username: Username for the redis server. Required if redis_use_ssl is True. Default value is "default"
+        :param redis_password: Password for the redis server. Required if redis_use_ssl is True. Default value is "password"
         """
 
         self.db_descriptor: DbDescriptor = db_descriptor
@@ -115,3 +121,6 @@ class AppDescriptor:
         self.redis_host = redis_host
         self.redis_port = redis_port
         self.redis_db_number = redis_db_number
+        self.redis_use_ssl = redis_use_ssl
+        self.redis_username = redis_username
+        self.redis_password = redis_password

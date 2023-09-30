@@ -120,9 +120,19 @@ class RuntimeApplication:
             self.app.logger.warning("Redis host, port or db number not set. Disabling Redis.")
             self.redis_client = None
         else:
+            ssl_args = {}
+            if app_descriptor.redis_use_ssl:
+                ssl_args = {
+                    "ssl": True,
+                    "username": app_descriptor.redis_username,
+                    "password": app_descriptor.redis_password
+                }
+
             self.redis_client: redis.StrictRedis = redis.StrictRedis(
-                host=app_descriptor.redis_host, port=app_descriptor.redis_port, db=app_descriptor.redis_db_number,
-                decode_responses=True
+                host=app_descriptor.redis_host,
+                port=app_descriptor.redis_port,
+                db=app_descriptor.redis_db_number,
+                decode_responses=True, **ssl_args
             )
 
         try:

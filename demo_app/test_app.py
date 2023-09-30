@@ -55,6 +55,7 @@ my_app_descriptor = AppDescriptor(
     redis_host=os.getenv("REDIS_HOST", "redis"),
     redis_port=int(os.getenv("REDIS_PORT", "6379")),
     redis_db_number=int(os.getenv("REDIS_DB_NUMBER", "0")),
+    # redis_use_ssl=os.getenv("REDIS_USE_SSL", "False").lower() == "true",
 )
 
 
