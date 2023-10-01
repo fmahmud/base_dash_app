@@ -49,8 +49,8 @@ class AppDescriptor:
             redis_port: int = None,
             redis_db_number: int = None,
             redis_use_ssl: bool = False,
-            redis_username: str = "default",
-            redis_password: str = "password",
+            redis_username: str = None,
+            redis_password: str = None,
     ):
         """
         :param global_inputs: 
