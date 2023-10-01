@@ -7,8 +7,11 @@ services:
       - "60000:60000"
     environment:
       - DATABASE_URL=postgresql://postgres:password@db:5432/testdb
-      - CELERY_BROKER_URL=redis://redis:6379/0
       - REPO_NAME=web
+      - REDIS_HOST=redis
+      - REDIS_USE_SSL=False
+      - REDIS_PASSWORD=YourPassword
+      - REDIS_PORT=6379
     depends_on:
       - redis
       - db
@@ -16,8 +19,11 @@ services:
     build: .
     environment:
       - DATABASE_URL=postgresql://postgres:password@db:5432/testdb
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_HOST=redis
       - REPO_NAME=worker
+      - REDIS_USE_SSL=False
+      - REDIS_PASSWORD=YourPassword
+      - REDIS_PORT=6379
     depends_on:
       - web
       - redis
@@ -33,9 +39,14 @@ services:
 #      - redis
 #      - db
   redis:
-    image: "redis:alpine"
+    image: redis:latest
     ports:
-      - "6379:6379"
+      - "6379:6379"  # Non-SSL port
+      - "6380:6380"  # SSL port
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+      - ./certs:/usr/local/etc/redis/
+    command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
   db:
     image: postgres:13
     environment:

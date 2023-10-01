@@ -1,8 +1,10 @@
 import os
+import ssl
 
 from celery import Celery, Task
 from celery.schedules import crontab
 from flask import Flask
+from kombu.utils.url import as_url
 
 
 class CelerySingleton:
@@ -16,9 +18,37 @@ class CelerySingleton:
 
     def __init__(self):
         if not hasattr(self, "celery"):
-            celery_broker_url = os.getenv("CELERY_BROKER_URL")
+            redis_use_ssl = os.getenv("REDIS_USE_SSL", "False").lower() == "true"
+            redis_password = os.getenv("REDIS_PASSWORD", "password")
+            redis_username = os.getenv("REDIS_USERNAME", "")
+            redis_host = os.getenv("REDIS_HOST", "localhost")
+            redis_port = int(os.getenv("REDIS_PORT", "6379"))
 
-            if celery_broker_url is None:
+            if redis_use_ssl:
+                print("CELERY: Using SSL for redis.")
+                self.celery_broker_url = as_url(
+                    scheme='rediss',  # Note the extra 's', which denotes a secure connection
+                    host=redis_host,
+                    port=redis_port,
+                    password=redis_password,
+                    user=redis_username,
+                ) + f"0?ssl_cert_reqs=CERT_REQUIRED"
+
+                print(self.celery_broker_url)
+                self.broker_use_ssl = {
+                    'ssl_cert_reqs': ssl.CERT_REQUIRED
+                }
+            else:
+                self.celery_broker_url = as_url(
+                    scheme='redis',
+                    host=redis_host,
+                    port=redis_port,
+                    password=redis_password,
+                    user=redis_username,
+                ) + "0"
+                self.broker_use_ssl = {}
+
+            if self.celery_broker_url is None:
                 raise Exception("CELERY_BROKER_URL environment variable not set.")
 
             class ContextTask(Task):
@@ -30,9 +60,10 @@ class CelerySingleton:
 
             self.celery = Celery(
                 "Main Celery Instance",
-                broker=celery_broker_url,
-                backend=celery_broker_url,
-                task_cls=ContextTask
+                broker=self.celery_broker_url,
+                backend=self.celery_broker_url,
+                task_cls=ContextTask,
+
             )
 
             self.celery.backend.ensure_chords_allowed()

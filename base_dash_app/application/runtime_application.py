@@ -1,6 +1,7 @@
 import datetime
 import logging
 import os
+import ssl
 import threading
 import traceback
 from operator import itemgetter
@@ -18,6 +19,7 @@ from celery.schedules import crontab
 from dash import dcc, html
 from dash.dependencies import Output, Input, State, ALL
 from dash.exceptions import PreventUpdate
+from kombu.utils.url import as_url
 from pympler import tracker
 from redis import Redis
 from sqlalchemy.orm import Session
@@ -120,26 +122,38 @@ class RuntimeApplication:
             self.app.logger.warning("Redis host, port or db number not set. Disabling Redis.")
             self.redis_client = None
         else:
-            ssl_args = {}
-            if app_descriptor.redis_use_ssl:
-                ssl_args = {
-                    "ssl": True,
-                    "username": app_descriptor.redis_username,
-                    "password": app_descriptor.redis_password
-                }
 
-            self.redis_client: redis.StrictRedis = redis.StrictRedis(
-                host=app_descriptor.redis_host,
-                port=app_descriptor.redis_port,
-                db=app_descriptor.redis_db_number,
-                decode_responses=True, **ssl_args
-            )
+            if app_descriptor.redis_use_ssl:
+                self.redis_client: redis.StrictRedis = redis.StrictRedis(
+                    host=app_descriptor.redis_host,
+                    port=app_descriptor.redis_port,
+                    db=app_descriptor.redis_db_number,
+                    decode_responses=True,
+                    ssl=True,
+                    password=app_descriptor.redis_password,
+                    socket_timeout=5
+                )
+            else:
+                self.redis_client: redis.StrictRedis = redis.StrictRedis(
+                    host=app_descriptor.redis_host,
+                    port=app_descriptor.redis_port,
+                    db=app_descriptor.redis_db_number,
+                    password=app_descriptor.redis_password,
+                    decode_responses=True,
+                    socket_timeout=5
+                )
 
         try:
             if self.redis_client.ping():
                 self.app.logger.debug("Connected to Redis.")
-        except redis.exceptions.ConnectionError:
+        except redis.exceptions.ConnectionError as ce:
+            traceback.print_exc()
             self.app.logger.error("Could not connect to Redis.")
+            exit(1)
+        except Exception as e:
+            traceback.print_exc()
+            self.app.logger.error("Could not connect to Redis.")
+            exit(1)
 
         # need to set celery instance from outside, so it can be referenced when decorating tasks
         self.celery: Optional[Celery] = None
