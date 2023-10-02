@@ -19,37 +19,53 @@ class CelerySingleton:
     def __init__(self):
         if not hasattr(self, "celery"):
             redis_use_ssl = os.getenv("REDIS_USE_SSL", "False").lower() == "true"
-            redis_password = os.getenv("REDIS_PASSWORD", "password")
-            redis_username = os.getenv("REDIS_USERNAME", "")
+            redis_password = os.getenv("REDIS_PASSWORD", None)
+            redis_username = os.getenv("REDIS_USERNAME", None)
             redis_host = os.getenv("REDIS_HOST", "localhost")
             redis_port = int(os.getenv("REDIS_PORT", "6379"))
 
+            url_args = {}
+
             if redis_use_ssl:
                 print("CELERY: Using SSL for redis.")
+                url_args["scheme"] = "rediss"
+                url_args["host"] = redis_host
+                url_args["port"] = redis_port or 6379
+                if redis_password:
+                    url_args["password"] = redis_password
+
+                if redis_username:
+                    url_args["user"] = redis_username
+
                 self.celery_broker_url = as_url(
-                    scheme='rediss',  # Note the extra 's', which denotes a secure connection
-                    host=redis_host,
-                    port=redis_port,
-                    password=redis_password,
-                    user=redis_username,
+                    **url_args
                 ) + f"0?ssl_cert_reqs=CERT_REQUIRED"
 
                 print(self.celery_broker_url)
                 self.broker_use_ssl = {
                     'ssl_cert_reqs': ssl.CERT_REQUIRED
                 }
+                self.broker_transport_options = {
+                    "socket_timeout": 5,
+                    "socket_connect_timeout": 5
+                }
             else:
+                url_args["scheme"] = "redis"
+                url_args["host"] = redis_host
+                url_args["port"] = redis_port or 6379
+                if redis_password:
+                    url_args["password"] = redis_password
+
+                if redis_username:
+                    url_args["user"] = redis_username
+
                 self.celery_broker_url = as_url(
-                    scheme='redis',
-                    host=redis_host,
-                    port=redis_port,
-                    password=redis_password,
-                    user=redis_username,
+                    **url_args
                 ) + "0"
                 self.broker_use_ssl = {}
 
             if self.celery_broker_url is None:
-                raise Exception("CELERY_BROKER_URL environment variable not set.")
+                raise ValueError("Celery broker url is None.")
 
             class ContextTask(Task):
                 def __call__(self, *args, **kwargs):

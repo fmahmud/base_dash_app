@@ -57,6 +57,7 @@ from base_dash_app.application.celery_decleration import CelerySingleton
 celery_singleton: CelerySingleton = CelerySingleton.get_instance()
 celery = celery_singleton.get_celery()
 broker_use_ssl = celery_singleton.broker_use_ssl
+broker_transport_options = celery_singleton.broker_transport_options
 
 
 rta = RuntimeApplication(my_app_descriptor)

@@ -9,9 +9,9 @@ services:
       - DATABASE_URL=postgresql://postgres:password@db:5432/testdb
       - REPO_NAME=web
       - REDIS_HOST=redis
-      - REDIS_USE_SSL=False
+      - REDIS_USE_SSL=True
       - REDIS_PASSWORD=YourPassword
-      - REDIS_PORT=6379
+      - REDIS_PORT=6380
     depends_on:
       - redis
       - db
@@ -21,9 +21,9 @@ services:
       - DATABASE_URL=postgresql://postgres:password@db:5432/testdb
       - REDIS_HOST=redis
       - REPO_NAME=worker
-      - REDIS_USE_SSL=False
+      - REDIS_USE_SSL=True
       - REDIS_PASSWORD=YourPassword
-      - REDIS_PORT=6379
+      - REDIS_PORT=6380
     depends_on:
       - web
       - redis
