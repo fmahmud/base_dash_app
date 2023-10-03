@@ -624,7 +624,11 @@ class JobCard(ComponentWithInternalCallback):
     ):
         in_progress = container is not None and container.is_in_progress()
         progress = container.progress if container is not None and container.is_in_progress() else 0
-        duration = container.get_duration() if container is not None else 0
+        duration = date_utils.readable_time_since(
+            start_time=container.start_time,
+            no_negatives=True,
+            short_form=True
+        ) if container is not None else 0
         return html.Div(
             children=[
                 dbc.Button(
