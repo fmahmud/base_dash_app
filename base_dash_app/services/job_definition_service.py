@@ -81,7 +81,10 @@ class JobDefinitionService(BaseService):
                 parameter_values[single_selectable_param_name] = selectable.get_value()
 
                 latest_exec: JobInstance = job_class.get_latest_exec_for_selectable(selectable, session=session)
-                if latest_exec is not None and latest_exec.end_time is None:
+                if (
+                        latest_exec is not None and latest_exec.end_time is None
+                        and latest_exec.execution_status_id not in StatusesEnum.get_non_terminal_statuses()
+                ):
                     raise JobAlreadyRunningException(job_id=job_def.id)
             else:
                 # issue: (issue: 183): Handle checking for running job instance for non-SSP jobs
