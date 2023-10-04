@@ -20,7 +20,12 @@ def get_num_days_in_month(month_number, year=datetime.datetime.now().year):
     return monthrange(year, month_number)[1]
 
 
-def readable_time_since(start_time: datetime.datetime, end_time: datetime.datetime = None, no_negatives=True):
+def readable_time_since(
+        start_time: datetime.datetime,
+        end_time: datetime.datetime = None,
+        no_negatives=True,
+        short_form=False
+):
     if start_time is None:
         return "Never"
 
@@ -50,7 +55,10 @@ def readable_time_since(start_time: datetime.datetime, end_time: datetime.dateti
         difference = difference / SECONDS_IN_WEEK
         unit = "week"
 
-    return f"{round(difference, 0):.0f} {unit}{'s' if round(difference) != 1 else ''}"
+    if short_form and unit is not None and len(unit) > 0:
+        unit = unit[0]
+
+    return f"{round(difference, 0):.0f} {unit}{'s' if round(difference) != 1 and not short_form else ''}"
 
 
 def enumerate_datetimes_between(
