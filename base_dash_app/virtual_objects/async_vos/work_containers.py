@@ -441,7 +441,7 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto
             [
                 container
                 for container in self.work_containers
-                if container.get_status() == status
+                if container and container.get_status() == status
             ]
         )
 
