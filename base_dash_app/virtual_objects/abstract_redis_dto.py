@@ -9,11 +9,13 @@ class AbstractRedisDto(abc.ABC):
         self,
         *args,
         redis_client: StrictRedis = None,
+        ignore_nones: bool = True,
         **kwargs
     ):
         self.redis_client: StrictRedis = redis_client
         self.uuid: str = uuid.uuid4().hex
         self.read_only: bool = False
+        self.ignore_nones: bool = ignore_nones
 
     @classmethod
     def from_redis(cls, *args, redis_client: StrictRedis, uuid: str, **kwargs):
@@ -47,6 +49,8 @@ class AbstractRedisDto(abc.ABC):
             return
 
         if value is None:
+            if self.ignore_nones:
+                return
             value = ""
 
         self.redis_client.hset(self.uuid, key, value)
