@@ -21,10 +21,13 @@ class CelerySingleton:
             redis_use_ssl = os.getenv("REDIS_USE_SSL", "False").lower() == "true"
             redis_password = os.getenv("REDIS_PASSWORD", None)
             redis_username = os.getenv("REDIS_USERNAME", None)
-            redis_host = os.getenv("REDIS_HOST", "localhost")
+            redis_host = os.getenv("REDIS_HOST", None)
             redis_port = int(os.getenv("REDIS_PORT", "6379"))
 
             url_args = {}
+
+            if redis_host is None:
+                raise ValueError("Redis host is None.")
 
             if redis_use_ssl:
                 print("CELERY: Using SSL for redis.")
