@@ -1,6 +1,7 @@
 import datetime
 import logging
 import os
+import pprint
 import ssl
 import threading
 import traceback
@@ -122,25 +123,35 @@ class RuntimeApplication:
             self.app.logger.warning("Redis host, port or db number not set. Disabling Redis.")
             self.redis_client = None
         else:
+            redis_args = {}
+            if app_descriptor.redis_username is not None:
+                redis_args["username"] = app_descriptor.redis_username
+
+            if app_descriptor.redis_password is not None:
+                redis_args["password"] = app_descriptor.redis_password
 
             if app_descriptor.redis_use_ssl:
+                self.app.logger.debug("Connecting to Redis with SSL.")
+                self.app.logger.debug(pprint.pformat(redis_args))
                 self.redis_client: redis.StrictRedis = redis.StrictRedis(
                     host=app_descriptor.redis_host,
                     port=app_descriptor.redis_port,
                     db=app_descriptor.redis_db_number,
                     decode_responses=True,
                     ssl=True,
-                    password=app_descriptor.redis_password,
-                    socket_timeout=5
+                    socket_timeout=5,
+                    **redis_args
                 )
             else:
+                self.app.logger.debug("Connecting to Redis without SSL.")
+                self.app.logger.debug(pprint.pformat(redis_args))
                 self.redis_client: redis.StrictRedis = redis.StrictRedis(
                     host=app_descriptor.redis_host,
                     port=app_descriptor.redis_port,
                     db=app_descriptor.redis_db_number,
-                    password=app_descriptor.redis_password,
                     decode_responses=True,
-                    socket_timeout=5
+                    socket_timeout=5,
+                    **redis_args
                 )
 
         try:

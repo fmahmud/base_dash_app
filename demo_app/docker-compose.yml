@@ -9,9 +9,9 @@ services:
       - DATABASE_URL=postgresql://postgres:password@db:5432/testdb
       - REPO_NAME=web
       - REDIS_HOST=redis
-      - REDIS_USE_SSL=True
-      - REDIS_PASSWORD=YourPassword
-      - REDIS_PORT=6380
+      #- REDIS_USE_SSL=True
+      #- REDIS_PASSWORD=YourPassword
+      - REDIS_PORT=6379
     depends_on:
       - redis
       - db
@@ -21,9 +21,9 @@ services:
       - DATABASE_URL=postgresql://postgres:password@db:5432/testdb
       - REDIS_HOST=redis
       - REPO_NAME=worker
-      - REDIS_USE_SSL=True
-      - REDIS_PASSWORD=YourPassword
-      - REDIS_PORT=6380
+      #- REDIS_USE_SSL=True
+      #- REDIS_PASSWORD=YourPassword
+      - REDIS_PORT=6379
     depends_on:
       - web
       - redis
@@ -39,14 +39,16 @@ services:
 #      - redis
 #      - db
   redis:
-    image: redis:latest
+    image: redis:alpine
     ports:
       - "6379:6379"  # Non-SSL port
-      - "6380:6380"  # SSL port
-    volumes:
-      - ./redis.conf:/usr/local/etc/redis/redis.conf
-      - ./certs:/usr/local/etc/redis/
-    command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
+      #- "6380:6380"  # SSL port
+    #volumes:
+      #- ./redis.conf:/usr/local/etc/redis/redis.conf
+      #- ./certs:/usr/local/etc/redis/
+    #command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
+    command: redis-server --bind 0.0.0.0
+
   db:
     image: postgres:13
     environment:

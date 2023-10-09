@@ -173,25 +173,25 @@ class CeleryTaskControls(ComponentWithInternalCallback):
 
     def __render_controls(self, extra_text=None):
         other_buttons = []
-        if self.collapsable:
-            other_buttons.append(
-                dbc.Button(
-                    html.I(className="fa-solid fa-chevron-down") if self.collapsed
-                    else html.I(className="fa-solid fa-chevron-up"),
-                    id={
-                        "type": CELERY_CONTROLS_EXPAND_BTN_ID,
-                        "index": self._instance_id,
-                    },
-                    style={
-                        "position": "relative",
-                        "float": "left",
-                        "minWidth": "65px",
-                        "fontSize": "25px",
-                    },
-                    color="dark",
-                    outline=True,
-                )
+        other_buttons.append(
+            dbc.Button(
+                html.I(className="fa-solid fa-chevron-down") if self.collapsed
+                else html.I(className="fa-solid fa-chevron-up"),
+                id={
+                    "type": CELERY_CONTROLS_EXPAND_BTN_ID,
+                    "index": self._instance_id,
+                },
+                style={
+                    "position": "relative",
+                    "float": "left",
+                    "minWidth": "65px",
+                    "fontSize": "25px",
+                    "display": "none" if not self.collapsable else "block"
+                },
+                color="dark",
+                outline=True,
             )
+        )
 
         download_string = self.download_string
         self.download_string = None

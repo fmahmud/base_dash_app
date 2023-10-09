@@ -48,16 +48,16 @@ my_app_descriptor = AppDescriptor(
     redis_port=int(os.getenv("REDIS_PORT", "6379")),
     redis_db_number=int(os.getenv("REDIS_DB_NUMBER", "0")),
     redis_use_ssl=os.getenv("REDIS_USE_SSL", "False").lower() == "true",
-    redis_password=os.getenv("REDIS_PASSWORD", "password"),
-    redis_username=os.getenv("REDIS_USERNAME", "default"),
+    redis_password=os.getenv("REDIS_PASSWORD", None),
+    redis_username=os.getenv("REDIS_USERNAME", None),
 )
 
 from base_dash_app.application.celery_decleration import CelerySingleton
 
 celery_singleton: CelerySingleton = CelerySingleton.get_instance()
 celery = celery_singleton.get_celery()
-broker_use_ssl = celery_singleton.broker_use_ssl
-broker_transport_options = celery_singleton.broker_transport_options
+# broker_use_ssl = celery_singleton.broker_use_ssl
+# broker_transport_options = celery_singleton.broker_transport_options
 
 
 rta = RuntimeApplication(my_app_descriptor)
