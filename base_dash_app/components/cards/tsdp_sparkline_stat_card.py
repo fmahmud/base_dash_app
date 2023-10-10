@@ -67,6 +67,7 @@ class TsdpStatCardDescriptor:
             description=None,
             show_expand_button=False,
             unit_is_suffix=False,
+            lower_is_better=False,
     ):
         self.title = title
         self.unit = unit
@@ -79,6 +80,7 @@ class TsdpStatCardDescriptor:
         self.use_human_formatting = use_human_formatting
         self.description = description
         self.show_expand_button = show_expand_button
+        self.lower_is_better = lower_is_better
 
 
 class TsdpSparklineStatCard(ComponentWithInternalCallback):
@@ -123,6 +125,7 @@ class TsdpSparklineStatCard(ComponentWithInternalCallback):
         description=None,
         show_expand_button=False,
         unit_is_suffix=False,
+        lower_is_better=False,
         *args,
         **kwargs,
     ):
@@ -142,6 +145,7 @@ class TsdpSparklineStatCard(ComponentWithInternalCallback):
         self.description = description
         self.modal_is_open = False
         self.show_expand_button = show_expand_button
+        self.lower_is_better = lower_is_better
 
         self.values: Dict[TimePeriodsEnum, LabelledValueChip] = {
             time_period: None for time_period in self.time_periods_to_show
@@ -169,6 +173,7 @@ class TsdpSparklineStatCard(ComponentWithInternalCallback):
                     LabelledValueChip(
                         value=" -",
                         label=time_period.get_label(),
+                        lower_is_better=self.lower_is_better
                     )
                 )
 

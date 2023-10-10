@@ -63,11 +63,12 @@ class TimeSeries(AbstractTimeSeries):
     def get_description(self):
         return self.description
 
-    def __init__(self, title, unique_id, unit=None, description=None):
+    def __init__(self, title, unique_id, unit=None, description=None, lower_is_better=False):
         super().__init__()
         self.title: str = title
         self.unique_id: str = unique_id
         self.unit: Optional[str] = unit
         self.description: Optional[str] = description
+        self.lower_is_better: bool = lower_is_better
 
 

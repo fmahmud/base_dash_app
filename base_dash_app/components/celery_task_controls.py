@@ -36,6 +36,7 @@ class CeleryTaskControls(ComponentWithInternalCallback):
             extra_buttons=None,
             get_kwargs_func: Callable[[CeleryOrderedTaskGroup], Dict[str, Any]] = None,
             right_align=False,
+            show_name=True,
             *args,
             **kwargs
     ):
@@ -74,6 +75,8 @@ class CeleryTaskControls(ComponentWithInternalCallback):
 
         if self.show_download_button:
             self.download_formatter_func = download_formatter_func
+
+        self.show_name = show_name
 
     @classmethod
     def handle_any_input(cls, *args, triggering_id, instance):
@@ -171,7 +174,6 @@ class CeleryTaskControls(ComponentWithInternalCallback):
             style={
                 "position": "relative",
                 "float": "right" if self.right_align else "left",
-                "width": "100%",
                 "minWidth": "560px",
                 "minHeight": "85px",
                 **override_style,
@@ -228,7 +230,7 @@ class CeleryTaskControls(ComponentWithInternalCallback):
                                 "float": "right" if self.right_align else "left",
                                 "minWidth": "100px",
                             },
-                        ),
+                        ) if self.show_name else None,
                         html.Div(
                             f"{extra_text}",
                             style={
