@@ -35,6 +35,7 @@ class CeleryTaskControls(ComponentWithInternalCallback):
             download_file_format="json",
             extra_buttons=None,
             get_kwargs_func: Callable[[CeleryOrderedTaskGroup], Dict[str, Any]] = None,
+            right_align=False,
             *args,
             **kwargs
     ):
@@ -68,6 +69,8 @@ class CeleryTaskControls(ComponentWithInternalCallback):
         self.download_string = None
         self.in_progress = False
         self.extra_buttons = extra_buttons or []
+
+        self.right_align = right_align
 
         if self.show_download_button:
             self.download_formatter_func = download_formatter_func
@@ -115,7 +118,11 @@ class CeleryTaskControls(ComponentWithInternalCallback):
         if instance.cotg.get_status() not in StatusesEnum.get_non_terminal_statuses() and instance.in_progress:
             instance.in_progress = False
 
-        return [instance.__render_controls()]
+        return [
+            instance.__render_controls(
+                right_align=instance.right_align
+            )
+        ]
 
     @staticmethod
     def get_input_to_states_map():
@@ -158,11 +165,12 @@ class CeleryTaskControls(ComponentWithInternalCallback):
             children=[
                 self.__render_controls(
                     extra_text=extra_text or self.extra_text,
+                    right_align=self.right_align
                 )
             ],
             style={
                 "position": "relative",
-                "float": "left",
+                "float": "right" if self.right_align else "left",
                 "width": "100%",
                 "minWidth": "560px",
                 "minHeight": "85px",
@@ -171,7 +179,7 @@ class CeleryTaskControls(ComponentWithInternalCallback):
             id={"type": CeleryTaskControls.get_wrapper_div_id(), "index": self._instance_id}
         )
 
-    def __render_controls(self, extra_text=None):
+    def __render_controls(self, extra_text=None, right_align=False):
         other_buttons = []
         other_buttons.append(
             dbc.Button(
@@ -183,7 +191,7 @@ class CeleryTaskControls(ComponentWithInternalCallback):
                 },
                 style={
                     "position": "relative",
-                    "float": "left",
+                    "float": "right" if self.right_align else "left",
                     "minWidth": "65px",
                     "fontSize": "25px",
                     "display": "none" if not self.collapsable else "block"
@@ -217,7 +225,7 @@ class CeleryTaskControls(ComponentWithInternalCallback):
                                 "fontSize": "24px",
                                 "fontWeight": "bold",
                                 "position": "relative",
-                                "float": "left",
+                                "float": "right" if self.right_align else "left",
                                 "minWidth": "100px",
                             },
                         ),
@@ -227,8 +235,8 @@ class CeleryTaskControls(ComponentWithInternalCallback):
                                 "paddingBottom": "10px",
                                 "fontSize": "16px",
                                 "position": "relative",
-                                "float": "left",
-                                "clear": "left",
+                                "float": "right" if self.right_align else "left",
+                                "clear": "right" if self.right_align else "left",
                             }
                         ) if extra_text else None,
                         construct_down_ref_btgrp(
@@ -258,20 +266,20 @@ class CeleryTaskControls(ComponentWithInternalCallback):
                             reload_progress=self.celery_task.get_progress(),
                             wrapper_style={
                                 "position": "relative",
-                                "float": "left",
+                                "float": "right" if self.right_align else "left",
                                 "margin": "0",
-                                "clear": "left",
+                                "clear": "right" if self.right_align else "left",
                             },
                             last_load_time=self.celery_task.get_start_time(with_refresh=True),
                             other_buttons=other_buttons + self.extra_buttons,
-                            right_align=False,
+                            right_align=right_align,
                         ),
                     ],
                     style={
                         "width": "100%",
                         "display": "inline",
                         "position": "relative",
-                        "float": "left",
+                        "float": "right" if self.right_align else "left",
                         "marginBottom": "20px"
                     },
                 ),

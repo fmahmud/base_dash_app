@@ -109,7 +109,7 @@ class AsyncDemoView(BaseView):
                                 #     work_func=celery_tasks.throw_exception_func
                                 # ),
                             ],
-                            reducer_task=combine_series
+                            reducer_task=combine_series  # not sure why this is highlighted
                         )
                     ]
                 )
@@ -126,6 +126,7 @@ class AsyncDemoView(BaseView):
                             tsdp_array=tsdp_utils.deserialize_tsdp_array(x)
                         ),
                         download_file_format="csv",
+                        right_align=True
                     )
                     self.task_controls.append(ctc.render(override_style={"width": "560px"}))
 
