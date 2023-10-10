@@ -632,7 +632,7 @@ class JobCard(ComponentWithInternalCallback):
         return html.Div(
             children=[
                 dbc.Button(
-                    f"{duration:.0f}s" if in_progress else "Run",
+                    f"{duration}" if in_progress else "Run",
                     style={
                         "position": "relative", "float": "left", "width": "100px"
                     },
