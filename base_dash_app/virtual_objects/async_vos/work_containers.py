@@ -3,6 +3,7 @@ import json
 from typing import Optional, Any, List, Dict
 
 import dash_bootstrap_components as dbc
+from celery.result import AsyncResult
 from dash import html
 from redis import StrictRedis
 
@@ -34,6 +35,7 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
         self.name = name
         self.color = color
         self.is_hidden = is_hidden
+        self.celery_task_id: Optional[str] = None
 
     def reset(self, destroy_in_redis=False):
         self.execution_status = StatusesEnum.NOT_STARTED
@@ -43,6 +45,7 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
         self.stacktrace = None
         self.progress = 0.0
         self.status_message = None
+        self.celery_task_id = None
         if destroy_in_redis:
             self.destroy_in_redis()
 
@@ -65,6 +68,7 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
             "is_hidden": str(self.is_hidden),
             "type": "WorkContainer",
             "uuid": self.uuid,
+            "task_id": self.celery_task_id or ""
         }
 
     def from_dict(self, d: Dict[str, str]):
@@ -92,6 +96,7 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
         self.status_message = d.get("status_message", "")
         self.is_hidden = d.get("is_hidden", "False") == "True"
         self.color = d.get("color", "red")
+        self.celery_task_id = d.get("task_id", None)
 
         # set it back to what it was before
         self.set_read_only(previous_readonly_value)

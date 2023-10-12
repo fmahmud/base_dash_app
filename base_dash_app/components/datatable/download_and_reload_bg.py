@@ -20,6 +20,9 @@ def construct_down_ref_btgrp(
     reload_progress=0,
     hide_download_button=False,
     right_align=True,
+    hide_stop_button=True,
+    disable_stop_button=True,
+    stop_button_id=None,
 ):
     if other_buttons is None:
         other_buttons = []
@@ -59,6 +62,15 @@ def construct_down_ref_btgrp(
                         color="secondary",
                         disabled=disable_reload_btn or reload_in_progress
                     ),
+                    dbc.Button(
+                        [html.I(className="fa-solid fa-stop")],
+                        id=stop_button_id,
+                        style={
+                            "fontSize": "25px", "width": "65px",
+                        },
+                        color="danger",
+                        disabled=disable_stop_button or not reload_in_progress
+                    ) if not hide_stop_button else None,
                     *other_buttons
                 ],
                 style={"position": "relative", "float": float_direction, "clear": float_direction, "height": "50px"},

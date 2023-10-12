@@ -11,6 +11,8 @@ from base_dash_app.components.datatable.download_and_reload_bg import construct_
 from base_dash_app.enums.status_colors import StatusesEnum
 from base_dash_app.virtual_objects.async_vos.celery_task import CeleryTask, CeleryOrderedTaskGroup
 
+CELERY_CONTROLS_STOP_BTN_ID = "CELERY_CONTROLS_STOP_BTN_ID"
+
 CELERY_CONTROLS_EXPAND_BTN_ID = "CELERY_CONTROLS_EXPAND_BTN_ID"
 
 RELOAD_CELERY_TASK_BTN_ID = "RELOAD_CELERY_TASK_BTN_ID"
@@ -37,6 +39,7 @@ class CeleryTaskControls(ComponentWithInternalCallback):
             get_kwargs_func: Callable[[CeleryOrderedTaskGroup], Dict[str, Any]] = None,
             right_align=False,
             show_name=True,
+            show_stop_button=False,
             *args,
             **kwargs
     ):
@@ -77,6 +80,7 @@ class CeleryTaskControls(ComponentWithInternalCallback):
             self.download_formatter_func = download_formatter_func
 
         self.show_name = show_name
+        self.show_stop_button = show_stop_button
 
     @classmethod
     def handle_any_input(cls, *args, triggering_id, instance):
@@ -90,9 +94,10 @@ class CeleryTaskControls(ComponentWithInternalCallback):
             cotg.refresh_all()
             if cotg.get_status() == StatusesEnum.SUCCESS:
                 instance.download_content = cotg.get_result()
+
         if triggering_id.startswith(RELOAD_CELERY_TASK_BTN_ID):
             instance.in_progress = True
-            instance.task = celery_service.submit_celery_task(
+            celery_service.submit_celery_task(
                 celery_task=cotg,
                 prev_result_uuids=[],
                 **instance.get_kwargs_func(cotg)
@@ -117,7 +122,10 @@ class CeleryTaskControls(ComponentWithInternalCallback):
                          f"_{cotg.get_name()}"
                          f".{instance.download_file_format}",
             )
-
+        elif triggering_id.startswith(CELERY_CONTROLS_STOP_BTN_ID):
+            for task in cotg.tasks:
+                celery_service.revoke(task)
+            # instance.in_progress = False
         if instance.cotg.get_status() not in StatusesEnum.get_non_terminal_statuses() and instance.in_progress:
             instance.in_progress = False
 
@@ -157,7 +165,15 @@ class CeleryTaskControls(ComponentWithInternalCallback):
                     input_property="n_clicks",
                 ),
                 states=[]
+            ),
+            InputToState(
+                input_mapping=InputMapping(
+                    input_id=CELERY_CONTROLS_STOP_BTN_ID,
+                    input_property="n_clicks",
+                ),
+                states=[]
             )
+
         ]
 
     def render(self, override_style=None, extra_text=None):
@@ -174,7 +190,7 @@ class CeleryTaskControls(ComponentWithInternalCallback):
             style={
                 "position": "relative",
                 "float": "right" if self.right_align else "left",
-                "minWidth": "560px",
+                "minWidth": "600px" if self.show_stop_button else "560px",
                 "minHeight": "85px",
                 **override_style,
             },
@@ -205,6 +221,11 @@ class CeleryTaskControls(ComponentWithInternalCallback):
 
         download_string = self.download_string
         self.download_string = None
+
+        in_progress = (
+            self.in_progress
+            or self.celery_task.get_status() in StatusesEnum.get_non_terminal_statuses()
+        )
 
         return html.Div(
             children=[
@@ -257,14 +278,8 @@ class CeleryTaskControls(ComponentWithInternalCallback):
                                 "type": RELOAD_CELERY_TASK_BTN_ID,
                                 "index": self._instance_id,
                             },
-                            disable_reload_btn=(
-                                self.in_progress
-                                or self.celery_task.get_status() in StatusesEnum.get_non_terminal_statuses()
-                            ),
-                            reload_in_progress=(
-                                self.in_progress
-                                or self.celery_task.get_status() in StatusesEnum.get_non_terminal_statuses()
-                            ),
+                            disable_reload_btn=in_progress,
+                            reload_in_progress=in_progress,
                             reload_progress=self.celery_task.get_progress(),
                             wrapper_style={
                                 "position": "relative",
@@ -275,6 +290,12 @@ class CeleryTaskControls(ComponentWithInternalCallback):
                             last_load_time=self.celery_task.get_start_time(with_refresh=True),
                             other_buttons=other_buttons + self.extra_buttons,
                             right_align=right_align,
+                            hide_stop_button=not self.show_stop_button,
+                            stop_button_id={
+                                "type": CELERY_CONTROLS_STOP_BTN_ID,
+                                "index": self._instance_id,
+                            },
+                            disable_stop_button=not in_progress,
                         ),
                     ],
                     style={

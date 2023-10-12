@@ -34,7 +34,6 @@ class CeleryTask(WorkContainer):
         )  # redis_client sent to AbstractRedisDto
         self.work_func: Optional[Task] = None
         self.func_kwargs: Dict[str, Any] = func_kwargs or {}
-
         self.set_work_func(work_func)
 
     def set_work_func(self, work_func):
