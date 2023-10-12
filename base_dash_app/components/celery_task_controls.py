@@ -40,6 +40,7 @@ class CeleryTaskControls(ComponentWithInternalCallback):
             right_align=False,
             show_name=True,
             show_stop_button=False,
+            stop_button_callback: Optional[Callable[['CeleryTaskControls'], Any]] = None,
             *args,
             **kwargs
     ):
@@ -81,6 +82,7 @@ class CeleryTaskControls(ComponentWithInternalCallback):
 
         self.show_name = show_name
         self.show_stop_button = show_stop_button
+        self.stop_button_callback = stop_button_callback
 
     @classmethod
     def handle_any_input(cls, *args, triggering_id, instance):
@@ -125,6 +127,8 @@ class CeleryTaskControls(ComponentWithInternalCallback):
         elif triggering_id.startswith(CELERY_CONTROLS_STOP_BTN_ID):
             for task in cotg.tasks:
                 celery_service.revoke(task)
+            if instance.stop_button_callback:
+                instance.stop_button_callback(instance)
             # instance.in_progress = False
         if instance.cotg.get_status() not in StatusesEnum.get_non_terminal_statuses() and instance.in_progress:
             instance.in_progress = False
@@ -307,5 +311,7 @@ class CeleryTaskControls(ComponentWithInternalCallback):
                     },
                 ),
                 self.celery_task.render() if not self.collapsed else None,
+                html.Div(id={"type": CELERY_CONTROLS_STOP_BTN_ID, "index": self._instance_id}, style={"display": "none"})
+                if not self.show_stop_button else None,  # to prevent "a nonexistent object error"
             ]
         )
