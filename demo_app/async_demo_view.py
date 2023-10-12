@@ -126,7 +126,8 @@ class AsyncDemoView(BaseView):
                             tsdp_array=tsdp_utils.deserialize_tsdp_array(x)
                         ),
                         download_file_format="csv",
-                        right_align=True
+                        right_align=True,
+                        show_stop_button=True
                     )
                     self.task_controls.append(ctc.render(override_style={"width": "560px"}))
 

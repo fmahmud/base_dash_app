@@ -1,3 +1,4 @@
+import base64
 import datetime
 import logging
 import os
@@ -11,6 +12,7 @@ from urllib.parse import unquote
 
 import dash
 import dash_auth
+import flask
 import psutil
 import redis
 import sqlalchemy.exc
@@ -105,7 +107,10 @@ class RuntimeApplication:
         )
 
         #issue: (issue: 188): Add validation for health endpoint path provided
-        @self.app.server.route(self.app_descriptor.health_endpoint_path, methods=['GET'])
+        @self.app.server.route(
+            self.app_descriptor.health_endpoint_path, methods=['GET'],
+
+        )
         def health():
             return "OK", 200
 
