@@ -1,6 +1,6 @@
 import datetime
 
-from sqlalchemy import Column, Integer, Sequence, Float, orm, String, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, Sequence, Float, orm, String, ForeignKey, DateTime, Index
 from sqlalchemy.orm import relationship
 
 from base_dash_app.enums.status_colors import StatusesEnum
@@ -23,19 +23,22 @@ class JobInstance(CachedResultableEvent, Progressable, BaseModel):
 
     __tablename__ = "job_instances"
 
+
+
     id = Column(Integer, Sequence("job_instances_id_seq"), primary_key=True)
-    job_definition_id = Column(Integer, ForeignKey("job_definitions.id"))
+    job_definition_id = Column(Integer, ForeignKey("job_definitions.id"), index=True)
 
     job_definition = relationship("JobDefinition", back_populates="job_instances")
 
     resultable_value = Column(Float)
-    start_time = Column(DateTime)
-    end_time = Column(DateTime)
+    start_time = Column(DateTime, index=True)
+    end_time = Column(DateTime, index=True)
 
-    parameters = Column(String)  # json representation of provided params
+    parameters = Column(String, index=True)  # json representation of provided params
 
     progress = Column(Float, default=0.0)
-    execution_status_id = Column(Integer, default=5)
+    execution_status_id = Column(Integer, default=5, index=True)
+
     prerequisites_status_id = Column(Integer, default=5)
     completion_criteria_status_id = Column(Integer, default=5)
     end_reason = Column(String)

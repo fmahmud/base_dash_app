@@ -5,6 +5,7 @@ from typing import Optional, Callable, Dict, Any
 from dash import html, dcc
 import dash_bootstrap_components as dbc
 
+from base_dash_app.components.alerts import Alert
 from base_dash_app.components.base_component import ComponentWithInternalCallback
 from base_dash_app.components.callback_utils.mappers import InputToState, InputMapping, StateMapping
 from base_dash_app.components.datatable.download_and_reload_bg import construct_down_ref_btgrp
@@ -99,11 +100,29 @@ class CeleryTaskControls(ComponentWithInternalCallback):
 
         if triggering_id.startswith(RELOAD_CELERY_TASK_BTN_ID):
             instance.in_progress = True
-            celery_service.submit_celery_task(
-                celery_task=cotg,
-                prev_result_uuids=[],
-                **instance.get_kwargs_func(cotg)
-            )
+            try:
+                celery_service.submit_celery_task(
+                    celery_task=cotg,
+                    prev_result_uuids=[],
+                    **instance.get_kwargs_func(cotg)
+                )
+            except ValueError as ve:
+                instance.in_progress = False
+                instance.push_alert(
+                    Alert(
+                        body=f"Error submitting celery task: {ve}",
+                        color="danger"
+                    )
+                )
+            except Exception as e:
+                instance.in_progress = False
+                instance.push_alert(
+                    Alert(
+                        body=f"Error submitting celery task: {e}",
+                        color="danger"
+                    )
+                )
+
         elif triggering_id.startswith(CELERY_CONTROLS_EXPAND_BTN_ID):
             instance.collapsed = not instance.collapsed
         elif triggering_id.startswith(CELERY_TASK_DOWNLOAD_BTN_ID):
@@ -299,7 +318,9 @@ class CeleryTaskControls(ComponentWithInternalCallback):
                                 "type": CELERY_CONTROLS_STOP_BTN_ID,
                                 "index": self._instance_id,
                             },
-                            disable_stop_button=not in_progress,
+                            disable_stop_button=not in_progress or (
+                                    self.celery_task is None or self.celery_task.celery_task_id is None
+                            ),
                         ),
                     ],
                     style={

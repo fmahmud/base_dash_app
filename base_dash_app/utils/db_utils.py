@@ -105,6 +105,7 @@ class DbManager:
         if drop_first:
             self.db.drop_all()
 
+        print(f"Job instances indexes: {db.metadata.tables['job_instances'].indexes}")
         self.db.create_all()
 
     def get_session(self):

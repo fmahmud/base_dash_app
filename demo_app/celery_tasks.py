@@ -22,6 +22,15 @@ def gen_graph_data(*args, prog_container_uuid: str, prev_result_uuids: List[str]
     prog_container: CeleryTask = prog_container
     prog_container.start()
 
+    interrupted = prog_container.check_for_interrupt()
+    if interrupted:
+        prog_container.complete(
+            status=StatusesEnum.FAILURE,
+            status_message="Interrupted",
+            result="",
+        )
+        return
+
     logger = logging.getLogger(f"{prog_container.name} - {prog_container.uuid}")
     logger.info("Starting gen work func")
     # time.sleep(random.randint(1, 2))
@@ -66,6 +75,16 @@ def throw_exception_func(task: Task, *args, prog_container_uuid: str, **kwargs):
     redis_client: StrictRedis = RuntimeApplication.get_instance().redis_client
     prog_container = CeleryTask().use_redis(redis_client, prog_container_uuid).hydrate_from_redis()
     prog_container.set_status(StatusesEnum.IN_PROGRESS)
+
+    interrupted = prog_container.check_for_interrupt()
+    if interrupted:
+        prog_container.complete(
+            status=StatusesEnum.FAILURE,
+            status_message="Interrupted",
+            result="",
+        )
+        return
+
     time.sleep(1)
     try:
         raise Exception("Sample Exception")
@@ -89,6 +108,15 @@ def long_sleep_task(*args, prog_container_uuid: str, **kwargs):
     from base_dash_app.application.runtime_application import RuntimeApplication
     redis_client: StrictRedis = RuntimeApplication.get_instance().redis_client
     prog_container = CeleryTask().use_redis(redis_client, prog_container_uuid).hydrate_from_redis()
+    interrupted = prog_container.check_for_interrupt()
+    if interrupted:
+        prog_container.complete(
+            status=StatusesEnum.FAILURE,
+            status_message="Interrupted",
+            result="",
+        )
+        return
+
     for i in range(20):
         prog_container.set_progress(i * 5)
         time.sleep(1)

@@ -97,7 +97,7 @@ def handle_chord_error(*args, target_uuid: str, request, exc, traceback, **kwarg
                 print(f"WorkContainerGroup {target_uuid} contains failed task: {failed_uuid}")
                 failed_task = work_container_group.get_container_by_uuid(failed_uuid)
                 failed_task.set_stacktrace(traceback)
-                failed_task.set_status(StatusesEnum.FAILED.value.name)
+                failed_task.set_status(StatusesEnum.FAILED)
                 failed_task.set_status_message("Task failed: " + str(exc))
                 failed_task.set_read_only(False)
                 failed_task.push_to_redis()
