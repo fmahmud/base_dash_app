@@ -416,8 +416,6 @@ class RuntimeApplication:
         self.app.logger.debug("Checking for scheduled jobs")
         self.last_job_check = datetime.datetime.now()
         # print current process and thread ids
-        self.app.logger.debug(f"Current process id: {os.getpid()}")
-        self.app.logger.debug(f"Current thread id: {threading.current_thread().ident}")
 
         with self.dbm as dbm:
             session: Session = dbm.get_session()

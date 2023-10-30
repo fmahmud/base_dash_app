@@ -36,6 +36,21 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
         self.color = color
         self.is_hidden = is_hidden
         self.celery_task_id: Optional[str] = None
+        self.interrupted_by_user: bool = False
+
+    def interrupt(self, push_to_redis: bool = True):
+        self.interrupted_by_user = True
+        if push_to_redis:
+            self.set_value_in_redis("interrupted_by_user", str(self.interrupted_by_user))
+
+    def check_for_interrupt(self):
+        interrupted = self.get_value_from_redis("interrupted_by_user")
+        if interrupted and interrupted == "True":
+            self.interrupted_by_user = True
+        else:
+            self.interrupted_by_user = False
+
+        return self.interrupted_by_user
 
     def reset(self, destroy_in_redis=False):
         self.execution_status = StatusesEnum.NOT_STARTED
@@ -46,6 +61,7 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
         self.progress = 0.0
         self.status_message = None
         self.celery_task_id = None
+        self.interrupted_by_user = False
         if destroy_in_redis:
             self.destroy_in_redis()
 
@@ -68,7 +84,8 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
             "is_hidden": str(self.is_hidden),
             "type": "WorkContainer",
             "uuid": self.uuid,
-            "task_id": self.celery_task_id or ""
+            "task_id": self.celery_task_id or "",
+            "interrupted_by_user": str(self.interrupted_by_user),
         }
 
     def from_dict(self, d: Dict[str, str]):
@@ -100,6 +117,8 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
 
         # set it back to what it was before
         self.set_read_only(previous_readonly_value)
+
+        self.interrupted_by_user = d.get("interrupted_by_user", "False") == "True"
 
     def get_name(self):
         return self.name
@@ -273,6 +292,23 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
 
 
 class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto):
+    def interrupt(self, push_to_redis: bool = True):
+        self.interrupted_by_user = True
+        for container in self.work_containers:
+            container.interrupt(push_to_redis)
+
+        if push_to_redis:
+            self.set_value_in_redis("interrupted_by_user", str(self.interrupted_by_user))
+
+    def check_for_interrupt(self):
+        interrupted = self.get_value_from_redis("interrupted_by_user")
+        if interrupted and interrupted == "True":
+            self.interrupted_by_user = True
+        else:
+            self.interrupted_by_user = False
+
+        return self.interrupted_by_user
+
     def from_dict(self, data: dict):
         self.work_containers = []
         for container_uuid in json.loads(data["work_containers"]):
@@ -288,6 +324,7 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto
         self.name = data.get("name", "")
         self.color = data.get("color", "")
         self.is_hidden = data.get("is_hidden", "False") == "True"
+        self.interrupted_by_user = data.get("interrupted_by_user", "False") == "True"
 
     def to_dict(self) -> dict:
         return {
@@ -297,6 +334,7 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto
             "type": "WorkContainerGroup",
             "error": "True" if self.get_status() == StatusesEnum.FAILURE else "False",
             "is_hidden": str(self.is_hidden),
+            "interrupted_by_user": str(self.interrupted_by_user),
         }
 
     def get_container_by_uuid(self, uuid: str) -> Optional[WorkContainer]:
@@ -333,6 +371,7 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto
         super().__init__(**kwargs)
         BaseComponent.__init__(self, **kwargs)
         AbstractRedisDto.__init__(self, **kwargs)
+        self.interrupted_by_user = False
         self.work_containers: List[WorkContainer] = containers or []
         self.name = name
         self.color = color

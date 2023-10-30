@@ -1,7 +1,7 @@
 import os
 import ssl
 
-from celery import Celery, Task
+from celery import Celery, Task, shared_task
 from celery.schedules import crontab
 from flask import Flask
 from kombu.utils.url import as_url
@@ -109,7 +109,7 @@ def setup_periodic_tasks(sender, **kwargs):
     )
 
 
-@celery.task
+@shared_task
 def handle_scheduler_interval():
     from base_dash_app.application.runtime_application import RuntimeApplication
     RuntimeApplication.get_instance().check_for_scheduled_jobs()

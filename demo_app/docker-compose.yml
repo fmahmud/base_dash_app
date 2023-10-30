@@ -28,16 +28,18 @@ services:
       - web
       - redis
       - db
-#  beat:
-#    build: .
-#    environment:
-#      - DATABASE_URL=postgresql://postgres:password@db:5432/testdb
+  beat:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/testdb
 #      - REDIS_URL=redis://redis:6379/0
-#      - REPO_NAME=beat
-#    depends_on:
-#      - web
-#      - redis
-#      - db
+      - REPO_NAME=beat
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - web
+      - redis
+      - db
   redis:
     image: redis:alpine
     ports:

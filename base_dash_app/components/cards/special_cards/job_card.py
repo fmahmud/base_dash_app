@@ -54,6 +54,7 @@ class JobCard(ComponentWithInternalCallback):
             footer=None,
             selectables_as_tabs=False,
             hide_log_div=False,
+            interval_size: int = 3000,
             *args, **kwargs
     ):
         super().__init__(*args, **kwargs)
@@ -65,6 +66,7 @@ class JobCard(ComponentWithInternalCallback):
         self.current_tab = 'tab-0'
         self.selectables_as_tabs = selectables_as_tabs
         self.hide_log_div = hide_log_div
+        self.interval_size: int = interval_size
 
         # used for each of the param combo tabs
         # used only for the custom params tab
@@ -74,7 +76,6 @@ class JobCard(ComponentWithInternalCallback):
         self.selectable_param = None
         self.selectable_to_prog_containers: Dict[Selectable, Optional[VirtualJobProgressContainer]] = {}
         self.selectable_id_to_selectable: Dict[int, Selectable] = {}
-        self.last_updated_at = (datetime.datetime.now() + datetime.timedelta(seconds=10)).timestamp()
 
     def refresh_selectables_info(self):
         """
@@ -85,6 +86,9 @@ class JobCard(ComponentWithInternalCallback):
         in_progress_instances = self.job_definition.get_in_progress_instances_by_selectable(
             session=session,
         )
+
+        self.logger.debug(f"[{self.job_definition_id}] num in progress instances in db: {len(in_progress_instances)}")
+
         job_class: Type[JobDefinitionImpl] = type(self.job_definition)
         self.selectable_param = self.selectable_param or type(self.job_definition).single_selectable_param_name()
 
@@ -100,33 +104,15 @@ class JobCard(ComponentWithInternalCallback):
                 ji_id=ji.id
             )
 
+            if self.selectable_to_prog_containers[selectable] is not None:
+                self.logger.debug(
+                    f"[{self.job_definition_id}] Found container in redis for selectable {selectable.get_value()}"
+                )
+
         self.selectable_id_to_selectable = {
             selectable.get_value(): selectable
             for selectable in self.selectable_to_prog_containers.keys()
         }
-
-    @staticmethod
-    def refresh_job_definition(instance: 'JobCard'):
-        start_time = time.time()
-        some_change = False
-
-        if instance.last_updated_at is not None:
-            for selectable, prog_container in instance.selectable_to_prog_containers.items():
-                if prog_container is None or prog_container.last_status_updated_at is None:
-                    continue
-
-                if instance.last_updated_at <= prog_container.last_status_updated_at.timestamp():
-                    some_change = True
-                    break
-        else:
-            some_change = True
-
-        if not some_change:
-            instance.logger.debug(f"early exit Execution time: {time.time() - start_time} seconds")
-            return
-
-        instance.last_updated_at = time.time()
-        instance.logger.debug(f"full refresh Execution time: {instance.last_updated_at - start_time} seconds")
 
     @classmethod
     def handle_any_input(cls, *args, triggering_id, instance):
@@ -183,7 +169,7 @@ class JobCard(ComponentWithInternalCallback):
                 session.query(JobInstance)
                 .filter(JobInstance.job_definition_id == instance.job_definition_id)
                 .order_by(JobInstance.start_time.desc())
-                .limit(30)
+                .limit(45)
                 .all()
             )
 
@@ -509,7 +495,7 @@ class JobCard(ComponentWithInternalCallback):
                         ]
                     ),
                     dcc.Interval(
-                        interval=1000,
+                        interval=self.interval_size or 3000,
                         disabled=not (custom_in_progress or selectable_in_progress),
                         id={"type": JOB_CARD_INTERVAL_ID, "index": self._instance_id}
                     ),
