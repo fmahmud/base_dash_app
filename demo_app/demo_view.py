@@ -270,9 +270,6 @@ class TestJobDef(JobDefinition):
 
         time.sleep(1)
 
-
-
-
         ran = random.random()
         if ran < 0.5:
             prog_container.end_reason = "Failed Successfully!"

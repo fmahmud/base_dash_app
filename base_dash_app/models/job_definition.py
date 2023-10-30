@@ -1,8 +1,11 @@
 import abc
+import datetime
 import json
 import logging
+import time
 from abc import ABC
 from operator import or_
+from timeit import timeit
 from typing import Optional, List, Dict, Any, Tuple, FrozenSet, TypeVar, Type
 
 from sqlalchemy import Column, Integer, Sequence, String, orm, Boolean, select, func
@@ -118,6 +121,8 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
         return selectable
 
     def get_in_progress_instances_by_selectable(self, session: Session) -> List[JobInstance]:
+        # note time
+        current_time = time.time_ns()
         # check for new in progress instances
         param_substring_comma = "%, " + f"\"{type(self).single_selectable_param_name()}\": %"
         param_substring_brace = "{" + f"\"{type(self).single_selectable_param_name()}\": %"
@@ -126,6 +131,7 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
             session.query(JobInstance)
             .filter_by(end_time=None)
             .filter_by(job_definition_id=self.id)
+            .filter(JobInstance.execution_status_id != StatusesEnum.FAILURE.value.id)
             .filter(
                 or_(
                     JobInstance.parameters.like(param_substring_comma),
@@ -135,6 +141,8 @@ class JobDefinition(CachedResultableEventSeries, Startable, Stoppable, BaseModel
             .all()
         )
 
+        finish_time = time.time_ns()
+        self.logger.info(f"get_in_progress_instances_by_selectable took {(finish_time - current_time) / 10**6} ms")
         return in_progress_instances
 
     @hybrid_property

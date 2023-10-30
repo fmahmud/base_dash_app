@@ -169,7 +169,7 @@ class JobCard(ComponentWithInternalCallback):
                 session.query(JobInstance)
                 .filter(JobInstance.job_definition_id == instance.job_definition_id)
                 .order_by(JobInstance.start_time.desc())
-                .limit(30)
+                .limit(45)
                 .all()
             )
 
