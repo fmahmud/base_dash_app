@@ -87,7 +87,9 @@ class SimpleTimeSeriesDashboard(ComponentWithInternalCallback):
                     instance.set_data_for_timeseries(series, series.get_tsdps())
 
                 instance.tsdp_dtw.datatable.set_data(instance.tsdp_dtw.generate_data_array())
-                async_container.complete()
+                async_container.complete(
+                    result={int: 1}
+                )
                 instance.last_load_time = async_container.end_time
                 time.sleep(0.5)
 

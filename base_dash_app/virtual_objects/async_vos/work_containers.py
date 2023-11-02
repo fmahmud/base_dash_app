@@ -37,6 +37,12 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
         self.is_hidden = is_hidden
         self.celery_task_id: Optional[str] = None
         self.interrupted_by_user: bool = False
+        self.serialize_result: bool = False
+
+    def use_redis(self, redis_client: StrictRedis, uuid: str):
+        super().use_redis(redis_client, uuid)
+        self.serialize_result = True
+        return self
 
     def interrupt(self, push_to_redis: bool = True):
         self.interrupted_by_user = True
@@ -66,11 +72,16 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
             self.destroy_in_redis()
 
     def to_dict(self):
+        if self.result:
+            result = json.dumps(self.result) if self.serialize_result else self.result
+        else:
+            result = "" if self.serialize_result else None
+
         return {
             "execution_status": (
                 self.execution_status.value.name if self.execution_status else StatusesEnum.NOT_STARTED.value.name
             ),
-            "result": json.dumps(self.result) if self.result else "",
+            "result": result,
             "start_time":  datetime.datetime.strftime(
                 self.start_time, date_utils.STANDARD_DATETIME_FORMAT
             ) if self.start_time else "",
@@ -102,8 +113,14 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
         )
 
         self.result = d.get("result", "")
-        # print result
-        self.result = json.loads(self.result) if self.result != "" else None
+
+        if self.result == "":
+            self.result = None
+        else:
+            if self.serialize_result:
+                self.result = json.loads(self.result) if self.result != "" else None
+            else:
+                pass
 
         self.set_start_time_from_string(d.get("start_time", ""))
         self.set_end_time_from_string(d.get("end_time", ""))
@@ -172,10 +189,12 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
                 self.end_time, date_utils.STANDARD_DATETIME_FORMAT
             ))
 
-    def set_result(self, result: Any):
+    def set_result(self, result: Any, push_to_redis: bool = True):
         self.result = result
-        dumped_string = json.dumps(result)
-        self.set_value_in_redis("result", dumped_string)
+        if self.serialize_result:
+            dumped_string = json.dumps(result)
+            if push_to_redis:
+                self.set_value_in_redis("result", dumped_string)
 
     def set_stacktrace(self, stacktrace: str):
         self.stacktrace = stacktrace
