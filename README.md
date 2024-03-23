@@ -5,7 +5,23 @@
 ![GitHub commit activity (branch)](https://img.shields.io/github/commit-activity/t/fmahmud/base_dash_app?style=for-the-badge&color=darkred)
 
 
+## Setting Up Development Environment
+### Dependencies
+This package requires the following dependencies to be installed:
+- Python 3.11
+- Docker [Download Here](https://www.docker.com/)
+- Precommit
+  - ```pip3 install pre-commit```
+- Pipenv:
+  - ```pip3 install pipenv```
 
+### Steps
+1) Clone the repository
+2) Create local virtual environment with ```pip3 -m venv venv```
+3) Activate the virtual environment with ```source venv/bin/activate```
+3) Run `pipenv install --dev`
+4) Run `pre-commit install`
+5) Run tests with `pipenv run pytest tests`
 
 ## Demo App Usage
 If you are checking out this repository, you can use the Demo App as an example of 
