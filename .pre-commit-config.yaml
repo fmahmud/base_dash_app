@@ -3,7 +3,7 @@ repos:
     hooks:
       - id: create-issues-from-todos
         name: 'Create Issues from TODOs'
-        entry: python ./precommit_scripts/handle_todos.py
+        entry: pipenv run python3 ./precommit_scripts/handle_todos.py
         language: system
         always_run: true
         require_serial: true
