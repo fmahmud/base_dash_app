@@ -331,6 +331,15 @@ class CeleryTaskControls(ComponentWithInternalCallback):
                         "marginBottom": "20px"
                     },
                 ),
+                html.Div(
+                    children=[
+                        dbc.Alert(
+                            html.Pre(self.celery_task.get_status_message()),
+                            color=StatusesEnum.FAILURE.value.hex_color
+                        )
+                    ],
+                    style={"marginTop": "20px", "width": "100%", "float": "left"}
+                ) if not self.collapsed and self.celery_task.get_status() == StatusesEnum.FAILURE else None,
                 self.celery_task.render() if not self.collapsed else None,
                 html.Div(id={"type": CELERY_CONTROLS_STOP_BTN_ID, "index": self._instance_id}, style={"display": "none"})
                 if not self.show_stop_button else None,  # to prevent "a nonexistent object error"

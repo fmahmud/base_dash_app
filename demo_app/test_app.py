@@ -1,12 +1,14 @@
 import logging
 import os
+import time
 
 import dash_bootstrap_components as dbc
 from celery import Celery
 from dash_bootstrap_components.icons import FONT_AWESOME
 from dotenv import load_dotenv
 
-
+print("Waiting for db to start")
+time.sleep(3)
 load_dotenv()
 
 from base_dash_app.application.runtime_application import RuntimeApplication

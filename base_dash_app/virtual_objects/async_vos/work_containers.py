@@ -436,7 +436,8 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto
                 container for container in self.work_containers
                 if container.get_status() == StatusesEnum.FAILURE
             ]
-            message = f"{len(failure_containers)} / {len(self.work_containers)} - Failed"
+
+            message = f"{failure_containers[0].name} failed with:\n{failure_containers[0].get_status_message()}".strip()
         else:
             raise ValueError(f"Unknown status: {status}")
 
