@@ -86,28 +86,28 @@ class AsyncDemoView(BaseView):
                         ),
                         CeleryUnorderedTaskGroup(
                             require_all_success=True,
-                            name="Unordered Task Group 2",
+                            name="Unordered Task Group 2 asdf",
                             tasks=[
                                 CeleryTask(
                                     name="Task 5",
                                     work_func=celery_tasks.gen_graph_data
                                 ),
                                 CeleryTask(
-                                    name="Task 5",
+                                    name="Task 6",
                                     work_func=celery_tasks.gen_graph_data
                                 ),
                                 CeleryTask(
-                                    name="Task 5",
-                                    work_func=celery_tasks.gen_graph_data
+                                    name="Task 7",
+                                    work_func=celery_tasks.throw_exception_func
                                 ),
-                                # CeleryTask(
-                                #     name="Long Sleep Task",
-                                #     work_func=celery_tasks.long_sleep_task
-                                # ),
-                                # CeleryTask(
-                                #     name="Failure Task",
-                                #     work_func=celery_tasks.throw_exception_func
-                                # ),
+                                CeleryTask(
+                                    name="Long Sleep Task",
+                                    work_func=celery_tasks.long_sleep_task
+                                ),
+                                CeleryTask(
+                                    name="Failure Task",
+                                    work_func=celery_tasks.throw_exception_func
+                                ),
                             ],
                             reducer_task=combine_series  # not sure why this is highlighted
                         )
