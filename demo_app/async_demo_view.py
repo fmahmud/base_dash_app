@@ -86,7 +86,7 @@ class AsyncDemoView(BaseView):
                         ),
                         CeleryUnorderedTaskGroup(
                             require_all_success=True,
-                            name="Unordered Task Group 2 asdf",
+                            name="Unordered Task Group 2",
                             tasks=[
                                 CeleryTask(
                                     name="Task 5",
