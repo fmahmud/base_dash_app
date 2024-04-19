@@ -57,7 +57,7 @@ from base_dash_app.models.job_definition import JobDefinition
 from base_dash_app.virtual_objects.timeseries.time_series import TimeSeries
 from base_dash_app.virtual_objects.timeseries.time_series_data_point import TimeSeriesDataPoint
 from base_dash_app.virtual_objects.virtual_framework_obj import VirtualFrameworkObject
-
+import base64
 ALERTS_WRAPPER_INTERVAL_ID = "alerts-wrapper-interval-id"
 
 ALERTS_WRAPPER_DIV_ID = "alerts-wrapper-div-id"
@@ -118,9 +118,14 @@ class RuntimeApplication:
         self.app.logger.setLevel(app_descriptor.log_level or logging.INFO)
 
         if app_descriptor.use_auth:
+            secret_key = base64.b64encode(os.urandom(30)).decode('utf-8')
             self.auth = dash_auth.BasicAuth(
                 self.app,
-                app_descriptor.valid_user_pairs
+                app_descriptor.valid_user_pairs,
+                None,
+                None,
+                None,
+                secret_key
             )
 
         self.server = self.app.server

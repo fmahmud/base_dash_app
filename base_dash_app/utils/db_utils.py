@@ -1,3 +1,4 @@
+import logging
 from enum import Enum
 from threading import local
 
@@ -6,7 +7,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import event
 
 from base_dash_app.application.db_declaration import db
-
+from contextlib import contextmanager
 
 class DbEngineTypes(Enum):
     POSTGRES = 'postgresql://'
@@ -46,6 +47,7 @@ class DbManager:
     def __init__(self, db_descriptor: DbDescriptor, app: Flask):
         self.db_descriptor: DbDescriptor = db_descriptor
         self.connection_args = {}
+        self.logger = logging.getLogger(__name__)
 
         if self.db_descriptor.engine_type == DbEngineTypes.SQLITE:
             self.connection_args['check_same_thread'] = self.db_descriptor.check_same_thread
@@ -122,5 +124,9 @@ class DbManager:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         # Only pop the context if it exists for this thread.
-        if hasattr(self._thread_local_data, 'app_context'):
-            self._thread_local_data.app_context.pop()
+        if (hasattr(self._thread_local_data, 'app_context')
+                and self._thread_local_data.app_context is not None):
+            try:
+                self._thread_local_data.app_context.pop()
+            except Exception as e:
+                self.logger.error(f"Error popping app context: {e}")
