@@ -73,6 +73,7 @@ gunicorn = "*"
 celery = {extras = ["redis"], version = "*"}
 redis = "*"
 lxml = "*"
+async-timeout = "*"
 
 [dev-packages]
 pre-commit = "*"
@@ -86,7 +87,7 @@ aiohttp = "==3.9.0b0"
 pygithub = "*"
 
 [requires]
-python_version = "3.11"
+python_version = "3.9"
 
 [scripts]
 pre-commit = "pre-commit run --all-files"
