@@ -55,16 +55,19 @@ class CeleryHandlerService(BaseService):
     def revoke(self, celery_task: CeleryTask, *args, **kwargs):
         self.logger.info(f"revoking celery task {celery_task.name}")
         celery_task.set_read_only(False)
+        celery_task.fetch_all_from_redis()
 
         if isinstance(celery_task, CeleryOrderedTaskGroup):
             celery_task_as_group: CeleryOrderedTaskGroup = celery_task
             for task in celery_task_as_group.tasks:
+                task.set_read_only(False)
                 self.revoke(task)
 
             WorkContainerGroup.interrupt(celery_task_as_group, push_to_redis=True)
         elif isinstance(celery_task, CeleryUnorderedTaskGroup):
             celery_task_as_group: CeleryUnorderedTaskGroup = celery_task
             for task in celery_task_as_group.tasks:
+                task.set_read_only(False)
                 self.revoke(task)
 
             WorkContainerGroup.interrupt(celery_task_as_group, push_to_redis=True)
@@ -85,7 +88,7 @@ class CeleryHandlerService(BaseService):
         # convert this to use the id instead of the actual task - the task is not serializable
         celery_task.complete(
             # result="Stopped by User",
-            status=StatusesEnum.FAILURE,
-            status_message="Stopped by User",
+            status=StatusesEnum.CANCELLED,
+            status_message="Cancelled by User",
         )
 

@@ -17,12 +17,16 @@ class StatusesEnum(Enum):
     IN_PROGRESS = Status(4, "In Progress", "#009fff", "info")
     PENDING = Status(5, "Pending", "#91d6ff", "lightblue")
     NOT_STARTED = Status(6, "Not Started", "#aaaaaa", "grey")
+    CANCELLED = Status(7, "Cancelled", "#ff7900", "orange")
 
     def __str__(self):
         return self.value.name
 
     @staticmethod
     def get_by_name(name: str):
+        if name is None:
+            return None
+
         for e in StatusesEnum:
             if e.value.name.lower() == name.lower():
                 return e
@@ -31,6 +35,9 @@ class StatusesEnum(Enum):
 
     @staticmethod
     def get_by_id(id: int) -> 'StatusesEnum':
+        if id is None:
+            return None
+
         for e in StatusesEnum:
             if e.value.id == id:
                 return e
@@ -47,7 +54,11 @@ class StatusesEnum(Enum):
 
     @staticmethod
     def get_terminal_statuses():
-        return [StatusesEnum.SUCCESS, StatusesEnum.WARNING, StatusesEnum.FAILURE, StatusesEnum.NOT_STARTED]
+        return [
+            StatusesEnum.SUCCESS, StatusesEnum.WARNING,
+            StatusesEnum.FAILURE, StatusesEnum.NOT_STARTED,
+            StatusesEnum.CANCELLED
+        ]
 
     @staticmethod
     def get_non_terminal_statuses():
