@@ -165,12 +165,11 @@ class CeleryUnorderedTaskGroup(WorkContainerGroup, CeleryTask):
         # return own result
         # todo: should parse? add function to help get results?
         #   should reducer function be processed here?
-        return json.loads(self.redis_client.hget(self.uuid, "result"))
+        return json.loads(self.redis_client.hget(self.uuid, "result") or "[]")
 
     def add_task(self, task: CeleryTask):
         self.tasks.append(task)
         super().add_container(task)
-
 
     def signature(self, *args, prev_result_uuids: List[str], **kwargs):
         from base_dash_app.virtual_objects.async_vos import celery_helpers

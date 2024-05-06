@@ -3,7 +3,6 @@ import json
 from typing import Optional, Any, List, Dict
 
 import dash_bootstrap_components as dbc
-from celery.result import AsyncResult
 from dash import html
 from redis import StrictRedis
 
@@ -47,6 +46,7 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
     def interrupt(self, push_to_redis: bool = True):
         self.interrupted_by_user = True
         if push_to_redis:
+            self.set_status(StatusesEnum.CANCELLED, override_cancelled=True)
             self.set_value_in_redis("interrupted_by_user", str(self.interrupted_by_user))
 
     def check_for_interrupt(self):
@@ -79,7 +79,7 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
 
         return {
             "execution_status": (
-                self.execution_status.value.name if self.execution_status else StatusesEnum.NOT_STARTED.value.name
+                self.get_status().value.name if self.execution_status else StatusesEnum.NOT_STARTED.value.name
             ),
             "result": result,
             "start_time":  datetime.datetime.strftime(
@@ -141,6 +141,11 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
         return self.name
 
     def set_progress(self, progress: float):
+        # check if status is cancelled - if so don't update the progress
+        self.get_status()  # this will refresh the status
+        if self.execution_status == StatusesEnum.CANCELLED:
+            raise ValueError("Cannot update progress of a cancelled task")
+
         self.progress = progress
         self.set_value_in_redis("progress", str(progress))
 
@@ -149,7 +154,11 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
             self.status_message = status_message
             self.set_value_in_redis("status_message", status_message)
 
-    def set_status(self, status: StatusesEnum):
+    def set_status(self, status: StatusesEnum, override_cancelled=False):
+        # check if status is cancelled - if so don't update the status
+        self.get_status()  # this will refresh the status
+        if self.execution_status == StatusesEnum.CANCELLED and not override_cancelled:
+            return
         self.execution_status = status or StatusesEnum.NOT_STARTED
         self.set_value_in_redis("execution_status", self.execution_status.value.name)
 
@@ -245,6 +254,11 @@ class WorkContainer(BaseWorkContainer, BaseComponent, AbstractRedisDto):
         }"""
 
     def get_status(self) -> StatusesEnum:
+        if self.redis_client is not None:
+            status_name = self.get_value_from_redis("execution_status")
+            self.execution_status = (
+                    StatusesEnum.get_by_name(status_name) or self.execution_status or StatusesEnum.NOT_STARTED
+            )
         return self.execution_status
 
     def get_result(self, clear_result=False) -> Any:
@@ -320,6 +334,9 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto
             self.set_value_in_redis("interrupted_by_user", str(self.interrupted_by_user))
 
     def check_for_interrupt(self):
+        if self.redis_client is None:
+            return False
+
         interrupted = self.get_value_from_redis("interrupted_by_user")
         if interrupted and interrupted == "True":
             self.interrupted_by_user = True
@@ -438,6 +455,8 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto
             ]
 
             message = f"{failure_containers[0].name} failed with:\n{failure_containers[0].get_status_message()}".strip()
+        elif status == StatusesEnum.CANCELLED:
+            message = "Cancelled"
         else:
             raise ValueError(f"Unknown status: {status}")
 
@@ -459,6 +478,9 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto
 
         if self.get_num_failed() > 0:
             return StatusesEnum.FAILURE
+
+        if self.interrupted_by_user or self.get_num_cancelled() > 0:
+            return StatusesEnum.CANCELLED
 
         if (self.get_num_in_progress() + self.get_num_pending()) > 0:
             return StatusesEnum.IN_PROGRESS
@@ -491,7 +513,9 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto
 
     def get_end_time(self):
         return None if self.get_num_in_progress() > 0 else \
-            max([container.get_end_time() for container in self.work_containers])
+            max([
+                container.get_end_time() for container in self.work_containers if container.get_end_time() is not None
+            ])
 
     def get_progress(self):
         total_progress = sum(
@@ -535,6 +559,9 @@ class WorkContainerGroup(BaseWorkContainerGroup, BaseComponent, AbstractRedisDto
 
     def get_num_failed(self):
         return self.get_num_by_status(StatusesEnum.FAILURE)
+
+    def get_num_cancelled(self):
+        return self.get_num_by_status(StatusesEnum.CANCELLED)
 
     def get_latest_status_message(self):
         messages = [
