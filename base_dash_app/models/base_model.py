@@ -1,7 +1,7 @@
 import abc
 from abc import abstractmethod
 
-from flask_sqlalchemy import DefaultMeta
+from flask_sqlalchemy.model import DefaultMeta
 
 from base_dash_app.application.db_declaration import db
 
