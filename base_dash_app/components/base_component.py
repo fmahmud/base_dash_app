@@ -101,11 +101,13 @@ class ComponentWithInternalCallback(BaseComponent, VirtualFrameworkObject, ABC):
         @return:
         """
 
-        num_inputs = len(cls.get_input_to_states_map())
+        inputs = cls.get_input_to_states_map()
 
         # check if all inputs have an invalid state
-        # todo: invert this check to "any(valid...)
-        if all(invalid_n_clicks(i) for i in args[0:num_inputs]):
+        if all(
+                invalid_n_clicks(i) and not inputs[i].input.can_be_empty
+                for i in range(len(inputs))
+        ):
             raise PreventUpdate()
 
         # get triggering id

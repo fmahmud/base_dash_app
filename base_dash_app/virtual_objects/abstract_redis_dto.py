@@ -97,8 +97,12 @@ class AbstractRedisDto(abc.ABC):
 
         return self.from_dict(data)
 
-    def destroy_in_redis(self):
+    def destroy_in_redis(self, expire: int = 0):
         if self.redis_client is None:
             raise ValueError("Redis client is not set")
 
-        self.redis_client.delete(self.uuid)
+        if expire > 0:
+            self.redis_client.expire(self.uuid, expire)
+        else:
+            self.redis_client.delete(self.uuid)
+

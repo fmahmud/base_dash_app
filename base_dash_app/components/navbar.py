@@ -46,6 +46,7 @@ class NavBar(BaseComponent):
     def __init__(
         self, title: str, nav_items, *args,
         nav_groups: List[NavGroup] = None, extra_components=None,
+        show_cpu_usage=False, show_memory_usage=False,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
@@ -53,6 +54,8 @@ class NavBar(BaseComponent):
         self.title = title if title is not None else ""
         self.nav_groups = nav_groups if nav_groups is not None else []
         self.extra_components = extra_components if extra_components is not None else []
+        self.show_cpu_usage = show_cpu_usage
+        self.show_memory_usage = show_memory_usage
         self.memory_consumption_bar = html.Div(
             children=[
                 html.Div(
@@ -76,7 +79,8 @@ class NavBar(BaseComponent):
             ],
             style={
                 "position": "relative", "float": "left",
-                "width": "300px", "height": "20px"
+                "width": "300px", "height": "20px",
+                "display": "none" if not self.show_memory_usage else None
             }
         )
 
@@ -103,7 +107,8 @@ class NavBar(BaseComponent):
             ],
             style={
                 "position": "relative", "float": "left",
-                "width": "300px", "height": "20px", "marginTop": "5px"
+                "width": "300px", "height": "20px", "marginTop": "5px",
+                "display": "none" if not self.show_cpu_usage else None
             }
         )
 

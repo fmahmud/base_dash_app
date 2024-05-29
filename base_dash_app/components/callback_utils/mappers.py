@@ -7,7 +7,8 @@ class StateMapping:
     def __init__(
             self, state_id, state_property,
             *, is_dynamic=False, index=None,
-            additional_key=None, additional_value=None
+            additional_key=None, additional_value=None,
+            can_be_empty=False
     ):
         self._state_id = state_id
         self.state_property = state_property
@@ -15,6 +16,7 @@ class StateMapping:
         self.index: _Wildcard = index
         self.additional_key = additional_key
         self.additional_value = additional_value
+        self.can_be_empty = can_be_empty
 
     def get_id(self):
         if self.is_dynamic:
@@ -43,14 +45,18 @@ class StateMapping:
 
 class InputMapping:
     def __init__(
-            self, input_id, input_property, *, is_dynamic=False, index=None,
-            additional_key=None, additional_value=None):
+            self, input_id, input_property, *,
+            is_dynamic=False, index=None,
+            additional_key=None, additional_value=None,
+            can_be_empty=False
+    ):
         self._input_id = input_id
         self.input_property = input_property
         self.is_dynamic = is_dynamic
         self.index: _Wildcard = index
         self.additional_key = additional_key
         self.additional_value = additional_value
+        self.can_be_empty = can_be_empty
 
     def get_string_id(self):
         return self._input_id

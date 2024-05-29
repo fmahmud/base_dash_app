@@ -4,7 +4,7 @@ from dash import html
 
 class ThreeColumnCard(BaseComponent):
     def __init__(self):
-        pass
+        super().__init__()
 
     def render(self, column1_content, column2_content, column3_content, style_override=None):
         if style_override is None:

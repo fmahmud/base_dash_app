@@ -12,6 +12,7 @@ def construct_down_ref_btgrp(
     date_format="%Y-%m-%d", time_format="%H:%M:%S",
     disable_download_btn=False,
     disable_reload_btn=False,
+    hide_reload_btn=False,
     other_buttons=None,
     wrapper_style=None,
     download_content=None,
@@ -58,6 +59,7 @@ def construct_down_ref_btgrp(
                         id=reload_btn_id,
                         style={
                             "fontSize": "25px", "width": "65px",
+                            "display": "none" if hide_reload_btn else None
                         },
                         color="secondary",
                         disabled=disable_reload_btn or reload_in_progress

@@ -51,6 +51,8 @@ class AppDescriptor:
             redis_use_ssl: bool = False,
             redis_username: str = None,
             redis_password: str = None,
+            show_navbar_cpu_usage: bool = False,
+            show_navbar_memory_usage: bool = False,
     ):
         """
         :param global_inputs: 
@@ -88,6 +90,8 @@ class AppDescriptor:
         :param redis_use_ssl: If True, uses SSL for the redis server
         :param redis_username: Username for the redis server. Required if redis_use_ssl is True. Default value is "default"
         :param redis_password: Password for the redis server. Required if redis_use_ssl is True. Default value is "password"
+        :param show_navbar_cpu_usage: If True, shows the CPU usage in the navbar
+        :param show_navbar_memory_usage: If True, shows the memory usage in the navbar
         """
 
         self.db_descriptor: DbDescriptor = db_descriptor
@@ -124,3 +128,5 @@ class AppDescriptor:
         self.redis_use_ssl = redis_use_ssl
         self.redis_username = redis_username
         self.redis_password = redis_password
+        self.show_navbar_cpu_usage = show_navbar_cpu_usage
+        self.show_navbar_memory_usage = show_navbar_memory_usage

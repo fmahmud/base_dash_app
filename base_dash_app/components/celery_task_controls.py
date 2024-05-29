@@ -1,6 +1,7 @@
 import json
 import pprint
-from typing import Optional, Callable, Dict, Any
+import traceback
+from typing import Optional, Callable, Dict, Any, Mapping
 
 from dash import html, dcc
 import dash_bootstrap_components as dbc
@@ -37,11 +38,12 @@ class CeleryTaskControls(ComponentWithInternalCallback):
             download_formatter_func=lambda x: json.dumps(x),
             download_file_format="json",
             extra_buttons=None,
-            get_kwargs_func: Callable[[CeleryOrderedTaskGroup], Dict[str, Any]] = None,
+            get_kwargs_func: Callable[[CeleryOrderedTaskGroup, Dict[str, Any]], Dict[str, Any]] = None,
             right_align=False,
             show_name=True,
             show_stop_button=False,
             stop_button_callback: Optional[Callable[['CeleryTaskControls'], Any]] = None,
+            show_reload_button=True,
             *args,
             **kwargs
     ):
@@ -61,6 +63,7 @@ class CeleryTaskControls(ComponentWithInternalCallback):
         if not self.get_kwargs_func:
             self.get_kwargs_func = lambda *_, **__: {}
 
+        self.show_reload_button = show_reload_button
         self.show_download_button = show_download_button
         self.collapsable = collapsable
         self.collapsed = True
@@ -85,6 +88,39 @@ class CeleryTaskControls(ComponentWithInternalCallback):
         self.show_stop_button = show_stop_button
         self.stop_button_callback = stop_button_callback
 
+    def start(self, kwargs_func_additional_args=None):
+        if kwargs_func_additional_args is None:
+            kwargs_func_additional_args = {}
+
+        self.in_progress = True
+
+        from base_dash_app.services.celery_handler_service import CeleryHandlerService
+        celery_service: CeleryHandlerService = self.get_service(CeleryHandlerService)
+        try:
+            celery_service.submit_celery_task(
+                celery_task=self.cotg,
+                prev_result_uuids=[],
+                **self.get_kwargs_func(self.cotg, **kwargs_func_additional_args),
+            )
+        except ValueError as ve:
+            stacktrace = traceback.format_exc()
+            self.in_progress = False
+            self.push_alert(
+                Alert(
+                    body=f"Error submitting celery task: {ve}. Stacktrace: {stacktrace}",
+                    color="danger"
+                )
+            )
+        except Exception as e:
+            stacktrace = traceback.format_exc()
+            self.in_progress = False
+            self.push_alert(
+                Alert(
+                    body=f"Error submitting celery task: {e}. Stacktrace: {stacktrace}",
+                    color="danger"
+                )
+            )
+
     @classmethod
     def handle_any_input(cls, *args, triggering_id, instance):
         instance: CeleryTaskControls = instance
@@ -99,29 +135,7 @@ class CeleryTaskControls(ComponentWithInternalCallback):
                 instance.download_content = cotg.get_result()
 
         if triggering_id.startswith(RELOAD_CELERY_TASK_BTN_ID):
-            instance.in_progress = True
-            try:
-                celery_service.submit_celery_task(
-                    celery_task=cotg,
-                    prev_result_uuids=[],
-                    **instance.get_kwargs_func(cotg)
-                )
-            except ValueError as ve:
-                instance.in_progress = False
-                instance.push_alert(
-                    Alert(
-                        body=f"Error submitting celery task: {ve}",
-                        color="danger"
-                    )
-                )
-            except Exception as e:
-                instance.in_progress = False
-                instance.push_alert(
-                    Alert(
-                        body=f"Error submitting celery task: {e}",
-                        color="danger"
-                    )
-                )
+            instance.start()
 
         elif triggering_id.startswith(CELERY_CONTROLS_EXPAND_BTN_ID):
             instance.collapsed = not instance.collapsed
@@ -199,7 +213,7 @@ class CeleryTaskControls(ComponentWithInternalCallback):
 
         ]
 
-    def render(self, override_style=None, extra_text=None):
+    def render(self, override_style=None, extra_text=None, last_loaded_override=None,):
         if override_style is None:
             override_style = {}
 
@@ -207,7 +221,8 @@ class CeleryTaskControls(ComponentWithInternalCallback):
             children=[
                 self.__render_controls(
                     extra_text=extra_text or self.extra_text,
-                    right_align=self.right_align
+                    right_align=self.right_align,
+                    last_loaded_override=last_loaded_override
                 )
             ],
             style={
@@ -220,7 +235,7 @@ class CeleryTaskControls(ComponentWithInternalCallback):
             id={"type": CeleryTaskControls.get_wrapper_div_id(), "index": self._instance_id}
         )
 
-    def __render_controls(self, extra_text=None, right_align=False):
+    def __render_controls(self, extra_text=None, right_align=False, last_loaded_override=None):
         other_buttons = []
         other_buttons.append(
             dbc.Button(
@@ -310,7 +325,7 @@ class CeleryTaskControls(ComponentWithInternalCallback):
                                 "margin": "0",
                                 "clear": "right" if self.right_align else "left",
                             },
-                            last_load_time=self.celery_task.get_start_time(with_refresh=True),
+                            last_load_time=last_loaded_override or self.celery_task.get_start_time(with_refresh=True),
                             other_buttons=other_buttons + self.extra_buttons,
                             right_align=right_align,
                             hide_stop_button=not self.show_stop_button,
@@ -321,6 +336,7 @@ class CeleryTaskControls(ComponentWithInternalCallback):
                             disable_stop_button=not in_progress or (
                                     self.celery_task is None or self.celery_task.celery_task_id is None
                             ),
+                            hide_reload_btn=not self.show_reload_button,
                         ),
                     ],
                     style={
