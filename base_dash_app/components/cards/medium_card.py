@@ -5,6 +5,7 @@ from base_dash_app.components.base_component import BaseComponent
 
 class MediumCard(BaseComponent):
     def __init__(self, title, body, left_complication=None, right_complication=None, style=None):
+        super().__init__()
         self.title = title
         self.body = body
         self.style = style if style is not None else {}

@@ -27,6 +27,12 @@ class CeleryHandlerService(BaseService):
         else:
             celery_task.reset(destroy_in_redis=True)
 
+    def clear_old_task_result(self, task_id):
+        """Clear old task result from Redis to avoid conflicts."""
+        if task_id:
+            async_result = AsyncResult(task_id)
+            async_result.forget()
+
     def submit_celery_task(self, celery_task: CeleryTask, *args, **kwargs):
         redis_client: StrictRedis = self.redis_client
         if not redis_client.ping():
@@ -41,6 +47,9 @@ class CeleryHandlerService(BaseService):
         # todo: maybe think of pulling push_to_redis out as a separate step outside of signature
         if "prev_result_uuids" not in kwargs:
             kwargs["prev_result_uuids"] = []
+
+        if celery_task.celery_task_id:
+            self.clear_old_task_result(celery_task.celery_task_id)
 
         async_result: AsyncResult = celery_task.signature(**kwargs).apply_async(countdown=2)
 

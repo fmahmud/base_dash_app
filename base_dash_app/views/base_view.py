@@ -57,7 +57,10 @@ class BaseView(VirtualFrameworkObject, BaseComponent, ABC):
         )
 
     def _pre_handle_any_input(self, *args):
-        if all(invalid_n_clicks(i) for i in args[0:len(self.input_to_states_map)]):
+        if all(
+                invalid_n_clicks(args[i]) and not self.input_to_states_map[i].input.can_be_empty
+                for i in range(len(self.input_to_states_map))
+        ):
             raise PreventUpdate()
 
         # view specific validation

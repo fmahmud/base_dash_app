@@ -543,7 +543,9 @@ class RuntimeApplication:
             title=self.app_descriptor.title,
             nav_items=nav_items,
             nav_groups=nav_groups,
-            extra_components=extra_components
+            extra_components=extra_components,
+            show_cpu_usage=self.app_descriptor.show_navbar_cpu_usage,
+            show_memory_usage=self.app_descriptor.show_navbar_memory_usage
         )
 
     def get_layout(self):
