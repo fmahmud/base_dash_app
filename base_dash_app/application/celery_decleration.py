@@ -23,6 +23,7 @@ class CelerySingleton:
             redis_username = os.getenv("REDIS_USERNAME", None)
             redis_host = os.getenv("REDIS_HOST", None)
             redis_port = int(os.getenv("REDIS_PORT", "6379"))
+            redis_db_number = int(os.getenv("REDIS_DB_NUMBER", "0"))
 
             url_args = {}
 
@@ -42,7 +43,7 @@ class CelerySingleton:
 
                 self.celery_broker_url = as_url(
                     **url_args
-                ) + f"0?ssl_cert_reqs=CERT_REQUIRED"
+                ) + f"{redis_db_number}?ssl_cert_reqs=CERT_REQUIRED"
 
                 print(self.celery_broker_url)
                 self.broker_use_ssl = {
@@ -64,7 +65,7 @@ class CelerySingleton:
 
                 self.celery_broker_url = as_url(
                     **url_args
-                ) + "0"
+                ) + f"{redis_db_number}"
                 self.broker_use_ssl = {}
 
             if self.celery_broker_url is None:
