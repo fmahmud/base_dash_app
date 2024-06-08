@@ -1,6 +1,6 @@
 import datetime
 from math import floor, log, isnan
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from dash import html
 from dash.exceptions import PreventUpdate
@@ -147,7 +147,7 @@ class TsdpSparklineStatCard(ComponentWithInternalCallback):
         self.show_expand_button = show_expand_button
         self.lower_is_better = lower_is_better
 
-        self.values: Dict[TimePeriodsEnum, LabelledValueChip] = {
+        self.values: Dict[TimePeriodsEnum, Optional[LabelledValueChip]] = {
             time_period: None for time_period in self.time_periods_to_show
         }
 
