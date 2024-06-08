@@ -131,6 +131,7 @@ class LineGraph(BaseComponent):
         show_legend=False,
         align_y_axes=True,
         style=None,
+        show_title=False
     ):
         if style is None:
             style = {}
@@ -153,6 +154,12 @@ class LineGraph(BaseComponent):
                 "barmode": self.barmode,
             }
         )
+
+        if show_title:
+            figure.update_layout(
+                title=self.title or "",
+                margin={'l': 30, 'r': 10, 'b': 30, 't': 120},
+            )
 
         for g_series in self.graphable_series:
             figure.add_trace(
